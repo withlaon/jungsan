@@ -20,13 +20,19 @@ function LoginForm() {
   const supabase = createClient()
   const redirectTo = searchParams.get('redirect') ?? '/dashboard'
 
-  // /login 접속 시 메인(/)으로 리다이렉트 (로그인 페이지는 메인에 있음)
+  // 이미 로그인된 경우 → redirect 파라미터 또는 대시보드로 이동
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+      }
+    })
+    // /login 경로로 직접 접속 시 루트(/)로 이동
     if (typeof window !== 'undefined' && window.location.pathname === '/login') {
       const qs = searchParams.toString()
       router.replace(qs ? `/?${qs}` : '/')
     }
-  }, [router, searchParams])
+  }, [router, searchParams, redirectTo])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
