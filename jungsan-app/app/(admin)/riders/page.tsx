@@ -108,10 +108,21 @@ export default function RidersPage() {
   const fetchRiders = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    let q = supabase.from('riders').select('*').order('name')
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const { data } = await q
-    if (data) setRiders(data)
+    try {
+      let q = supabase.from('riders').select('*').order('name')
+      if (!isAdmin && userId) q = q.or(`user_id.eq.${userId},user_id.is.null`)
+      const { data, error } = await q
+      if (error) throw error
+      setRiders(data ?? [])
+    } catch {
+      try {
+        const res = await fetch('/api/admin/riders')
+        const apiData = await res.json()
+        setRiders(res.ok && Array.isArray(apiData) ? apiData : [])
+      } catch {
+        setRiders([])
+      }
+    }
     setLoading(false)
   }
 
@@ -177,20 +188,58 @@ export default function RidersPage() {
       }
       toast.success('라이더 정보가 수정되었습니다.')
     } else {
-      const { error } = await supabase.rpc('insert_rider', {
-        p_join_date: form.join_date || null,
-        p_name: form.name.trim(),
-        p_rider_username: form.rider_username.trim() || null,
-        p_id_number: form.id_number.trim() || null,
-        p_phone: form.phone.trim() || null,
-        p_bank_name: form.bank_name.trim() || null,
-        p_bank_account: form.bank_account.trim() || null,
-        p_account_holder: form.account_holder.trim() || null,
-        p_status: form.status,
-      })
+      let error: { message: string } | null = null
+      if (userId) {
+        const res = await supabase.rpc('insert_rider', {
+          p_user_id: userId,
+          p_join_date: form.join_date || null,
+          p_name: form.name.trim(),
+          p_rider_username: form.rider_username.trim() || null,
+          p_id_number: form.id_number.trim() || null,
+          p_phone: form.phone.trim() || null,
+          p_bank_name: form.bank_name.trim() || null,
+          p_bank_account: form.bank_account.trim() || null,
+          p_account_holder: form.account_holder.trim() || null,
+          p_status: form.status,
+        })
+        error = res.error
+      } else {
+        const res = await supabase.rpc('insert_rider', {
+          p_join_date: form.join_date || null,
+          p_name: form.name.trim(),
+          p_rider_username: form.rider_username.trim() || null,
+          p_id_number: form.id_number.trim() || null,
+          p_phone: form.phone.trim() || null,
+          p_bank_name: form.bank_name.trim() || null,
+          p_bank_account: form.bank_account.trim() || null,
+          p_account_holder: form.account_holder.trim() || null,
+          p_status: form.status,
+        })
+        error = res.error
+      }
       if (error) {
-        const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : '등록 실패: ' + error.message
-        toast.error(msg); setSaving(false); return
+        const res = await fetch('/api/admin/rider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            join_date: form.join_date || null,
+            name: form.name.trim(),
+            rider_username: form.rider_username.trim() || null,
+            id_number: form.id_number.trim() || null,
+            phone: form.phone.trim() || null,
+            bank_name: form.bank_name.trim() || null,
+            bank_account: form.bank_account.trim() || null,
+            account_holder: form.account_holder.trim() || null,
+            status: form.status,
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const msg = data?.error ?? (/unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : '등록 실패')
+          toast.error(msg)
+          setSaving(false)
+          return
+        }
       }
       toast.success('라이더가 등록되었습니다.')
     }
@@ -321,28 +370,50 @@ export default function RidersPage() {
     if (validRows.length === 0) { toast.error('등록 가능한 데이터가 없습니다.'); return }
     setBulkSaving(true)
 
-    const payload = validRows.map(r => ({
-      join_date: r.join_date || null,
-      name: r.name,
-      rider_username: r.rider_username || null,
-      id_number: r.id_number || null,
-      phone: r.phone || null,
-      bank_name: r.bank_name || null,
-      bank_account: r.bank_account || null,
-      account_holder: r.account_holder || null,
-      status: 'active',
-    }))
+    try {
+      const payload = validRows.map(r => ({
+        join_date: r.join_date || null,
+        name: r.name,
+        rider_username: r.rider_username || null,
+        id_number: r.id_number || null,
+        phone: r.phone || null,
+        bank_name: r.bank_name || null,
+        bank_account: r.bank_account || null,
+        account_holder: r.account_holder || null,
+        status: 'active',
+      }))
 
-    const { error } = await supabase.rpc('insert_riders_bulk', {
-      p_riders: payload,
-    })
-    if (error) { toast.error('저장 실패: ' + error.message); setBulkSaving(false); return }
-    toast.success(`${validRows.length}명의 라이더가 등록되었습니다.`)
-    setBulkSaving(false)
-    setBulkDialogOpen(false)
-    setBulkRows([])
-    setBulkFileName('')
-    fetchRiders()
+      let ok = false
+      if (userId) {
+        const { error } = await supabase.rpc('insert_riders_bulk', { p_user_id: userId, p_riders: payload })
+        ok = !error
+        if (error) {
+          const res = await fetch('/api/admin/riders-bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ riders: payload }) })
+          const data = await res.json().catch(() => ({}))
+          ok = res.ok
+          if (!ok) toast.error('저장 실패: ' + (data?.error ?? res.statusText))
+        }
+      } else {
+        const { error } = await supabase.rpc('insert_riders_bulk', { p_riders: payload })
+        ok = !error
+        if (error) {
+          const res = await fetch('/api/admin/riders-bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ riders: payload }) })
+          const data = await res.json().catch(() => ({}))
+          ok = res.ok
+          if (!ok) toast.error('저장 실패: ' + (data?.error ?? res.statusText))
+        }
+      }
+
+      if (ok) {
+        toast.success(`${validRows.length}명의 라이더가 등록되었습니다.`)
+        setBulkDialogOpen(false)
+        setBulkRows([])
+        setBulkFileName('')
+        fetchRiders()
+      }
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   const activeCount = riders.filter(r => r.status === 'active').length

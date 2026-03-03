@@ -1,0 +1,13 @@
+{
+  "name": "jungsan",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd jungsan-app && npm install",
+    "sync:watch": "node scripts/auto-sync.js",
+    "dev": "cd jungsan-app && npm run dev",
+    "build": "cd jungsan-app && npm run build",
+    "start": "cd jungsan-app && npm run start",
+    "lint": "cd jungsan-app && npm run lint",
+    "install:app": "cd jungsan-app && npm install"
+  }
+}

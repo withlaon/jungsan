@@ -9,8 +9,8 @@
 ## GitHub 동기화
 
 - **원격 저장소**: https://github.com/withlaon/jungsan
-- **자동 푸시**: `git commit` 시 자동으로 GitHub에 푸시됩니다 (post-commit 훅)
-- 수정 후 동기화: `git add .` → `git commit -m "메시지"` → 자동 푸시
+- **실시간 자동 푸시**: `npm run sync:watch` 실행 시 30초마다 변경사항을 자동 커밋 & 푸시
+- **수동 푸시**: `git add .` → `git commit -m "메시지"` → post-commit 훅으로 자동 푸시
 
 ## 시작하기
 
