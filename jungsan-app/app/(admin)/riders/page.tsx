@@ -156,7 +156,7 @@ export default function RidersPage() {
   const checkUsernamedup = (val: string, currentId?: string) => {
     if (!val.trim()) { setUsernameError(''); return }
     const dup = riders.some(r =>
-      r.rider_username === val.trim() && r.id !== currentId
+      (r.rider_username ?? '').toLowerCase() === val.trim().toLowerCase() && r.id !== currentId
     )
     setUsernameError(dup ? '이미 사용 중인 아이디입니다.' : '')
   }
@@ -166,6 +166,20 @@ export default function RidersPage() {
       toast.error('라이더명을 입력해주세요.')
       return
     }
+
+    // 저장 직전 아이디 중복 최종 검증
+    if (form.rider_username.trim()) {
+      const dup = riders.some(
+        r => (r.rider_username ?? '').toLowerCase() === form.rider_username.trim().toLowerCase()
+          && r.id !== editingRider?.id
+      )
+      if (dup) {
+        setUsernameError('이미 사용 중인 아이디입니다.')
+        toast.error('이미 사용 중인 아이디입니다. 다른 아이디를 사용해주세요.')
+        return
+      }
+    }
+
     if (usernameError) {
       toast.error('아이디 중복을 확인해주세요.')
       return
