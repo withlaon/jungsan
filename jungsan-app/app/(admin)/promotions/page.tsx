@@ -194,6 +194,13 @@ export default function PromotionsPage() {
   const [detailGroup, setDetailGroup] = useState<PromoGroup | null>(null)
   const setF = (patch: Partial<ReturnType<typeof initForm>>) => setForm(f => ({ ...f, ...patch }))
 
+  // 상세 다이얼로그 탭/수정/추가 상태
+  const [detailTab, setDetailTab] = useState<'info' | 'add' | 'edit'>('info')
+  const [detailAddIds, setDetailAddIds] = useState<string[]>([])
+  const [detailEditForm, setDetailEditForm] = useState(initForm())
+  const [detailSaving, setDetailSaving] = useState(false)
+  const setDE = (patch: Partial<ReturnType<typeof initForm>>) => setDetailEditForm(f => ({ ...f, ...patch }))
+
   useEffect(() => {
     if (!userLoading && (isAdmin || userId)) fetchData()
   }, [userLoading, userId, isAdmin])
@@ -242,9 +249,26 @@ export default function PromotionsPage() {
     })
   }, [promotions])
 
-  // 상세 다이얼로그 열 때, detailGroup 갱신
   const openDetail = (g: PromoGroup) => {
-    // promotions 최신 상태 기준으로 재조회
+    setDetailTab('info')
+    setDetailAddIds([])
+    setDetailEditForm({
+      ...initForm(),
+      target_type: g.type,
+      promo_kind: g.promo_kind,
+      date_mode: g.date_mode,
+      week_start: g.week_start ?? weekOptions[0]?.value ?? '',
+      deadline_date: g.deadline_date ?? '',
+      amount: g.promo_kind === 'fixed' ? String(g.amount) : '',
+      per_count_amount: g.promo_kind === 'per_count' ? String(g.amount) : '',
+      per_count_min: g.promo_kind === 'per_count' ? String(g.per_count_min ?? '') : '',
+      ranges: g.ranges
+        ? g.ranges.map(r => ({ min_count: String(r.min_count), max_count: r.max_count !== null ? String(r.max_count) : '', amount: String(r.amount) }))
+        : [{ min_count: '', max_count: '', amount: '' }],
+      description: g.description ?? '',
+      rider_ids: [],
+      rider_id: '',
+    })
     const fresh = promotions.filter(p => groupKey(p) === g.key)
     setDetailGroup({ ...g, promos: fresh })
   }
@@ -301,6 +325,64 @@ export default function PromotionsPage() {
       if (fresh.length === 0) setDetailGroup(null)
       else setDetailGroup(g => g ? { ...g, promos: fresh } : null)
     }
+  }
+
+  const handleAddRidersToGroup = async (g: PromoGroup) => {
+    if (detailAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
+    setDetailSaving(true)
+    const existing = new Set(g.promos.map(p => p.rider_id).filter(Boolean))
+    const newIds = detailAddIds.filter(id => !existing.has(id))
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
+    const base: Record<string, unknown> = {
+      type: g.type, promo_kind: g.promo_kind, amount: g.amount, ranges: g.ranges,
+      per_count_min: g.per_count_min, date_mode: g.date_mode,
+      week_start: g.week_start, deadline_date: g.deadline_date,
+      description: g.description, settlement_id: null,
+    }
+    if (userId) base.user_id = userId
+    const { error } = await supabase.from('promotions').insert(newIds.map(id => ({ ...base, rider_id: id })))
+    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    setDetailAddIds([])
+    setDetailSaving(false)
+    setDetailTab('info')
+    fetchData()
+  }
+
+  const handleEditGroup = async (g: PromoGroup) => {
+    const f = detailEditForm
+    if (!f.description.trim()) { toast.error('프로모션 이름을 입력해주세요.'); return }
+    let finalAmount = 0, finalRanges: PromoRange[] | null = null, finalPerCountMin: number | null = null
+    if (f.promo_kind === 'fixed') {
+      const a = parseInt(f.amount.replace(/,/g, ''))
+      if (isNaN(a) || a <= 0) { toast.error('올바른 금액을 입력해주세요.'); return }
+      finalAmount = a
+    } else if (f.promo_kind === 'per_count') {
+      const a = parseInt(f.per_count_amount.replace(/,/g, ''))
+      if (isNaN(a) || a <= 0) { toast.error('초과 건당 금액을 입력해주세요.'); return }
+      finalAmount = a
+      const m = parseInt(f.per_count_min)
+      if (isNaN(m) || m < 1) { toast.error('올바른 최소 건수를 입력해주세요.'); return }
+      finalPerCountMin = m
+    } else {
+      const parsed = f.ranges.map(r => ({ min_count: parseInt(r.min_count) || 0, max_count: r.max_count.trim() ? parseInt(r.max_count) : null, amount: parseInt(r.amount) || 0 }))
+      if (parsed.some(r => r.amount <= 0)) { toast.error('각 구간의 금액을 입력해주세요.'); return }
+      finalRanges = parsed
+    }
+    setDetailSaving(true)
+    const updates = {
+      promo_kind: f.promo_kind, amount: finalAmount, ranges: finalRanges,
+      per_count_min: finalPerCountMin, date_mode: f.date_mode,
+      week_start: f.date_mode === 'week' ? f.week_start : null,
+      deadline_date: f.date_mode === 'deadline' ? f.deadline_date : null,
+      description: f.description.trim(),
+    }
+    const { error } = await supabase.from('promotions').update(updates).in('id', g.promos.map(p => p.id))
+    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success('프로모션이 수정되었습니다.')
+    setDetailTab('info')
+    setDetailSaving(false)
+    fetchData()
   }
 
   const handleDeleteGroup = async (g: PromoGroup) => {
@@ -435,6 +517,7 @@ export default function PromotionsPage() {
             const title = g.description || promoAutoName(g.promos[0])
             const namedPromos = g.promos.filter(p => p.riders?.name)
             const unnamedPromos = g.promos.filter(p => !p.riders?.name)
+            const alreadyAppliedIds = new Set(g.promos.map(p => p.rider_id).filter(Boolean))
             return (
               <>
                 <DialogHeader>
@@ -443,73 +526,175 @@ export default function PromotionsPage() {
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-5 py-2">
-                  {/* 프로모션 내용 */}
-                  <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
-                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">프로모션 내용</p>
-                    <InfoRow label="종류" value={<Badge className={`text-xs ${kindColor(g.promo_kind)}`}>{kindLabel(g.promo_kind)}</Badge>} />
-                    <InfoRow label="금액/조건" value={<span className="text-violet-300 font-medium text-sm">{amountText(g)}</span>} />
-                    <InfoRow label="대상 기간" value={
-                      g.date_mode === 'none'
-                        ? <span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5" />매주 자동 적용</span>
-                        : <span className="text-slate-300 text-sm">{periodText(g)}</span>
-                    } />
-                    <InfoRow label="적용 대상" value={
-                      g.type === 'global'
-                        ? <Badge className="text-xs bg-emerald-900/40 text-emerald-300">전체</Badge>
-                        : <Badge className="text-xs bg-blue-900/40 text-blue-300">라이더별</Badge>
-                    } />
-                  </div>
+                {/* 탭 */}
+                <div className="flex gap-0 border-b border-slate-700 mb-2">
+                  {([['info', '상세 정보'], ['add', '라이더 추가'], ['edit', '내용 수정']] as const).map(([tab, label]) => (
+                    <button key={tab} type="button" onClick={() => setDetailTab(tab)}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${detailTab === tab ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
 
-                  {/* 적용 라이더 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5" />적용 라이더
-                      </p>
-                      <span className="text-slate-500 text-xs">{g.promos.length}건</span>
+                {/* 탭: 상세 정보 */}
+                {detailTab === 'info' && (
+                  <div className="space-y-5 py-2">
+                    <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
+                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">프로모션 내용</p>
+                      <InfoRow label="종류" value={<Badge className={`text-xs ${kindColor(g.promo_kind)}`}>{kindLabel(g.promo_kind)}</Badge>} />
+                      <InfoRow label="금액/조건" value={<span className="text-violet-300 font-medium text-sm">{amountText(g)}</span>} />
+                      <InfoRow label="대상 기간" value={
+                        g.date_mode === 'none'
+                          ? <span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5" />매주 자동 적용</span>
+                          : <span className="text-slate-300 text-sm">{periodText(g)}</span>
+                      } />
+                      <InfoRow label="적용 대상" value={
+                        g.type === 'global'
+                          ? <Badge className="text-xs bg-emerald-900/40 text-emerald-300">전체</Badge>
+                          : <Badge className="text-xs bg-blue-900/40 text-blue-300">라이더별</Badge>
+                      } />
                     </div>
-
-                    {unnamedPromos.length > 0 && (
-                      <div className="flex items-center justify-between px-3 py-2.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg mb-2">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-emerald-400" />
-                          <span className="text-emerald-300 text-sm font-medium">전체 라이더 적용</span>
-                        </div>
-                        {unnamedPromos.map(p => (
-                          <button key={p.id} type="button" onClick={() => handleDeleteOne(p.id)}
-                            className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-900/20">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        ))}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" />적용 라이더
+                        </p>
+                        <span className="text-slate-500 text-xs">{g.promos.length}건</span>
                       </div>
-                    )}
-
-                    {namedPromos.length > 0 && (
-                      <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                        {namedPromos.map(p => (
-                          <div key={p.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <UserCircle className="h-4 w-4 text-slate-500" />
-                              <span className="text-white text-sm font-medium">{p.riders!.name}</span>
-                              {p.riders!.rider_username && (
-                                <span className="text-slate-500 text-xs">@{p.riders!.rider_username}</span>
-                              )}
-                            </div>
-                            <button type="button" onClick={() => handleDeleteOne(p.id)}
+                      {unnamedPromos.length > 0 && (
+                        <div className="flex items-center justify-between px-3 py-2.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg mb-2">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-emerald-400" />
+                            <span className="text-emerald-300 text-sm font-medium">전체 라이더 적용</span>
+                          </div>
+                          {unnamedPromos.map(p => (
+                            <button key={p.id} type="button" onClick={() => handleDeleteOne(p.id)}
                               className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-900/20">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
-                          </div>
+                          ))}
+                        </div>
+                      )}
+                      {namedPromos.length > 0 && (
+                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                          {namedPromos.map(p => (
+                            <div key={p.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <UserCircle className="h-4 w-4 text-slate-500" />
+                                <span className="text-white text-sm font-medium">{p.riders!.name}</span>
+                                {p.riders!.rider_username && <span className="text-slate-500 text-xs">@{p.riders!.rider_username}</span>}
+                              </div>
+                              <button type="button" onClick={() => handleDeleteOne(p.id)}
+                                className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-900/20">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {namedPromos.length === 0 && unnamedPromos.length === 0 && (
+                        <p className="text-slate-500 text-sm text-center py-4">적용 라이더 없음</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 탭: 라이더 추가 */}
+                {detailTab === 'add' && (
+                  <div className="space-y-4 py-2">
+                    <p className="text-slate-400 text-sm">이 프로모션에 추가로 적용할 라이더를 선택하세요.</p>
+                    <RiderMultiSelect
+                      riders={riders.filter(r => !alreadyAppliedIds.has(r.id))}
+                      values={detailAddIds}
+                      onChange={setDetailAddIds}
+                    />
+                    {detailAddIds.length > 0 && (
+                      <p className="text-blue-400 text-xs">{detailAddIds.length}명 선택됨</p>
+                    )}
+                    <Button
+                      onClick={() => handleAddRidersToGroup(g)}
+                      disabled={detailSaving || detailAddIds.length === 0}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      {detailSaving ? '추가 중...' : `라이더 ${detailAddIds.length}명 추가`}
+                    </Button>
+                  </div>
+                )}
+
+                {/* 탭: 내용 수정 */}
+                {detailTab === 'edit' && (
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">프로모션 이름 <span className="text-red-400">*</span></Label>
+                      <input value={detailEditForm.description} onChange={e => setDE({ description: e.target.value })}
+                        placeholder="프로모션 이름" className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">프로모션 종류</Label>
+                      <div className="flex gap-2">
+                        {([{ value: 'fixed', label: '고정금액' }, { value: 'range', label: '건수구간' }, { value: 'per_count', label: '건수별' }] as const).map(opt => (
+                          <button key={opt.value} type="button" onClick={() => setDE({ promo_kind: opt.value })}
+                            className={`flex-1 py-2 px-2 rounded-md text-sm font-medium border transition-all ${detailEditForm.promo_kind === opt.value ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
+                            {opt.label}
+                          </button>
                         ))}
                       </div>
+                    </div>
+                    {detailEditForm.promo_kind === 'fixed' && (
+                      <div className="space-y-1.5">
+                        <Label className="text-slate-300">금액</Label>
+                        <input type="number" value={detailEditForm.amount} onChange={e => setDE({ amount: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                      </div>
                     )}
-
-                    {namedPromos.length === 0 && unnamedPromos.length === 0 && (
-                      <p className="text-slate-500 text-sm text-center py-4">적용 라이더 없음</p>
+                    {detailEditForm.promo_kind === 'per_count' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-slate-300">최소 건수</Label>
+                          <input type="number" value={detailEditForm.per_count_min} onChange={e => setDE({ per_count_min: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-slate-300">건당 금액</Label>
+                          <input type="number" value={detailEditForm.per_count_amount} onChange={e => setDE({ per_count_amount: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                        </div>
+                      </div>
                     )}
+                    {detailEditForm.promo_kind === 'range' && (
+                      <div className="space-y-1.5">
+                        <Label className="text-slate-300">건수 구간별 금액</Label>
+                        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                          <RangeEditor ranges={detailEditForm.ranges} onChange={r => setDE({ ranges: r })} />
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">대상 기간</Label>
+                      <div className="flex gap-2">
+                        {([{ value: 'week', label: '주간 선택' }, { value: 'deadline', label: '마감일 지정' }, { value: 'none', label: '미지정 (매주)' }] as const).map(opt => (
+                          <button key={opt.value} type="button" onClick={() => setDE({ date_mode: opt.value })}
+                            className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border transition-all ${detailEditForm.date_mode === opt.value ? 'bg-violet-700 border-violet-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      {detailEditForm.date_mode === 'week' && (
+                        <select value={detailEditForm.week_start} onChange={e => setDE({ week_start: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white appearance-none">
+                          {weekOptions.map(w => <option key={w.value} value={w.value} className="bg-slate-800">{w.label}</option>)}
+                        </select>
+                      )}
+                      {detailEditForm.date_mode === 'deadline' && (
+                        <input type="date" value={detailEditForm.deadline_date} onChange={e => setDE({ deadline_date: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                      )}
+                    </div>
+                    <Button onClick={() => handleEditGroup(g)} disabled={detailSaving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      {detailSaving ? '수정 중...' : '수정 저장'}
+                    </Button>
                   </div>
-                </div>
+                )}
 
                 <DialogFooter className="border-t border-slate-700 pt-4 flex justify-between">
                   <Button variant="ghost" onClick={() => handleDeleteGroup(g)}

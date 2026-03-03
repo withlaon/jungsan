@@ -163,6 +163,15 @@ export default function SettingsPage() {
   const [detailFee, setDetailFee] = useState<FeeGroup | null>(null)
   const [detailIns, setDetailIns] = useState<InsuranceFeeGroup | null>(null)
 
+  // 상세 탭 / 추가 / 수정 상태
+  const [feeDetailTab, setFeeDetailTab] = useState<'info' | 'add' | 'edit'>('info')
+  const [feeAddIds, setFeeAddIds] = useState<string[]>([])
+  const [feeEditForm, setFeeEditForm] = useState({ item_name: '', amount: '', date_mode: 'none' as 'none'|'week'|'deadline', week_start: weekOptions[0]?.value??'', deadline_date: '', memo: '' })
+  const [insDetailTab, setInsDetailTab] = useState<'info' | 'add' | 'edit'>('info')
+  const [insAddIds, setInsAddIds] = useState<string[]>([])
+  const [insEditForm, setInsEditForm] = useState({ employment_fee: '', accident_fee: '', date_mode: 'none' as 'none'|'week'|'deadline', week_start: weekOptions[0]?.value??'', deadline_date: '', memo: '' })
+  const [detailSaving, setDetailSaving] = useState(false)
+
   useEffect(()=>{
     if (!userLoading && (isAdmin || userId)) fetchData()
   },[userLoading, userId, isAdmin])
@@ -298,6 +307,58 @@ export default function SettingsPage() {
   const feeGroupKey  = (f: FeeWithRider) => [f.fee_type,f.item_name,f.amount,f.date_mode,f.week_start??'',f.deadline_date??''].join('||')
   const insGroupKey  = (f: InsuranceFeeWithRider) => [f.employment_fee,f.accident_fee,f.date_mode,f.week_start??'',f.deadline_date??''].join('||')
 
+  const handleAddRidersToFee = async (g: FeeGroup) => {
+    if (feeAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
+    setDetailSaving(true)
+    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+    const newIds = feeAddIds.filter(id => !existing.has(id))
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
+    const rows = newIds.map(rid => ({ fee_type: g.fee_type, item_name: g.item_name, rider_id: rid, amount: g.amount, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
+    const { error } = await supabase.from('management_fees').insert(rows)
+    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    setFeeAddIds([]); setFeeDetailTab('info'); setDetailSaving(false); fetchData()
+  }
+
+  const handleEditFeeGroup = async (g: FeeGroup) => {
+    if (!feeEditForm.item_name.trim()) { toast.error('항목명을 입력해주세요.'); return }
+    const amount = parseInt(feeEditForm.amount.replace(/,/g,''))
+    if (isNaN(amount) || amount <= 0) { toast.error('올바른 금액을 입력해주세요.'); return }
+    if (feeEditForm.date_mode === 'deadline' && !feeEditForm.deadline_date) { toast.error('마감일을 입력해주세요.'); return }
+    setDetailSaving(true)
+    const updates = { item_name: feeEditForm.item_name.trim(), amount, date_mode: feeEditForm.date_mode, week_start: feeEditForm.date_mode==='week'?feeEditForm.week_start:null, deadline_date: feeEditForm.date_mode==='deadline'?feeEditForm.deadline_date:null, memo: feeEditForm.memo.trim()||null }
+    const { error } = await supabase.from('management_fees').update(updates).in('id', g.items.map(i => i.id))
+    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success('수정되었습니다.')
+    setFeeDetailTab('info'); setDetailSaving(false); setDetailFee(null); fetchData()
+  }
+
+  const handleAddRidersToIns = async (g: InsuranceFeeGroup) => {
+    if (insAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
+    setDetailSaving(true)
+    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+    const newIds = insAddIds.filter(id => !existing.has(id))
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
+    const rows = newIds.map(rid => ({ rider_id: rid, employment_fee: g.employment_fee, accident_fee: g.accident_fee, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
+    const { error } = await supabase.from('insurance_fees').insert(rows)
+    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    setInsAddIds([]); setInsDetailTab('info'); setDetailSaving(false); fetchData()
+  }
+
+  const handleEditInsGroup = async (g: InsuranceFeeGroup) => {
+    const empFee = parseInt(insEditForm.employment_fee.replace(/,/g,''))
+    const accFee = parseInt(insEditForm.accident_fee.replace(/,/g,''))
+    if ((isNaN(empFee)||empFee<0) && (isNaN(accFee)||accFee<0)) { toast.error('보험료를 입력해주세요.'); return }
+    if (insEditForm.date_mode === 'deadline' && !insEditForm.deadline_date) { toast.error('마감일을 입력해주세요.'); return }
+    setDetailSaving(true)
+    const updates = { employment_fee: isNaN(empFee)?0:empFee, accident_fee: isNaN(accFee)?0:accFee, date_mode: insEditForm.date_mode, week_start: insEditForm.date_mode==='week'?insEditForm.week_start:null, deadline_date: insEditForm.date_mode==='deadline'?insEditForm.deadline_date:null, memo: insEditForm.memo.trim()||null }
+    const { error } = await supabase.from('insurance_fees').update(updates).in('id', g.items.map(i => i.id))
+    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
+    toast.success('수정되었습니다.')
+    setInsDetailTab('info'); setDetailSaving(false); setDetailIns(null); fetchData()
+  }
+
   // ── 라이더 이름 요약 ──
   const riderSummary = (items: Array<{riders: Rider|null}>) => {
     const named=items.filter(i=>i.riders?.name).map(i=>i.riders!.name)
@@ -344,7 +405,7 @@ export default function SettingsPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
             {feeGroups.map(g=>(
-              <Card key={g.key} onClick={()=>setDetailFee(g)}
+              <Card key={g.key} onClick={()=>{ setFeeDetailTab('info'); setFeeAddIds([]); setFeeEditForm({ item_name: g.item_name, amount: String(g.amount), date_mode: g.date_mode as 'none'|'week'|'deadline', week_start: g.week_start??weekOptions[0]?.value??'', deadline_date: g.deadline_date??'', memo: g.memo??'' }); setDetailFee(g) }}
                 className="border-slate-700 bg-slate-900 hover:bg-slate-800 hover:border-blue-700/50 cursor-pointer transition-all group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -413,7 +474,7 @@ export default function SettingsPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
             {insGroups.map(g=>(
-              <Card key={g.key} onClick={()=>setDetailIns(g)}
+              <Card key={g.key} onClick={()=>{ setInsDetailTab('info'); setInsAddIds([]); setInsEditForm({ employment_fee: String(g.employment_fee), accident_fee: String(g.accident_fee), date_mode: g.date_mode as 'none'|'week'|'deadline', week_start: g.week_start??weekOptions[0]?.value??'', deadline_date: g.deadline_date??'', memo: g.memo??'' }); setDetailIns(g) }}
                 className="border-emerald-700/30 bg-slate-900 hover:bg-slate-800 hover:border-emerald-600/50 cursor-pointer transition-all group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -470,6 +531,7 @@ export default function SettingsPage() {
             const g=detailFee
             const namedItems=g.items.filter(i=>i.riders?.name)
             const unnamedItems=g.items.filter(i=>!i.riders?.name)
+            const alreadyIds = new Set(g.items.map(i=>i.rider_id).filter(Boolean))
             return (
               <>
                 <DialogHeader>
@@ -478,53 +540,88 @@ export default function SettingsPage() {
                     {g.item_name}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-5 py-2">
-                  <div className="bg-slate-800/60 rounded-xl p-4 space-y-2">
-                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">관리비 내용</p>
-                    <FeeInfoRow label="종류" value={g.fee_type==='call'
-                      ?<Badge className="text-xs bg-orange-900/50 text-orange-300 border border-orange-700/50">콜관리비</Badge>
-                      :<Badge className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50">일반관리비</Badge>} />
-                    <FeeInfoRow label="금액" value={<span className={`font-medium text-sm ${g.fee_type==='call'?'text-orange-300':'text-rose-300'}`}>{formatKRW(g.amount)}{g.fee_type==='call'&&<span className="text-slate-500 ml-1">/콜</span>}</span>} />
-                    <FeeInfoRow label="기간" value={
-                      g.date_mode==='none'
-                        ?<span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5"/>매주 자동</span>
-                        :<span className="text-slate-300 text-sm">{periodText(g.date_mode,g.week_start,g.deadline_date)}</span>
-                    } />
-                    {g.memo&&<FeeInfoRow label="메모" value={<span className="text-slate-400 text-sm">{g.memo}</span>} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">적용 라이더</p>
-                      <span className="text-slate-500 text-xs">{g.items.length}건</span>
-                    </div>
-                    {unnamedItems.length>0&&(
-                      <div className="flex items-center justify-between px-3 py-2.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg mb-2">
-                        <span className="text-emerald-300 text-sm font-medium">전체 라이더 적용</span>
-                        {unnamedItems.map(i=>(
-                          <button key={i.id} type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
-                        ))}
-                      </div>
-                    )}
-                    {namedItems.length>0&&(
-                      <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                        {namedItems.map(i=>(
-                          <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <UserCircle className="h-4 w-4 text-slate-500"/>
-                              <span className="text-white text-sm font-medium">{i.riders!.name}</span>
-                              {i.riders!.rider_username&&<span className="text-slate-500 text-xs">@{i.riders!.rider_username}</span>}
-                            </div>
-                            <button type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                {/* 탭 */}
+                <div className="flex gap-0 border-b border-slate-700 mb-2">
+                  {([['info','상세 정보'],['add','라이더 추가'],['edit','내용 수정']] as const).map(([tab,label])=>(
+                    <button key={tab} type="button" onClick={()=>setFeeDetailTab(tab)}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${feeDetailTab===tab?'border-blue-500 text-blue-400':'border-transparent text-slate-400 hover:text-white'}`}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
+
+                {/* 상세 정보 */}
+                {feeDetailTab==='info'&&(
+                  <div className="space-y-5 py-2">
+                    <div className="bg-slate-800/60 rounded-xl p-4 space-y-2">
+                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">관리비 내용</p>
+                      <FeeInfoRow label="종류" value={g.fee_type==='call'?<Badge className="text-xs bg-orange-900/50 text-orange-300 border border-orange-700/50">콜관리비</Badge>:<Badge className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50">일반관리비</Badge>} />
+                      <FeeInfoRow label="금액" value={<span className={`font-medium text-sm ${g.fee_type==='call'?'text-orange-300':'text-rose-300'}`}>{formatKRW(g.amount)}{g.fee_type==='call'&&<span className="text-slate-500 ml-1">/콜</span>}</span>} />
+                      <FeeInfoRow label="기간" value={g.date_mode==='none'?<span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5"/>매주 자동</span>:<span className="text-slate-300 text-sm">{periodText(g.date_mode,g.week_start,g.deadline_date)}</span>} />
+                      {g.memo&&<FeeInfoRow label="메모" value={<span className="text-slate-400 text-sm">{g.memo}</span>} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">적용 라이더</p>
+                        <span className="text-slate-500 text-xs">{g.items.length}건</span>
+                      </div>
+                      {unnamedItems.length>0&&(
+                        <div className="flex items-center justify-between px-3 py-2.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg mb-2">
+                          <span className="text-emerald-300 text-sm font-medium">전체 라이더 적용</span>
+                          {unnamedItems.map(i=>(<button key={i.id} type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>))}
+                        </div>
+                      )}
+                      {namedItems.length>0&&(
+                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                          {namedItems.map(i=>(
+                            <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                              <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-slate-500"/><span className="text-white text-sm font-medium">{i.riders!.name}</span>{i.riders!.rider_username&&<span className="text-slate-500 text-xs">@{i.riders!.rider_username}</span>}</div>
+                              <button type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 라이더 추가 */}
+                {feeDetailTab==='add'&&(
+                  <div className="space-y-4 py-2">
+                    <p className="text-slate-400 text-sm">이 관리비에 추가로 적용할 라이더를 선택하세요.</p>
+                    <RiderMultiSelect riders={riders.filter(r=>!alreadyIds.has(r.id))} selected={feeAddIds} onChange={setFeeAddIds}/>
+                    <Button onClick={()=>handleAddRidersToFee(g)} disabled={detailSaving||feeAddIds.length===0} className="w-full bg-blue-600 hover:bg-blue-700">
+                      {detailSaving?'추가 중...':`라이더 ${feeAddIds.length}명 추가`}
+                    </Button>
+                  </div>
+                )}
+
+                {/* 내용 수정 */}
+                {feeDetailTab==='edit'&&(
+                  <div className="space-y-4 py-2">
+                    {g.fee_type==='general'&&(
+                      <div className="space-y-1.5">
+                        <Label className="text-slate-300">관리비 항목명</Label>
+                        <input value={feeEditForm.item_name} onChange={e=>setFeeEditForm(f=>({...f,item_name:e.target.value}))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500"/>
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">{g.fee_type==='call'?'콜당 금액':'금액'}</Label>
+                      <input type="number" value={feeEditForm.amount} onChange={e=>setFeeEditForm(f=>({...f,amount:e.target.value}))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500"/>
+                    </div>
+                    <PeriodSelector dateMode={feeEditForm.date_mode} weekStart={feeEditForm.week_start} deadlineDate={feeEditForm.deadline_date} onChange={p=>setFeeEditForm(f=>({...f,...p}))}/>
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">메모</Label>
+                      <textarea value={feeEditForm.memo} onChange={e=>setFeeEditForm(f=>({...f,memo:e.target.value}))} rows={2} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white resize-none focus:outline-none focus:border-blue-500"/>
+                    </div>
+                    <Button onClick={()=>handleEditFeeGroup(g)} disabled={detailSaving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      {detailSaving?'수정 중...':'수정 저장'}
+                    </Button>
+                  </div>
+                )}
+
                 <DialogFooter className="border-t border-slate-700 pt-4 flex justify-between">
-                  <Button variant="ghost" onClick={()=>deleteFeeGroup(g)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20">
-                    <Trash2 className="h-4 w-4 mr-2"/>전체 삭제
-                  </Button>
+                  <Button variant="ghost" onClick={()=>deleteFeeGroup(g)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20"><Trash2 className="h-4 w-4 mr-2"/>전체 삭제</Button>
                   <Button variant="ghost" onClick={()=>setDetailFee(null)} className="text-slate-400 hover:text-white">닫기</Button>
                 </DialogFooter>
               </>
@@ -538,6 +635,7 @@ export default function SettingsPage() {
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
           {detailIns&&(()=>{
             const g=detailIns
+            const alreadyIds = new Set(g.items.map(i=>i.rider_id).filter(Boolean))
             return (
               <>
                 <DialogHeader>
@@ -545,41 +643,80 @@ export default function SettingsPage() {
                     <ShieldCheck className="h-4 w-4 text-emerald-400"/>고용/산재보험 추가 관리비
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-5 py-2">
-                  <div className="bg-slate-800/60 rounded-xl p-4 space-y-2">
-                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">관리비 내용</p>
-                    <FeeInfoRow label="고용보험" value={<span className="text-blue-300 font-medium text-sm">{formatKRW(g.employment_fee)}</span>} />
-                    <FeeInfoRow label="산재보험" value={<span className="text-violet-300 font-medium text-sm">{formatKRW(g.accident_fee)}</span>} />
-                    <FeeInfoRow label="기간" value={
-                      g.date_mode==='none'
-                        ?<span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5"/>매주 자동</span>
-                        :<span className="text-slate-300 text-sm">{periodText(g.date_mode,g.week_start,g.deadline_date)}</span>
-                    } />
-                    {g.memo&&<FeeInfoRow label="메모" value={<span className="text-slate-400 text-sm">{g.memo}</span>} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">적용 라이더</p>
-                      <span className="text-slate-500 text-xs">{g.items.length}명</span>
-                    </div>
-                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                      {g.items.map(i=>(
-                        <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <UserCircle className="h-4 w-4 text-slate-500"/>
-                            <span className="text-white text-sm font-medium">{i.riders?.name??'-'}</span>
-                            {i.riders?.rider_username&&<span className="text-slate-500 text-xs">@{i.riders.rider_username}</span>}
-                          </div>
-                          <button type="button" onClick={()=>deleteInsOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                {/* 탭 */}
+                <div className="flex gap-0 border-b border-slate-700 mb-2">
+                  {([['info','상세 정보'],['add','라이더 추가'],['edit','내용 수정']] as const).map(([tab,label])=>(
+                    <button key={tab} type="button" onClick={()=>setInsDetailTab(tab)}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${insDetailTab===tab?'border-emerald-500 text-emerald-400':'border-transparent text-slate-400 hover:text-white'}`}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
+
+                {/* 상세 정보 */}
+                {insDetailTab==='info'&&(
+                  <div className="space-y-5 py-2">
+                    <div className="bg-slate-800/60 rounded-xl p-4 space-y-2">
+                      <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">관리비 내용</p>
+                      <FeeInfoRow label="고용보험" value={<span className="text-blue-300 font-medium text-sm">{formatKRW(g.employment_fee)}</span>} />
+                      <FeeInfoRow label="산재보험" value={<span className="text-violet-300 font-medium text-sm">{formatKRW(g.accident_fee)}</span>} />
+                      <FeeInfoRow label="기간" value={g.date_mode==='none'?<span className="flex items-center gap-1 text-emerald-400 text-sm"><RefreshCw className="h-3.5 w-3.5"/>매주 자동</span>:<span className="text-slate-300 text-sm">{periodText(g.date_mode,g.week_start,g.deadline_date)}</span>} />
+                      {g.memo&&<FeeInfoRow label="메모" value={<span className="text-slate-400 text-sm">{g.memo}</span>} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide">적용 라이더</p>
+                        <span className="text-slate-500 text-xs">{g.items.length}명</span>
+                      </div>
+                      <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                        {g.items.map(i=>(
+                          <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                            <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-slate-500"/><span className="text-white text-sm font-medium">{i.riders?.name??'-'}</span>{i.riders?.rider_username&&<span className="text-slate-500 text-xs">@{i.riders.rider_username}</span>}</div>
+                            <button type="button" onClick={()=>deleteInsOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 라이더 추가 */}
+                {insDetailTab==='add'&&(
+                  <div className="space-y-4 py-2">
+                    <p className="text-slate-400 text-sm">이 고용산재 관리비에 추가로 적용할 라이더를 선택하세요.</p>
+                    <RiderMultiSelect riders={riders.filter(r=>!alreadyIds.has(r.id))} selected={insAddIds} onChange={setInsAddIds}/>
+                    <Button onClick={()=>handleAddRidersToIns(g)} disabled={detailSaving||insAddIds.length===0} className="w-full bg-blue-600 hover:bg-blue-700">
+                      {detailSaving?'추가 중...':`라이더 ${insAddIds.length}명 추가`}
+                    </Button>
+                  </div>
+                )}
+
+                {/* 내용 수정 */}
+                {insDetailTab==='edit'&&(
+                  <div className="space-y-4 py-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-slate-300">고용보험비</Label>
+                        <input type="number" value={insEditForm.employment_fee} onChange={e=>setInsEditForm(f=>({...f,employment_fee:e.target.value}))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500"/>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-slate-300">산재보험비</Label>
+                        <input type="number" value={insEditForm.accident_fee} onChange={e=>setInsEditForm(f=>({...f,accident_fee:e.target.value}))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500"/>
+                      </div>
+                    </div>
+                    <PeriodSelector dateMode={insEditForm.date_mode} weekStart={insEditForm.week_start} deadlineDate={insEditForm.deadline_date} onChange={p=>setInsEditForm(f=>({...f,...p}))}/>
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">메모</Label>
+                      <textarea value={insEditForm.memo} onChange={e=>setInsEditForm(f=>({...f,memo:e.target.value}))} rows={2} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white resize-none focus:outline-none focus:border-blue-500"/>
+                    </div>
+                    <Button onClick={()=>handleEditInsGroup(g)} disabled={detailSaving} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      {detailSaving?'수정 중...':'수정 저장'}
+                    </Button>
+                  </div>
+                )}
+
                 <DialogFooter className="border-t border-slate-700 pt-4 flex justify-between">
-                  <Button variant="ghost" onClick={()=>deleteInsGroup(g)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20">
-                    <Trash2 className="h-4 w-4 mr-2"/>전체 삭제
-                  </Button>
+                  <Button variant="ghost" onClick={()=>deleteInsGroup(g)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20"><Trash2 className="h-4 w-4 mr-2"/>전체 삭제</Button>
                   <Button variant="ghost" onClick={()=>setDetailIns(null)} className="text-slate-400 hover:text-white">닫기</Button>
                 </DialogFooter>
               </>
