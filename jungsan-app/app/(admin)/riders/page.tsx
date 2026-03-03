@@ -101,6 +101,11 @@ export default function RidersPage() {
   const [bulkSaving, setBulkSaving] = useState(false)
   const [bulkFileName, setBulkFileName] = useState('')
 
+  // 선택 관련 상태
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkActionConfirm, setBulkActionConfirm] = useState<'deactivate' | 'delete' | null>(null)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
   const fetchedRef = useRef(false)
 
   useEffect(() => {
@@ -416,6 +421,62 @@ export default function RidersPage() {
     r.name.includes(search) || (r.phone ?? '').includes(search) || (r.rider_username ?? '').includes(search)
   )
 
+  const allSelected = filtered.length > 0 && filtered.every(r => selectedIds.has(r.id))
+  const someSelected = filtered.some(r => selectedIds.has(r.id))
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        filtered.forEach(r => next.delete(r.id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        filtered.forEach(r => next.add(r.id))
+        return next
+      })
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleBulkDeactivate = async () => {
+    setBulkProcessing(true)
+    const ids = filtered.filter(r => selectedIds.has(r.id) && r.status === 'active').map(r => r.id)
+    for (const id of ids) {
+      await supabase.rpc('update_rider_status', { p_id: id, p_status: 'inactive' })
+    }
+    toast.success(`${ids.length}명을 비활성화했습니다.`)
+    setSelectedIds(new Set())
+    setBulkActionConfirm(null)
+    setBulkProcessing(false)
+    fetchRiders()
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkProcessing(true)
+    const ids = filtered.filter(r => selectedIds.has(r.id)).map(r => r.id)
+    let failCount = 0
+    for (const id of ids) {
+      const { error } = await supabase.rpc('delete_rider', { p_id: id })
+      if (error) failCount++
+    }
+    if (failCount > 0) toast.error(`${failCount}명 삭제 실패`)
+    else toast.success(`${ids.length}명을 삭제했습니다.`)
+    setSelectedIds(new Set())
+    setBulkActionConfirm(null)
+    setBulkProcessing(false)
+    fetchRiders()
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -450,7 +511,7 @@ export default function RidersPage() {
 
       <div className="grid grid-cols-3 gap-4">
         <Card
-          onClick={() => setActiveTab('all')}
+          onClick={() => { setActiveTab('all'); setSelectedIds(new Set()) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'all' ? 'ring-2 ring-blue-500 bg-blue-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -462,7 +523,7 @@ export default function RidersPage() {
           </CardContent>
         </Card>
         <Card
-          onClick={() => setActiveTab('active')}
+          onClick={() => { setActiveTab('active'); setSelectedIds(new Set()) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'active' ? 'ring-2 ring-emerald-500 bg-emerald-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -474,7 +535,7 @@ export default function RidersPage() {
           </CardContent>
         </Card>
         <Card
-          onClick={() => setActiveTab('inactive')}
+          onClick={() => { setActiveTab('inactive'); setSelectedIds(new Set()) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'inactive' ? 'ring-2 ring-rose-500 bg-rose-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -498,16 +559,58 @@ export default function RidersPage() {
       </div>
 
       <Card className="border-slate-700 bg-slate-900">
-        <CardHeader>
-          <CardTitle className="text-white text-base">
-            {activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성'} 라이더 목록 ({filtered.length}명)
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-white text-base">
+              {activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성'} 라이더 목록 ({filtered.length}명)
+            </CardTitle>
+            {someSelected && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm">{selectedIds.size}명 선택됨</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkActionConfirm('deactivate')}
+                  className="border-amber-600 text-amber-400 hover:bg-amber-900/20 h-8 text-xs"
+                >
+                  <UserX className="h-3.5 w-3.5 mr-1" />
+                  선택 비활성화
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkActionConfirm('delete')}
+                  className="border-rose-600 text-rose-400 hover:bg-rose-900/20 h-8 text-xs"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  선택 삭제
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-slate-400 hover:text-white h-8 text-xs"
+                >
+                  선택 해제
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700 hover:bg-transparent">
+                  <TableHead className="w-10 px-4">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => { if (el) el.indeterminate = someSelected && !allSelected }}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 accent-blue-500 cursor-pointer"
+                    />
+                  </TableHead>
                   <TableHead className="text-slate-400">가입일</TableHead>
                   <TableHead className="text-slate-400">라이더명</TableHead>
                   <TableHead className="text-slate-400">아이디</TableHead>
@@ -517,23 +620,32 @@ export default function RidersPage() {
                   <TableHead className="text-slate-400">계좌번호</TableHead>
                   <TableHead className="text-slate-400">예금주</TableHead>
                   <TableHead className="text-slate-400">상태</TableHead>
-                  <TableHead className="text-slate-400 text-right">
-                    {activeTab === 'inactive' ? '관리/삭제' : '관리'}
-                  </TableHead>
+                  <TableHead className="text-slate-400 text-right">관리</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-slate-500 py-8">로딩 중...</TableCell>
+                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">로딩 중...</TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-slate-500 py-8">등록된 라이더가 없습니다.</TableCell>
+                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">등록된 라이더가 없습니다.</TableCell>
                   </TableRow>
                 ) : (
                   filtered.map(rider => (
-                    <TableRow key={rider.id} className="border-slate-700 hover:bg-slate-800/50">
+                    <TableRow
+                      key={rider.id}
+                      className={`border-slate-700 hover:bg-slate-800/50 ${selectedIds.has(rider.id) ? 'bg-blue-900/10' : ''}`}
+                    >
+                      <TableCell className="px-4" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(rider.id)}
+                          onChange={() => toggleSelect(rider.id)}
+                          className="w-4 h-4 accent-blue-500 cursor-pointer"
+                        />
+                      </TableCell>
                       <TableCell className="text-slate-400 text-sm">{rider.join_date ?? '-'}</TableCell>
                       <TableCell
                         className="text-white font-medium cursor-pointer hover:text-blue-400 hover:underline"
@@ -569,12 +681,10 @@ export default function RidersPage() {
                               ? <UserX className="h-3.5 w-3.5" />
                               : <UserCheck className="h-3.5 w-3.5" />}
                           </Button>
-                          {activeTab === 'inactive' && (
-                            <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmId(rider.id)}
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                          <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmId(rider.id)}
+                            className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -738,6 +848,58 @@ export default function RidersPage() {
               className="bg-rose-600 hover:bg-rose-700 text-white"
             >
               <Trash2 className="h-4 w-4 mr-2" />삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 일괄 비활성화/삭제 확인 다이얼로그 */}
+      <Dialog open={bulkActionConfirm !== null} onOpenChange={open => { if (!open) setBulkActionConfirm(null) }}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {bulkActionConfirm === 'deactivate' ? '선택 라이더 비활성화' : '선택 라이더 삭제'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {bulkActionConfirm === 'deactivate' ? (
+              <>
+                <p className="text-slate-300 text-sm">
+                  선택한 <span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id) && r.status === 'active').length}명</span>의 활성 라이더를 비활성화합니다.
+                </p>
+                <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-3">
+                  <p className="text-amber-300 text-xs flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    이미 비활성 상태인 라이더는 건너뜁니다.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-slate-300 text-sm">
+                  선택한 <span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id)).length}명</span>의 라이더를 완전히 삭제합니다.
+                </p>
+                <div className="bg-rose-900/20 border border-rose-800 rounded-lg p-3">
+                  <p className="text-rose-300 text-xs flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    삭제된 데이터는 복구할 수 없습니다. 관련 정산 데이터도 함께 삭제됩니다.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulkActionConfirm(null)} className="text-slate-400 hover:text-white" disabled={bulkProcessing}>취소</Button>
+            <Button
+              onClick={bulkActionConfirm === 'deactivate' ? handleBulkDeactivate : handleBulkDelete}
+              disabled={bulkProcessing}
+              className={bulkActionConfirm === 'deactivate' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white'}
+            >
+              {bulkProcessing ? '처리 중...' : bulkActionConfirm === 'deactivate' ? (
+                <><UserX className="h-4 w-4 mr-2" />비활성화</>
+              ) : (
+                <><Trash2 className="h-4 w-4 mr-2" />삭제</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
