@@ -253,11 +253,26 @@ export default function SettlementUploadPage() {
     const successFiles = files.filter(f => f.status === 'success')
     if (successFiles.length === 0) return
 
-    // 라이더별 합산 (여러 파일 동일 라이더 데이터 병합)
+    // ── 1단계: 이름 → userId 역방향 인덱스 구축 ──
+    // 어떤 파일이든 userId 가 있는 행이 있으면 그 userId 를 정규 키로 사용
+    const nameToUserId = new Map<string, string>()
+    for (const uf of successFiles) {
+      for (const row of uf.rows) {
+        const uid = (row.userId ?? '').trim().toLowerCase()
+        const nm  = row.name.replace(/\s/g, '').toLowerCase()
+        if (uid) nameToUserId.set(nm, uid)
+      }
+    }
+
+    // ── 2단계: 라이더별 합산 (여러 파일 동일 라이더 데이터 병합) ──
+    // 정규 키: userId > 이름으로 역조회된 userId > 정규화된 이름
     const mergedMap = new Map<string, ParsedRiderRow>()
     for (const uf of successFiles) {
       for (const row of uf.rows) {
-        const key      = row.userId || row.name
+        const uid = (row.userId ?? '').trim().toLowerCase()
+        const nm  = row.name.replace(/\s/g, '').toLowerCase()
+        const key = uid || nameToUserId.get(nm) || nm
+
         const existing = mergedMap.get(key)
         if (existing) {
           mergedMap.set(key, {
@@ -327,19 +342,49 @@ export default function SettlementUploadPage() {
     ])
     const promotions: Promotion[] = promoRes.data ?? []
     const advances: AdvancePayment[] = advanceRes.data ?? []
-    const inputs = parsedRows
+
+    // 라이더 연결된 행만 추출
+    const rawInputs = parsedRows
       .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
-      .map(r => ({
-        riderId:                 riderMapping[r.name],
-        riderName:               r.name,
-        deliveryCount:           r.deliveryCount,
-        baseAmount:              r.baseAmount,
-        deliveryFee:             r.deliveryFee,
-        additionalPay:           r.additionalPay,
-        hourlyInsurance:         r.hourlyInsurance,
-        excelEmploymentInsurance: r.employmentInsurance,
-        excelAccidentInsurance:   r.accidentInsurance,
-      }))
+      .map(r => {
+        const rId = riderMapping[r.name]
+        // DB 라이더 목록에서 공식 이름 조회 (없으면 파일의 이름 사용)
+        const officialName = riders.find(rd => rd.id === rId)?.name ?? r.name
+        return {
+          riderId:                  rId,
+          riderName:                officialName,
+          deliveryCount:            r.deliveryCount,
+          baseAmount:               r.baseAmount,
+          deliveryFee:              r.deliveryFee,
+          additionalPay:            r.additionalPay,
+          hourlyInsurance:          r.hourlyInsurance,
+          excelEmploymentInsurance: r.employmentInsurance,
+          excelAccidentInsurance:   r.accidentInsurance,
+        }
+      })
+
+    // 같은 riderId 가 여러 행에 연결된 경우(파일 중복 등) riderId 기준으로 합산
+    // → 합산된 배달건수·금액을 기준으로 프로모션/관리비가 올바르게 적용됨
+    const mergedMap = new Map<string, typeof rawInputs[0]>()
+    for (const input of rawInputs) {
+      const existing = mergedMap.get(input.riderId)
+      if (existing) {
+        mergedMap.set(input.riderId, {
+          ...existing,
+          deliveryCount:            existing.deliveryCount            + input.deliveryCount,
+          baseAmount:               existing.baseAmount               + input.baseAmount,
+          deliveryFee:              existing.deliveryFee              + input.deliveryFee,
+          additionalPay:            existing.additionalPay            + input.additionalPay,
+          hourlyInsurance:          existing.hourlyInsurance          + input.hourlyInsurance,
+          excelEmploymentInsurance: existing.excelEmploymentInsurance + input.excelEmploymentInsurance,
+          excelAccidentInsurance:   existing.excelAccidentInsurance   + input.excelAccidentInsurance,
+        })
+      } else {
+        mergedMap.set(input.riderId, { ...input })
+      }
+    }
+    const inputs = Array.from(mergedMap.values())
+
     const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees)
     setResults(calc)
     setStep('confirm')
