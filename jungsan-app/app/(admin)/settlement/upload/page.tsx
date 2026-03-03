@@ -121,10 +121,8 @@ export default function SettlementUploadPage() {
   }
 
   const fetchRiders = async () => {
-    let q = supabase.from('riders').select('*').eq('status', 'active').order('name')
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const { data } = await q
-    if (data) setRiders(data)
+    const data = await fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json())
+    if (Array.isArray(data)) setRiders((data as Rider[]).filter(r => r.status === 'active'))
   }
   const fetchSettings = async () => {
     const { data } = await supabase.from('fee_settings').select('*').order('effective_from', { ascending: false }).limit(1).maybeSingle()
@@ -330,7 +328,7 @@ export default function SettlementUploadPage() {
     const promotions: Promotion[] = promoRes.data ?? []
     const advances: AdvancePayment[] = advanceRes.data ?? []
     const inputs = parsedRows
-      .filter(r => riderMapping[r.name])
+      .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
       .map(r => ({
         riderId:                 riderMapping[r.name],
         riderName:               r.name,
