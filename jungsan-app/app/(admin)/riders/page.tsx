@@ -116,8 +116,8 @@ export default function RidersPage() {
     fetchRiders()
   }, [userLoading, userId, isAdmin])
 
-  const fetchRiders = async () => {
-    setLoading(true)
+  const fetchRiders = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await fetch('/api/admin/riders')
       const data = await res.json()
@@ -125,7 +125,7 @@ export default function RidersPage() {
     } catch {
       setRiders([])
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -249,7 +249,8 @@ export default function RidersPage() {
 
     setSaving(false)
     setDialogOpen(false)
-    fetchRiders()
+    setSearch('')
+    await fetchRiders(true)
   }
 
   const toggleStatus = async (rider: Rider) => {
@@ -260,7 +261,7 @@ export default function RidersPage() {
     })
     if (error) { toast.error('상태 변경 실패: ' + error.message); return }
     toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
-    fetchRiders()
+    fetchRiders(true)
   }
 
   const deleteRider = async (rider: Rider) => {
@@ -268,7 +269,7 @@ export default function RidersPage() {
     if (error) { toast.error('삭제 실패: ' + error.message); return }
     toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
     setDeleteConfirmId(null)
-    fetchRiders()
+    fetchRiders(true)
   }
 
   const parseBulkExcel = useCallback((file: File) => {
@@ -402,7 +403,7 @@ export default function RidersPage() {
       setBulkDialogOpen(false)
       setBulkRows([])
       setBulkFileName('')
-      fetchRiders()
+      fetchRiders(true)
     } catch (e) {
       toast.error('저장 실패: 네트워크 오류')
     } finally {
@@ -458,7 +459,7 @@ export default function RidersPage() {
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    fetchRiders()
+    fetchRiders(true)
   }
 
   const handleBulkDelete = async () => {
@@ -474,7 +475,7 @@ export default function RidersPage() {
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    fetchRiders()
+    fetchRiders(true)
   }
 
   return (
