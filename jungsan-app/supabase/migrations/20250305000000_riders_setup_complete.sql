@@ -168,6 +168,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- 관련 데이터 먼저 삭제 (FK 제약 순서 고려)
+  DELETE FROM settlement_details WHERE rider_id = p_id;
+  DELETE FROM advance_payments WHERE rider_id = p_id;
+  DELETE FROM promotions WHERE rider_id = p_id;
+  DELETE FROM management_fees WHERE rider_id = p_id;
+  DELETE FROM insurance_fees WHERE rider_id = p_id;
   DELETE FROM riders WHERE id = p_id;
 END;
 $$;
