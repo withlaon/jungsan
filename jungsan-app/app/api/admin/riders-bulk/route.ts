@@ -64,11 +64,15 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       if (/SUPABASE_SERVICE_ROLE_KEY|설정되지 않았습니다/i.test(msg)) {
-        let rpcError = (await supabase.rpc('insert_riders_bulk', { p_riders: validRows })).error
-        if (rpcError && /user_id|column|undefined/i.test(rpcError.message)) {
-          rpcError = (await supabase.rpc('insert_riders_bulk_legacy', { p_riders: validRows })).error
+        const { error: rpcErr } = await supabase.rpc('insert_riders_bulk', {
+          p_user_id: user.id,
+          p_riders: validRows,
+        })
+        error = rpcErr
+        if (rpcErr && /user_id|column|undefined|function/i.test(rpcErr.message)) {
+          const { error: legacyErr } = await supabase.rpc('insert_riders_bulk_legacy', { p_riders: validRows })
+          error = legacyErr
         }
-        error = rpcError
       } else {
         throw e
       }

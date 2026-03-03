@@ -383,34 +383,25 @@ export default function RidersPage() {
         status: 'active',
       }))
 
-      let ok = false
-      if (userId) {
-        const { error } = await supabase.rpc('insert_riders_bulk', { p_user_id: userId, p_riders: payload })
-        ok = !error
-        if (error) {
-          const res = await fetch('/api/admin/riders-bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ riders: payload }) })
-          const data = await res.json().catch(() => ({}))
-          ok = res.ok
-          if (!ok) toast.error('저장 실패: ' + (data?.error ?? res.statusText))
-        }
-      } else {
-        const { error } = await supabase.rpc('insert_riders_bulk', { p_riders: payload })
-        ok = !error
-        if (error) {
-          const res = await fetch('/api/admin/riders-bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ riders: payload }) })
-          const data = await res.json().catch(() => ({}))
-          ok = res.ok
-          if (!ok) toast.error('저장 실패: ' + (data?.error ?? res.statusText))
-        }
-      }
+      const res = await fetch('/api/admin/riders-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ riders: payload }),
+      })
+      const data = await res.json().catch(() => ({}))
 
-      if (ok) {
-        toast.success(`${validRows.length}명의 라이더가 등록되었습니다.`)
-        setBulkDialogOpen(false)
-        setBulkRows([])
-        setBulkFileName('')
-        fetchRiders()
+      if (!res.ok) {
+        toast.error('저장 실패: ' + (data?.error ?? res.statusText))
+        return
       }
+      toast.success(`${validRows.length}명의 라이더가 등록되었습니다.`)
+      setBulkDialogOpen(false)
+      setBulkRows([])
+      setBulkFileName('')
+      fetchRiders()
+    } catch (e) {
+      toast.error('저장 실패: 네트워크 오류')
     } finally {
       setBulkSaving(false)
     }
