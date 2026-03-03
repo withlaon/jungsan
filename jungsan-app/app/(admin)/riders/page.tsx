@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
@@ -101,29 +101,27 @@ export default function RidersPage() {
   const [bulkSaving, setBulkSaving] = useState(false)
   const [bulkFileName, setBulkFileName] = useState('')
 
+  const fetchedRef = useRef(false)
+
   useEffect(() => {
-    if (!userLoading && (isAdmin || userId)) fetchRiders()
+    if (userLoading) return
+    if (!isAdmin && !userId) return
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    fetchRiders()
   }, [userLoading, userId, isAdmin])
 
   const fetchRiders = async () => {
-    if (!userId && !isAdmin) return
     setLoading(true)
     try {
-      let q = supabase.from('riders').select('*').order('name')
-      if (!isAdmin && userId) q = q.or(`user_id.eq.${userId},user_id.is.null`)
-      const { data, error } = await q
-      if (error) throw error
-      setRiders(data ?? [])
+      const res = await fetch('/api/admin/riders')
+      const data = await res.json()
+      setRiders(res.ok && Array.isArray(data) ? data : [])
     } catch {
-      try {
-        const res = await fetch('/api/admin/riders')
-        const apiData = await res.json()
-        setRiders(res.ok && Array.isArray(apiData) ? apiData : [])
-      } catch {
-        setRiders([])
-      }
+      setRiders([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const openCreate = () => {

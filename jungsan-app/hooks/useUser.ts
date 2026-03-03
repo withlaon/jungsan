@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 
@@ -8,38 +8,40 @@ export function useUser() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
     const supabase = createClient()
+
+    const resolveProfile = async (u: User | null) => {
+      if (!u) {
+        setUser(null)
+        setIsAdmin(false)
+        return
+      }
+      setUser(u)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', u.id)
+        .maybeSingle()
+      setIsAdmin(profile?.username?.toLowerCase() === 'admin')
+    }
+
     const load = async () => {
       const { data: { user: u } } = await supabase.auth.getUser()
-      setUser(u)
-      if (u) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', u.id)
-          .maybeSingle()
-        setIsAdmin(profile?.username?.toLowerCase() === 'admin')
-      } else {
-        setIsAdmin(false)
-      }
+      await resolveProfile(u)
       setLoading(false)
+      initializedRef.current = true
     }
+
     load()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        setIsAdmin(profile?.username?.toLowerCase() === 'admin')
-      } else {
-        setIsAdmin(false)
-      }
+      if (!initializedRef.current) return
+      await resolveProfile(session?.user ?? null)
     })
+
     return () => subscription.unsubscribe()
   }, [])
 
