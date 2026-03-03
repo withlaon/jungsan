@@ -206,7 +206,12 @@ export default function AdvancePaymentsPage() {
   }
 
   const handleDelete = async (id: string, riderName: string, type: 'advance' | 'recovery') => {
-    if (!confirm(`${riderName}의 ${type === 'advance' ? '선지급금' : '회수 내역'}을 삭제하시겠습니까?`)) return
+    const target = payments.find(p => p.id === id)
+    const label = type === 'advance' ? '선지급금' : '회수 내역'
+    const extraWarning = target?.deducted_settlement_id
+      ? '\n※ 이미 정산에 공제된 항목입니다. 삭제해도 기존 정산 결과는 변경되지 않습니다.'
+      : ''
+    if (!confirm(`${riderName}의 ${label}을 삭제하시겠습니까?${extraWarning}`)) return
     const { error } = await supabase.from('advance_payments').delete().eq('id', id)
     if (error) { toast.error('삭제 실패'); return }
     toast.success('삭제되었습니다.')
@@ -384,13 +389,11 @@ export default function AdvancePaymentsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {!p.deducted_settlement_id && (
-                        <Button size="sm" variant="ghost"
-                          onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
-                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
-                        </Button>
-                      )}
+                      <Button size="sm" variant="ghost"
+                        onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
