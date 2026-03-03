@@ -201,20 +201,18 @@ export default function PromotionsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [promoRes, riderRes] = await Promise.all([
+    const [promoRes, ridersData] = await Promise.all([
       (() => {
         let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
         if (!isAdmin && userId) q = q.eq('user_id', userId)
         return q
       })(),
-      (() => {
-        let q = supabase.from('riders').select('*').eq('status', 'active').order('name')
-        if (!isAdmin && userId) q = q.eq('user_id', userId)
-        return q
-      })(),
+      fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json()),
     ])
     if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
-    if (riderRes.data) setRiders(riderRes.data)
+    if (Array.isArray(ridersData)) {
+      setRiders((ridersData as Rider[]).filter(r => r.status === 'active'))
+    }
     setLoading(false)
   }
 

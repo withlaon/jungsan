@@ -158,20 +158,18 @@ export default function AdvancePaymentsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [paymentsRes, ridersRes] = await Promise.all([
+    const [paymentsRes, ridersData] = await Promise.all([
       (() => {
         let q = supabase.from('advance_payments').select('*, riders(*)').order('paid_date', { ascending: false })
         if (!isAdmin && userId) q = q.eq('user_id', userId)
         return q
       })(),
-      (() => {
-        let q = supabase.from('riders').select('*').eq('status', 'active').order('name')
-        if (!isAdmin && userId) q = q.eq('user_id', userId)
-        return q
-      })(),
+      fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json()),
     ])
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentWithRider[])
-    if (ridersRes.data) setRiders(ridersRes.data)
+    if (Array.isArray(ridersData)) {
+      setRiders((ridersData as Rider[]).filter(r => r.status === 'active'))
+    }
     setLoading(false)
   }
 
