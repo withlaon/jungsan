@@ -615,7 +615,7 @@ export default function SettlementUploadPage() {
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">총배달료</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">프로모션</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별정산금액</TableHead>
@@ -713,13 +713,13 @@ export default function SettlementUploadPage() {
                     <TableRow className="border-slate-700 hover:bg-transparent">
                       <TableHead className="text-slate-400 whitespace-nowrap">라이더</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">배달료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">기본정산금액</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ배달료</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ추가지급</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">프로모션</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
@@ -733,9 +733,9 @@ export default function SettlementUploadPage() {
                       <TableRow key={r.riderId} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="text-white font-medium whitespace-nowrap">{r.riderName}</TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{r.deliveryCount.toLocaleString()}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(r.deliveryFee)}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(r.additionalPay)}</TableCell>
-                        <TableCell className="text-blue-400 text-right whitespace-nowrap">{formatKRW(r.baseAmount)}</TableCell>
+                        <TableCell className="text-blue-400 text-right whitespace-nowrap font-medium">{formatKRW(r.baseAmount)}</TableCell>
+                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.deliveryFee)}</TableCell>
+                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.additionalPay)}</TableCell>
                         <TableCell className="text-amber-400 text-right whitespace-nowrap">{r.hourlyInsurance > 0 ? `-${formatKRW(r.hourlyInsurance)}` : '-'}</TableCell>
                         <TableCell className="text-cyan-400 text-right whitespace-nowrap">{r.totalEmploymentInsurance > 0 ? `-${formatKRW(r.totalEmploymentInsurance)}` : '-'}</TableCell>
                         <TableCell className="text-purple-400 text-right whitespace-nowrap">{r.totalAccidentInsurance > 0 ? `-${formatKRW(r.totalAccidentInsurance)}` : '-'}</TableCell>

@@ -215,13 +215,13 @@ export default function SettlementResultPage() {
                     <TableRow className="border-slate-700 hover:bg-transparent">
                       <TableHead className="text-slate-400 whitespace-nowrap">라이더명</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">배달료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">기본정산금액</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ배달료</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ추가지급</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">프로모션</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
@@ -236,9 +236,9 @@ export default function SettlementResultPage() {
                       <TableRow key={d.id} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="text-white font-medium whitespace-nowrap">{d.riders?.name}</TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{d.delivery_count.toLocaleString()}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(d.delivery_fee ?? 0)}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(d.additional_pay ?? 0)}</TableCell>
-                        <TableCell className="text-blue-400 text-right whitespace-nowrap">{formatKRW(d.base_amount)}</TableCell>
+                        <TableCell className="text-blue-400 text-right whitespace-nowrap font-medium">{formatKRW(d.base_amount)}</TableCell>
+                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(d.delivery_fee ?? 0)}</TableCell>
+                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(d.additional_pay ?? 0)}</TableCell>
                         <TableCell className="text-amber-400 text-right whitespace-nowrap">{(d.hourly_insurance ?? 0) > 0 ? `-${formatKRW(d.hourly_insurance ?? 0)}` : '-'}</TableCell>
                         <TableCell className="text-cyan-400 text-right whitespace-nowrap">{totalEmp(d) > 0 ? `-${formatKRW(totalEmp(d))}` : '-'}</TableCell>
                         <TableCell className="text-purple-400 text-right whitespace-nowrap">{totalAcc(d) > 0 ? `-${formatKRW(totalAcc(d))}` : '-'}</TableCell>
@@ -263,9 +263,9 @@ export default function SettlementResultPage() {
                     <TableRow className="border-slate-700 bg-slate-800/30 font-bold">
                       <TableCell className="text-white">합계</TableCell>
                       <TableCell className="text-slate-300 text-right">{details.reduce((s, d) => s + d.delivery_count, 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-slate-300 text-right">{formatKRW(summary.total_delivery)}</TableCell>
-                      <TableCell className="text-slate-300 text-right">{formatKRW(summary.total_add)}</TableCell>
                       <TableCell className="text-blue-400 text-right">{formatKRW(summary.total_base)}</TableCell>
+                      <TableCell className="text-slate-400 text-right text-xs">{formatKRW(summary.total_delivery)}</TableCell>
+                      <TableCell className="text-slate-400 text-right text-xs">{formatKRW(summary.total_add)}</TableCell>
                       <TableCell className="text-amber-400 text-right">{summary.total_hourly > 0 ? `-${formatKRW(summary.total_hourly)}` : '-'}</TableCell>
                       <TableCell className="text-cyan-400 text-right">{summary.total_emp > 0 ? `-${formatKRW(summary.total_emp)}` : '-'}</TableCell>
                       <TableCell className="text-purple-400 text-right">{summary.total_acc > 0 ? `-${formatKRW(summary.total_acc)}` : '-'}</TableCell>
@@ -305,15 +305,31 @@ export default function SettlementResultPage() {
                   정산 기간: {currentSettlement.week_start} ~ {currentSettlement.week_end}
                 </div>
                 <div className="space-y-1.5">
+                  {/* 배달건수 */}
+                  <div className="flex justify-between py-1.5 border-b border-slate-700/50">
+                    <span className="text-slate-400 text-sm">배달건수</span>
+                    <span className="font-medium text-sm text-white">{d.delivery_count}건</span>
+                  </div>
+                  {/* 기본정산금액 (배달료 + 추가지급 구분) */}
+                  <div className="flex justify-between py-1.5 border-b border-slate-700/50">
+                    <span className="text-slate-400 text-sm">기본정산금액</span>
+                    <span className="font-medium text-sm text-blue-400">{formatKRW(d.base_amount)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-700/30 pl-4">
+                    <span className="text-slate-500 text-xs">ㄴ 배달료</span>
+                    <span className="text-slate-400 text-xs">{formatKRW(d.delivery_fee ?? 0)}</span>
+                  </div>
+                  {(d.additional_pay ?? 0) > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-700/30 pl-4">
+                      <span className="text-slate-500 text-xs">ㄴ 추가지급</span>
+                      <span className="text-slate-400 text-xs">{formatKRW(d.additional_pay ?? 0)}</span>
+                    </div>
+                  )}
                   {[
-                    { label: '배달건수',        value: `${d.delivery_count}건`,         color: 'text-white' },
-                    { label: '배달료',           value: formatKRW(d.delivery_fee ?? 0),  color: 'text-slate-300' },
-                    { label: '추가지급',         value: formatKRW(d.additional_pay ?? 0),color: 'text-slate-300' },
-                    { label: '기본정산금액',     value: formatKRW(d.base_amount),         color: 'text-blue-400' },
                     { label: '시간제보험료',     value: `-${formatKRW(d.hourly_insurance ?? 0)}`, color: 'text-amber-400', skip: !d.hourly_insurance },
                     { label: '고용보험',         value: `-${formatKRW(empTotal)}`,         color: 'text-cyan-400',   skip: empTotal === 0 },
                     { label: '산재보험',         value: `-${formatKRW(accTotal)}`,         color: 'text-purple-400', skip: accTotal === 0 },
-                    { label: '프로모션',         value: `+${formatKRW(d.promotion_amount)}`,color:'text-violet-400',skip: d.promotion_amount === 0 },
+                    { label: '지사프로모션',     value: `+${formatKRW(d.promotion_amount)}`,color:'text-violet-400',skip: d.promotion_amount === 0 },
                     { label: '콜관리비',         value: `-${formatKRW(d.call_fee_deduction ?? 0)}`, color: 'text-orange-400', skip: !d.call_fee_deduction },
                     { label: '세금신고금액',     value: formatKRW(tb),                    color: 'text-emerald-400' },
                     { label: '원천세 (3.3%)',    value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
