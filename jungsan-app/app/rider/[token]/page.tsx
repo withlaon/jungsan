@@ -139,26 +139,45 @@ export default function RiderPortalPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                    {/* 배달건수 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">배달건수</span>
+                      <span className="text-sm font-medium text-white">{selectedDetail.delivery_count}건</span>
+                    </div>
+                    {/* 기본정산금액 (배달료 + 추가지급 구분) */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">기본 정산금액</span>
+                      <span className="text-sm font-medium text-blue-400">{formatKRW(selectedDetail.base_amount)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                      <span className="text-slate-500 text-xs">ㄴ 배달료</span>
+                      <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.delivery_fee ?? 0)}</span>
+                    </div>
+                    {(selectedDetail.additional_pay ?? 0) > 0 && (
+                      <div className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                        <span className="text-slate-500 text-xs">ㄴ 추가지급</span>
+                        <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.additional_pay ?? 0)}</span>
+                      </div>
+                    )}
+                    {selectedDetail.promotion_amount > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">지사프로모션</span>
+                        <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount)}</span>
+                      </div>
+                    )}
+                    <hr className="border-slate-700 my-2" />
                     {([
-                      { label: '배달건수',      value: `${selectedDetail.delivery_count}건`,                          color: 'text-white' },
-                      { label: '기본 정산금액', value: formatKRW(selectedDetail.base_amount),                         color: 'text-blue-400' },
-                      { label: '프로모션',       value: `+${formatKRW(selectedDetail.promotion_amount)}`,              color: 'text-violet-400', skip: selectedDetail.promotion_amount === 0 },
-                      'divider',
                       { label: '고용/산재보험', value: `-${formatKRW(selectedDetail.insurance_deduction)}`,           color: 'text-amber-400' },
                       { label: '소득세 (3.3%)', value: `-${formatKRW(selectedDetail.income_tax_deduction)}`,          color: 'text-rose-400' },
                       { label: '관리비',         value: `-${formatKRW(selectedDetail.management_fee_deduction)}`,     color: 'text-slate-400', skip: selectedDetail.management_fee_deduction === 0 },
                       { label: '선지급금 공제', value: `-${formatKRW(selectedDetail.advance_deduction)}`,             color: 'text-orange-400', skip: selectedDetail.advance_deduction === 0 },
                       { label: '선지급금 회수', value: `+${formatKRW(selectedDetail.advance_recovery ?? 0)}`,         color: 'text-teal-400',   skip: !(selectedDetail.advance_recovery && selectedDetail.advance_recovery > 0) },
-                    ] as const).filter(item => item === 'divider' || !('skip' in item && item.skip)).map((item, i) =>
-                      item === 'divider' ? (
-                        <hr key={`divider-${i}`} className="border-slate-700 my-2" />
-                      ) : (
-                        <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-700/40 last:border-0">
-                          <span className="text-slate-400 text-sm">{item.label}</span>
-                          <span className={`text-sm font-medium ${item.color}`}>{item.value}</span>
-                        </div>
-                      )
-                    )}
+                    ] as const).filter(item => !('skip' in item && item.skip)).map(item => (
+                      <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-700/40 last:border-0">
+                        <span className="text-slate-400 text-sm">{item.label}</span>
+                        <span className={`text-sm font-medium ${item.color}`}>{item.value}</span>
+                      </div>
+                    ))}
 
                     <div className="mt-3 bg-emerald-900/30 rounded-xl p-4 flex justify-between items-center border border-emerald-700/30">
                       <span className="text-emerald-300 font-bold">최종 지급액</span>
