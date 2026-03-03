@@ -71,11 +71,24 @@ export default function SettlementResultPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 정산을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.')) return
-    const { error } = await supabase.from('weekly_settlements').delete().eq('id', id)
-    if (error) { toast.error('삭제 실패'); return }
-    toast.success('정산이 삭제되었습니다.')
-    setDetails([])
-    fetchSettlements()
+    try {
+      const res = await fetch(`/api/admin/settlement?id=${id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('삭제 실패: ' + (data?.error ?? res.statusText))
+        return
+      }
+      toast.success('정산이 삭제되었습니다.')
+      setDetails([])
+      setSelectedId('')
+      setCurrentSettlement(null)
+      fetchSettlements()
+    } catch {
+      toast.error('삭제 실패: 네트워크 오류')
+    }
   }
 
   const handleExportAll = () => {
