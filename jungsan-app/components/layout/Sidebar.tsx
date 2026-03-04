@@ -185,13 +185,6 @@ export function Sidebar() {
           <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
           <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
         </div>
-        <button
-          onClick={() => setProfileOpen(true)}
-          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-xs"
-        >
-          <Pencil className="h-3 w-3" />
-          정보수정
-        </button>
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto flex flex-col">
@@ -248,6 +241,14 @@ export function Sidebar() {
         >
           <LogOut className="h-4 w-4" />
           로그아웃
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => setProfileOpen(true)}
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+        >
+          <Pencil className="h-4 w-4" />
+          정보수정
         </Button>
         <Button
           variant="ghost"
