@@ -15,6 +15,14 @@ import { exportSingleRiderExcel } from '@/lib/excel/export'
 
 type DetailWithSettlement = SettlementDetail & { weekly_settlements: WeeklySettlement }
 
+interface AdvanceItem {
+  id: string
+  amount: number
+  memo: string | null
+  type: 'advance' | 'recovery'
+  deducted_settlement_id: string | null
+}
+
 type Step = 'login' | 'portal'
 
 // 주민등록번호 정규화 (하이픈·공백 제거, 숫자만)
@@ -32,6 +40,7 @@ export default function RiderPortalPage() {
 
   const [rider, setRider] = useState<Rider | null>(null)
   const [details, setDetails] = useState<DetailWithSettlement[]>([])
+  const [advanceItems, setAdvanceItems] = useState<AdvanceItem[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [dataLoading, setDataLoading] = useState(false)
 
@@ -71,16 +80,29 @@ export default function RiderPortalPage() {
     setDataLoading(true)
     setStep('portal')
 
-    const { data: detailData } = await supabase
-      .from('settlement_details')
-      .select('*, weekly_settlements(*)')
-      .eq('rider_id', riderData.id)
-      .order('created_at', { ascending: false })
+    const [{ data: detailData }, { data: advData }] = await Promise.all([
+      supabase
+        .from('settlement_details')
+        .select('*, weekly_settlements(*)')
+        .eq('rider_id', riderData.id),
+      supabase
+        .from('advance_payments')
+        .select('id, amount, memo, type, deducted_settlement_id')
+        .eq('rider_id', riderData.id)
+        .not('deducted_settlement_id', 'is', null),
+    ])
 
     if (detailData && detailData.length > 0) {
-      setDetails(detailData as DetailWithSettlement[])
-      setSelectedId(detailData[0].id)
+      // week_start 기준 최신 날짜 먼저 정렬
+      const sorted = [...(detailData as DetailWithSettlement[])].sort((a, b) => {
+        const wa = a.weekly_settlements?.week_start ?? ''
+        const wb = b.weekly_settlements?.week_start ?? ''
+        return wb.localeCompare(wa)
+      })
+      setDetails(sorted)
+      setSelectedId(sorted[0].id)
     }
+    if (advData) setAdvanceItems(advData as AdvanceItem[])
     setDataLoading(false)
   }
 
@@ -89,12 +111,21 @@ export default function RiderPortalPage() {
     setIdNumber('')
     setRider(null)
     setDetails([])
+    setAdvanceItems([])
     setSelectedId('')
     setLoginError('')
   }
 
   const selectedDetail = details.find(d => d.id === selectedId)
   const currentSettlement = selectedDetail?.weekly_settlements
+
+  // 현재 선택된 정산에 공제된 선지급금/회수 항목
+  const currentAdvances = advanceItems.filter(
+    a => a.deducted_settlement_id === selectedDetail?.settlement_id && a.type === 'advance'
+  )
+  const currentRecoveries = advanceItems.filter(
+    a => a.deducted_settlement_id === selectedDetail?.settlement_id && a.type === 'recovery'
+  )
 
   // ── 로그인 화면 ──
   if (step === 'login') {
@@ -222,26 +253,88 @@ export default function RiderPortalPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-1">
-                    {([
-                      { label: '배달건수', value: `${selectedDetail.delivery_count}건`, color: 'text-white' },
-                      { label: '기본 정산금액', value: formatKRW(selectedDetail.base_amount), color: 'text-blue-400' },
-                      { label: '프로모션', value: `+${formatKRW(selectedDetail.promotion_amount)}`, color: 'text-violet-400' },
-                      null,
-                      { label: '고용/산재보험', value: `-${formatKRW(selectedDetail.insurance_deduction + (selectedDetail.employment_insurance_addition ?? 0) + (selectedDetail.accident_insurance_addition ?? 0))}`, color: 'text-amber-400' },
-                      { label: '소득세 (3.3%)', value: `-${formatKRW(selectedDetail.income_tax_deduction)}`, color: 'text-rose-400' },
-                      { label: '일반관리비', value: `-${formatKRW(selectedDetail.management_fee_deduction)}`, color: 'text-blue-400' },
-                      { label: '콜관리비', value: `-${formatKRW(selectedDetail.call_fee_deduction ?? 0)}`, color: 'text-orange-400' },
-                      { label: '선지급금 공제', value: `-${formatKRW(selectedDetail.advance_deduction)}`, color: 'text-amber-300' },
-                    ] as (null | { label: string; value: string; color: string })[]).map((item, i) =>
-                      item === null ? (
-                        <hr key={i} className="border-slate-700 my-2" />
-                      ) : (
-                        <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-700/40 last:border-0">
-                          <span className="text-slate-400 text-sm">{item.label}</span>
-                          <span className={`text-sm font-medium ${item.color}`}>{item.value}</span>
+                  <CardContent className="space-y-2">
+                    {/* 배달건수 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">배달건수</span>
+                      <span className="text-sm font-medium text-white">{selectedDetail.delivery_count}건</span>
+                    </div>
+                    {/* 기본정산금액 → 배달료 + 배민추가지급 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">기본 정산금액</span>
+                      <span className="text-sm font-medium text-blue-400">{formatKRW(selectedDetail.base_amount)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                      <span className="text-slate-500 text-xs">ㄴ 배달료</span>
+                      <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.delivery_fee ?? 0)}</span>
+                    </div>
+                    {(selectedDetail.additional_pay ?? 0) > 0 && (
+                      <div className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                        <span className="text-slate-500 text-xs">ㄴ 배민추가지급</span>
+                        <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.additional_pay ?? 0)}</span>
+                      </div>
+                    )}
+                    {/* 지사프로모션 - 0원이면 미표시 */}
+                    {(selectedDetail.promotion_amount ?? 0) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">지사프로모션</span>
+                        <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount)}</span>
+                      </div>
+                    )}
+                    <hr className="border-slate-700 my-2" />
+                    {/* 고용/산재보험 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">고용/산재보험</span>
+                      <span className="text-sm font-medium text-amber-400">-{formatKRW(selectedDetail.insurance_deduction)}</span>
+                    </div>
+                    {/* 소득세 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">소득세 (3.3%)</span>
+                      <span className="text-sm font-medium text-rose-400">-{formatKRW(selectedDetail.income_tax_deduction)}</span>
+                    </div>
+                    {/* 일반관리비 - 0원이면 미표시 */}
+                    {(selectedDetail.management_fee_deduction ?? 0) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">일반관리비</span>
+                        <span className="text-sm font-medium text-slate-400">-{formatKRW(selectedDetail.management_fee_deduction)}</span>
+                      </div>
+                    )}
+                    {/* 콜관리비 - 0원이면 미표시 */}
+                    {(selectedDetail.call_fee_deduction ?? 0) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">콜관리비</span>
+                        <span className="text-sm font-medium text-slate-400">-{formatKRW(selectedDetail.call_fee_deduction)}</span>
+                      </div>
+                    )}
+                    {/* 선지급금 공제 - 해당 라이더만 메모 포함 표시 */}
+                    {currentAdvances.length > 0 && (
+                      <>
+                        <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                          <span className="text-slate-400 text-sm">선지급금 공제</span>
+                          <span className="text-sm font-medium text-orange-400">-{formatKRW(selectedDetail.advance_deduction)}</span>
                         </div>
-                      )
+                        {currentAdvances.map(item => (
+                          <div key={item.id} className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                            <span className="text-slate-500 text-xs">ㄴ {item.memo ?? '선지급금'}</span>
+                            <span className="text-orange-300/80 text-xs">-{formatKRW(item.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {/* 회수등록 - 해당 라이더만 메모 포함 표시 */}
+                    {currentRecoveries.length > 0 && (
+                      <>
+                        <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                          <span className="text-slate-400 text-sm">회수등록</span>
+                          <span className="text-sm font-medium text-teal-400">+{formatKRW(selectedDetail.advance_recovery ?? 0)}</span>
+                        </div>
+                        {currentRecoveries.map(item => (
+                          <div key={item.id} className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                            <span className="text-slate-500 text-xs">ㄴ {item.memo ?? '회수'}</span>
+                            <span className="text-teal-300/80 text-xs">+{formatKRW(item.amount)}</span>
+                          </div>
+                        ))}
+                      </>
                     )}
                     <div className="mt-3 bg-emerald-900/30 rounded-xl p-4 flex justify-between items-center border border-emerald-700/30">
                       <span className="text-emerald-300 font-bold">최종 지급액</span>
