@@ -55,17 +55,17 @@ export default function RiderPortalPage() {
 
     setRider(riderData)
 
-    const [{ data: detailData }, { data: advData }] = await Promise.all([
+    const [{ data: detailData }, advRes] = await Promise.all([
       supabase
         .from('settlement_details')
         .select('*, weekly_settlements(*)')
         .eq('rider_id', riderData.id),
-      supabase
-        .from('advance_payments')
-        .select('id, amount, memo, type, deducted_settlement_id')
-        .eq('rider_id', riderData.id)
-        .not('deducted_settlement_id', 'is', null),
+      // advance_payments는 RLS 우회를 위해 서버사이드 API 사용 (모바일 포함 모든 환경 지원)
+      fetch(`/api/rider/advance-payments?rider_id=${riderData.id}`)
+        .then(r => r.json())
+        .catch(() => []),
     ])
+    const advData = Array.isArray(advRes) ? advRes : []
 
     if (detailData) {
       // week_start 기준 최신 날짜가 먼저 오도록 정렬
@@ -77,7 +77,7 @@ export default function RiderPortalPage() {
       setDetails(sorted)
       if (sorted.length > 0) setSelectedId(sorted[0].id)
     }
-    if (advData) setAdvanceItems(advData as AdvanceItem[])
+    if (advData.length > 0) setAdvanceItems(advData as AdvanceItem[])
 
     setLoading(false)
   }
