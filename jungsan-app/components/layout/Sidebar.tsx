@@ -24,7 +24,26 @@ import {
   UserX,
   AlertTriangle,
   BookOpen,
+  Package,
 } from 'lucide-react'
+import { useUser } from '@/hooks/useUser'
+
+const PLATFORM_CONFIG = {
+  baemin: {
+    label: '배민 라이더 정산',
+    sub: '배달의 민족',
+    accent: 'bg-teal-600',
+    activeNav: 'bg-teal-600 text-white shadow-lg',
+    icon: Bike,
+  },
+  coupang: {
+    label: '쿠팡 라이더 정산',
+    sub: '쿠팡이츠',
+    accent: 'bg-red-600',
+    activeNav: 'bg-red-600 text-white shadow-lg',
+    icon: Package,
+  },
+} as const
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
@@ -64,6 +83,9 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { platform } = useUser()
+  const config = PLATFORM_CONFIG[platform ?? 'baemin']
+  const PlatformIcon = config.icon
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [profile, setProfile] = useState<Profile>({ username: '', company_name: '', business_number: '', manager_name: '', phone: '', email: '' })
@@ -156,12 +178,12 @@ export function Sidebar() {
     <>
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
       <div className="p-5 flex items-center gap-3 border-b border-slate-700">
-        <div className="bg-blue-600 rounded-xl p-2 shrink-0">
-          <Bike className="h-6 w-6 text-white" />
+        <div className={`${config.accent} rounded-xl p-2 shrink-0`}>
+          <PlatformIcon className="h-6 w-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-white font-bold text-sm leading-tight">라이더 정산</h1>
-          <p className="text-slate-400 text-xs">관리자 시스템</p>
+          <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
+          <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
         </div>
         <button
           onClick={() => setProfileOpen(true)}
@@ -183,9 +205,7 @@ export function Sidebar() {
                 href={item.href}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 )}
               >
                 <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
@@ -207,9 +227,7 @@ export function Sidebar() {
                 href={item.href}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 )}
               >
                 <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />

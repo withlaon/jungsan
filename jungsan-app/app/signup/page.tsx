@@ -8,14 +8,35 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bike, Loader2, CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
+import { Bike, Loader2, CheckCircle, XCircle, ArrowLeft, Package } from 'lucide-react'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken'
+type Platform = 'baemin' | 'coupang'
+
+const PLATFORMS: { id: Platform; label: string; desc: string; color: string; border: string; icon: React.ReactNode }[] = [
+  {
+    id: 'baemin',
+    label: '배달의 민족',
+    desc: '배민 라이더 정산',
+    color: 'text-teal-300',
+    border: 'border-teal-500 bg-teal-900/30',
+    icon: <Bike className="h-6 w-6 text-teal-400" />,
+  },
+  {
+    id: 'coupang',
+    label: '쿠팡이츠',
+    desc: '쿠팡 라이더 정산',
+    color: 'text-red-300',
+    border: 'border-red-500 bg-red-900/30',
+    icon: <Package className="h-6 w-6 text-red-400" />,
+  },
+]
 
 export default function SignupPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const [platform, setPlatform] = useState<Platform | null>(null)
   const [form, setForm] = useState({
     username: '',
     password: '',
@@ -61,6 +82,10 @@ export default function SignupPage() {
     e.preventDefault()
     setError('')
 
+    if (!platform) {
+      setError('사용하실 플랫폼을 먼저 선택해주세요.')
+      return
+    }
     if (form.username.trim().toLowerCase() === 'admin') {
       setError('해당 아이디는 사용할 수 없습니다.')
       return
@@ -117,6 +142,9 @@ export default function SignupPage() {
       return
     }
 
+    // 플랫폼 저장 (프로필 생성 후 업데이트)
+    await supabase.from('profiles').update({ platform }).eq('id', authData.user.id)
+
     setLoading(false)
     router.push('/')
   }
@@ -141,6 +169,44 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-4">
+
+              {/* 플랫폼 선택 */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">
+                  사용 플랫폼 <span className="text-red-400">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PLATFORMS.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setPlatform(p.id)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
+                        ${platform === p.id
+                          ? p.border + ' shadow-lg scale-[1.02]'
+                          : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                        }`}
+                    >
+                      {p.icon}
+                      <span className={`font-bold text-sm ${platform === p.id ? p.color : 'text-slate-300'}`}>
+                        {p.label}
+                      </span>
+                      <span className="text-slate-500 text-xs">{p.desc}</span>
+                      {platform === p.id && (
+                        <CheckCircle className={`h-4 w-4 ${p.color}`} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {!platform && (
+                  <p className="text-slate-500 text-xs text-center">플랫폼을 선택하면 맞춤형 정산 시스템이 제공됩니다</p>
+                )}
+              </div>
+
+              {/* 구분선 */}
+              <div className="border-t border-slate-700 pt-1">
+                <p className="text-slate-500 text-xs">계정 정보</p>
+              </div>
 
               {/* 아이디 */}
               <div className="space-y-1.5">
