@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Rider, SettlementDetail, WeeklySettlement } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,8 +30,6 @@ function normalizeIdNumber(idNumber: string) {
 }
 
 export default function RiderPortalPage() {
-  const supabase = createClient()
-
   const [step, setStep] = useState<Step>('login')
   const [idNumber, setIdNumber] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
@@ -51,7 +48,7 @@ export default function RiderPortalPage() {
     setLoginLoading(true)
     setLoginError('')
 
-    // 입력값과 DB 저장값 모두 정규화해서 비교 (숫자 13자리)
+    // 입력값 정규화 (숫자 13자리)
     const normalized = normalizeIdNumber(trimmed)
     if (normalized.length !== 13) {
       setLoginError('주민등록번호 13자리를 입력해주세요.')
@@ -59,42 +56,35 @@ export default function RiderPortalPage() {
       return
     }
 
-    // 하이픈 있는 형식 (6-7)
-    const formatted = normalized.replace(/^(\d{6})(\d{7})$/, '$1-$2')
+    // RLS 우회를 위해 서버사이드 API로 라이더 조회
+    const riderRes = await fetch(`/api/rider/by-ssn?ssn=${encodeURIComponent(trimmed)}`)
+      .then(r => r.json())
+      .catch(() => null)
 
-    const { data: riderData } = await supabase
-      .from('riders')
-      .select('*')
-      .or(`id_number.eq.${trimmed},id_number.eq.${normalized},id_number.eq.${formatted}`)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!riderData) {
+    if (!riderRes || riderRes.notFound || riderRes.error) {
       setLoginError('일치하는 라이더 정보가 없습니다. 주민등록번호를 다시 확인해주세요.')
       setLoginLoading(false)
       return
     }
+    const riderData = riderRes as Rider
 
     setRider(riderData)
     setLoginLoading(false)
     setDataLoading(true)
     setStep('portal')
 
-    const [{ data: detailData }, advRes] = await Promise.all([
-      supabase
-        .from('settlement_details')
-        .select('*, weekly_settlements(*)')
-        .eq('rider_id', riderData.id),
-      // advance_payments는 RLS 우회를 위해 서버사이드 API 사용 (모바일 포함 모든 환경 지원)
-      fetch(`/api/rider/advance-payments?rider_id=${riderData.id}`)
-        .then(r => r.json())
-        .catch(() => []),
-    ])
-    const advData = Array.isArray(advRes) ? advRes : []
+    // RLS 우회를 위해 서버사이드 API로 settlement_details + advance_payments 일괄 조회
+    // → 모바일 포함 모든 환경에서 동일하게 동작
+    const res = await fetch(`/api/rider/settlements?rider_id=${riderData.id}`)
+      .then(r => r.json())
+      .catch(() => ({ details: [], advances: [] }))
 
-    if (detailData && detailData.length > 0) {
+    const detailData: DetailWithSettlement[] = Array.isArray(res.details) ? res.details : []
+    const advData: AdvanceItem[] = Array.isArray(res.advances) ? res.advances : []
+
+    if (detailData.length > 0) {
       // week_start 기준 최신 날짜 먼저 정렬
-      const sorted = [...(detailData as DetailWithSettlement[])].sort((a, b) => {
+      const sorted = [...detailData].sort((a, b) => {
         const wa = a.weekly_settlements?.week_start ?? ''
         const wb = b.weekly_settlements?.week_start ?? ''
         return wb.localeCompare(wa)
@@ -102,7 +92,7 @@ export default function RiderPortalPage() {
       setDetails(sorted)
       setSelectedId(sorted[0].id)
     }
-    if (advData.length > 0) setAdvanceItems(advData as AdvanceItem[])
+    if (advData.length > 0) setAdvanceItems(advData)
     setDataLoading(false)
   }
 

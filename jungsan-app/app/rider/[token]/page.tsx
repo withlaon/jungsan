@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { SettlementDetail, Rider, WeeklySettlement } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +24,6 @@ interface AdvanceItem {
 export default function RiderPortalPage() {
   const params = useParams()
   const token = params.token as string
-  const supabase = createClient()
 
   const [rider, setRider] = useState<Rider | null>(null)
   const [details, setDetails] = useState<DetailWithSettlement[]>([])
@@ -41,35 +39,32 @@ export default function RiderPortalPage() {
   const loadRiderData = async () => {
     setLoading(true)
 
-    const { data: riderData } = await supabase
-      .from('riders')
-      .select('*')
-      .eq('access_token', token)
-      .single()
+    // RLS 우회를 위해 서버사이드 API로 라이더 조회
+    const riderRes = await fetch(`/api/rider/by-token?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .catch(() => null)
 
-    if (!riderData) {
+    if (!riderRes || riderRes.error) {
       setNotFound(true)
       setLoading(false)
       return
     }
+    const riderData = riderRes as Rider
 
     setRider(riderData)
 
-    const [{ data: detailData }, advRes] = await Promise.all([
-      supabase
-        .from('settlement_details')
-        .select('*, weekly_settlements(*)')
-        .eq('rider_id', riderData.id),
-      // advance_payments는 RLS 우회를 위해 서버사이드 API 사용 (모바일 포함 모든 환경 지원)
-      fetch(`/api/rider/advance-payments?rider_id=${riderData.id}`)
-        .then(r => r.json())
-        .catch(() => []),
-    ])
-    const advData = Array.isArray(advRes) ? advRes : []
+    // RLS 우회를 위해 서버사이드 API로 settlement_details + advance_payments 일괄 조회
+    // → 모바일 포함 모든 환경에서 동일하게 동작
+    const res = await fetch(`/api/rider/settlements?rider_id=${riderData.id}`)
+      .then(r => r.json())
+      .catch(() => ({ details: [], advances: [] }))
 
-    if (detailData) {
+    const detailData: DetailWithSettlement[] = Array.isArray(res.details) ? res.details : []
+    const advData: AdvanceItem[] = Array.isArray(res.advances) ? res.advances : []
+
+    if (detailData.length > 0) {
       // week_start 기준 최신 날짜가 먼저 오도록 정렬
-      const sorted = [...(detailData as DetailWithSettlement[])].sort((a, b) => {
+      const sorted = [...detailData].sort((a, b) => {
         const wa = a.weekly_settlements?.week_start ?? ''
         const wb = b.weekly_settlements?.week_start ?? ''
         return wb.localeCompare(wa)
@@ -77,7 +72,7 @@ export default function RiderPortalPage() {
       setDetails(sorted)
       if (sorted.length > 0) setSelectedId(sorted[0].id)
     }
-    if (advData.length > 0) setAdvanceItems(advData as AdvanceItem[])
+    if (advData.length > 0) setAdvanceItems(advData)
 
     setLoading(false)
   }
