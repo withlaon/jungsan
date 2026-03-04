@@ -59,8 +59,7 @@ export default function RiderPortalPage() {
       supabase
         .from('settlement_details')
         .select('*, weekly_settlements(*)')
-        .eq('rider_id', riderData.id)
-        .order('created_at', { ascending: false }),
+        .eq('rider_id', riderData.id),
       supabase
         .from('advance_payments')
         .select('id, amount, memo, type, deducted_settlement_id')
@@ -69,8 +68,14 @@ export default function RiderPortalPage() {
     ])
 
     if (detailData) {
-      setDetails(detailData as DetailWithSettlement[])
-      if (detailData.length > 0) setSelectedId(detailData[0].id)
+      // week_start 기준 최신 날짜가 먼저 오도록 정렬
+      const sorted = [...(detailData as DetailWithSettlement[])].sort((a, b) => {
+        const wa = a.weekly_settlements?.week_start ?? ''
+        const wb = b.weekly_settlements?.week_start ?? ''
+        return wb.localeCompare(wa)
+      })
+      setDetails(sorted)
+      if (sorted.length > 0) setSelectedId(sorted[0].id)
     }
     if (advData) setAdvanceItems(advData as AdvanceItem[])
 
@@ -180,7 +185,7 @@ export default function RiderPortalPage() {
                     </div>
                     {(selectedDetail.additional_pay ?? 0) > 0 && (
                       <div className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
-                        <span className="text-slate-500 text-xs">ㄴ 추가지급</span>
+                        <span className="text-slate-500 text-xs">ㄴ 배민추가지급</span>
                         <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.additional_pay ?? 0)}</span>
                       </div>
                     )}
@@ -223,11 +228,11 @@ export default function RiderPortalPage() {
                         ))}
                       </>
                     )}
-                    {/* 선지급금 회수 - 항목별 메모 표시 */}
+                    {/* 회수등록 - 항목별 메모 표시 */}
                     {currentRecoveries.length > 0 && (
                       <>
                         <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                          <span className="text-slate-400 text-sm">선지급금 회수</span>
+                          <span className="text-slate-400 text-sm">회수등록</span>
                           <span className="text-sm font-medium text-teal-400">+{formatKRW(selectedDetail.advance_recovery ?? 0)}</span>
                         </div>
                         {currentRecoveries.map(item => (
