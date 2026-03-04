@@ -14,6 +14,7 @@ const PROTECTED_PREFIXES = [
   '/settlement',
   '/rider-site',
   '/site-admin',
+  '/manual',
 ]
 
 export async function proxy(request: NextRequest) {

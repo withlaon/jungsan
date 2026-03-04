@@ -23,6 +23,7 @@ import {
   EyeOff,
   UserX,
   AlertTriangle,
+  BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -36,46 +37,18 @@ import {
 } from '@/components/ui/dialog'
 
 const navItems = [
-  {
-    href: '/dashboard',
-    label: '주간정산현황',
-    icon: BarChart3,
-  },
-  {
-    href: '/riders',
-    label: '라이더 관리',
-    icon: Users,
-  },
-  {
-    href: '/advance-payments',
-    label: '선지급금 관리',
-    icon: Wallet,
-  },
-  {
-    href: '/promotions',
-    label: '프로모션 설정',
-    icon: Gift,
-  },
-  {
-    href: '/settings',
-    label: '관리비 설정',
-    icon: Settings,
-  },
-  {
-    href: '/settlement/upload',
-    label: '정산파일 등록',
-    icon: Upload,
-  },
-  {
-    href: '/settlement/result',
-    label: '정산결과보기',
-    icon: FileText,
-  },
-  {
-    href: '/rider-site',
-    label: '라이더사이트',
-    icon: Globe,
-  },
+  { href: '/dashboard',          label: '주간정산현황',   icon: BarChart3 },
+  { href: '/riders',             label: '라이더 관리',    icon: Users     },
+  { href: '/advance-payments',   label: '선지급금 관리',  icon: Wallet    },
+  { href: '/promotions',         label: '프로모션 설정',  icon: Gift      },
+  { href: '/settings',           label: '관리비 설정',    icon: Settings  },
+  { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload    },
+  { href: '/settlement/result',  label: '정산결과보기',   icon: FileText  },
+  { href: '/rider-site',         label: '라이더사이트',   icon: Globe     },
+]
+
+const bottomNavItems = [
+  { href: '/manual', label: '사용자 메뉴얼', icon: BookOpen },
 ]
 
 interface Profile {
@@ -199,28 +172,53 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto flex flex-col">
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
+                <span className="truncate">{item.label}</span>
+                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+              </Link>
+            )
+          })}
+        </div>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                isActive
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              )}
-            >
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
-              <span className="truncate">{item.label}</span>
-              {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
-            </Link>
-          )
-        })}
+        {/* 구분선 + 사용자 메뉴얼 */}
+        <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-1">
+          {bottomNavItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
+                <span className="truncate">{item.label}</span>
+                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       <div className="p-3 border-t border-slate-700 space-y-1">
