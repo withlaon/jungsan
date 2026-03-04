@@ -206,11 +206,18 @@ export default function RiderPortalPage() {
                       <span className="text-slate-400 text-sm">소득세 (3.3%)</span>
                       <span className="text-sm font-medium text-rose-400">-{formatKRW(selectedDetail.income_tax_deduction)}</span>
                     </div>
-                    {/* 관리비 */}
-                    {selectedDetail.management_fee_deduction > 0 && (
+                    {/* 일반관리비 - 0원이면 미표시 */}
+                    {(selectedDetail.management_fee_deduction ?? 0) > 0 && (
                       <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                        <span className="text-slate-400 text-sm">관리비</span>
+                        <span className="text-slate-400 text-sm">일반관리비</span>
                         <span className="text-sm font-medium text-slate-400">-{formatKRW(selectedDetail.management_fee_deduction)}</span>
+                      </div>
+                    )}
+                    {/* 콜관리비 - 0원이면 미표시 */}
+                    {(selectedDetail.call_fee_deduction ?? 0) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">콜관리비</span>
+                        <span className="text-sm font-medium text-slate-400">-{formatKRW(selectedDetail.call_fee_deduction)}</span>
                       </div>
                     )}
                     {/* 선지급금 공제 - 항목별 메모 표시 */}
