@@ -189,12 +189,11 @@ export default function RiderPortalPage() {
                         <span className="text-slate-400 text-xs">{formatKRW(selectedDetail.additional_pay ?? 0)}</span>
                       </div>
                     )}
-                    {selectedDetail.promotion_amount > 0 && (
-                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                        <span className="text-slate-400 text-sm">지사프로모션</span>
-                        <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount)}</span>
-                      </div>
-                    )}
+                    {/* 지사프로모션 - 항상 표시 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">지사프로모션</span>
+                      <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount ?? 0)}</span>
+                    </div>
                     <hr className="border-slate-700 my-2" />
                     {/* 고용/산재보험 */}
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">
