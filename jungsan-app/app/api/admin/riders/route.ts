@@ -33,7 +33,7 @@ export async function GET() {
         const { data: rows } = await admin
           .from('riders')
           .select('*')
-          .or(`user_id.eq.${user.id},user_id.is.null`)
+          .eq('user_id', user.id)
           .order('name')
         data = rows ?? []
       }
@@ -41,7 +41,7 @@ export async function GET() {
       const msg = e instanceof Error ? e.message : String(e)
       if (/SUPABASE_SERVICE_ROLE_KEY|설정되지 않았습니다/i.test(msg)) {
         let q = supabase.from('riders').select('*').order('name')
-        if (!isAdmin) q = q.or(`user_id.eq.${user.id},user_id.is.null`)
+        if (!isAdmin) q = q.eq('user_id', user.id)
         const { data: rows } = await q
         data = rows ?? []
       } else {
