@@ -5,14 +5,13 @@ import { useUser } from '@/hooks/useUser'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Copy, ExternalLink, Smartphone, CheckCircle, Info, Link2 } from 'lucide-react'
+import { Copy, ExternalLink, CheckCircle, Info, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function RiderSitePage() {
   const { user, loading: userLoading } = useUser()
   const [origin, setOrigin] = useState('')
   const [copiedPersonal, setCopiedPersonal] = useState(false)
-  const [copiedGeneral, setCopiedGeneral] = useState(false)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -36,17 +35,11 @@ export default function RiderSitePage() {
   }, [user])
 
   const personalUrl = username ? `${origin}/rider/site/${username}` : ''
-  const generalUrl = `${origin}/rider`
 
-  const handleCopy = (url: string, type: 'personal' | 'general') => {
+  const handleCopy = (url: string) => {
     navigator.clipboard.writeText(url)
-    if (type === 'personal') {
-      setCopiedPersonal(true)
-      setTimeout(() => setCopiedPersonal(false), 2000)
-    } else {
-      setCopiedGeneral(true)
-      setTimeout(() => setCopiedGeneral(false), 2000)
-    }
+    setCopiedPersonal(true)
+    setTimeout(() => setCopiedPersonal(false), 2000)
     toast.success('라이더 사이트 주소가 복사되었습니다.')
   }
 
@@ -80,7 +73,7 @@ export default function RiderSitePage() {
             <div className="bg-slate-800 rounded-lg p-4 flex items-center justify-between gap-3">
               <span className="text-white font-mono text-sm break-all">{personalUrl}</span>
               <div className="flex gap-2 shrink-0">
-                <Button size="sm" onClick={() => handleCopy(personalUrl, 'personal')}
+                <Button size="sm" onClick={() => handleCopy(personalUrl)}
                   className={`h-8 text-xs transition-colors ${copiedPersonal ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                   {copiedPersonal
                     ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />복사됨</>
@@ -94,35 +87,6 @@ export default function RiderSitePage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* 공용 URL */}
-      <Card className="border-slate-700 bg-slate-900">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-slate-300 text-base flex items-center gap-2">
-            <Globe className="h-5 w-5 text-slate-400" />
-            공용 라이더 사이트 주소
-          </CardTitle>
-          <p className="text-slate-500 text-xs mt-1">모든 계정의 라이더가 조회 가능한 공용 주소 (SSN 기반 전체 검색)</p>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-slate-800/60 rounded-lg p-4 flex items-center justify-between gap-3">
-            <span className="text-slate-400 font-mono text-sm break-all">{generalUrl || 'https://jungsan-iol8.vercel.app/rider'}</span>
-            <div className="flex gap-2 shrink-0">
-              <Button size="sm" onClick={() => handleCopy(generalUrl, 'general')}
-                className={`h-8 text-xs transition-colors ${copiedGeneral ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-600 hover:bg-slate-500'}`}>
-                {copiedGeneral
-                  ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />복사됨</>
-                  : <><Copy className="h-3.5 w-3.5 mr-1" />복사</>}
-              </Button>
-              <Button size="sm" variant="outline"
-                onClick={() => window.open(generalUrl, '_blank')}
-                className="h-8 text-xs border-slate-700 text-slate-400 hover:bg-slate-700">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />열기
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
