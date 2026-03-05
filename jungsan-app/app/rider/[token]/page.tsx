@@ -80,6 +80,14 @@ export default function RiderPortalPage() {
   const selectedDetail = details.find(d => d.id === selectedId)
   const currentSettlement = selectedDetail?.weekly_settlements
 
+  const employmentTotal =
+    (selectedDetail?.excel_employment_insurance ?? 0) +
+    (selectedDetail?.employment_insurance_addition ?? 0)
+  const accidentTotal =
+    (selectedDetail?.excel_accident_insurance ?? 0) +
+    (selectedDetail?.accident_insurance_addition ?? 0)
+  const combinedInsurance = employmentTotal + accidentTotal
+
   // 현재 선택된 정산에 공제된 선지급금/회수 항목
   const currentAdvances  = advanceItems.filter(
     a => a.deducted_settlement_id === selectedDetail?.settlement_id && a.type === 'advance'
@@ -190,27 +198,13 @@ export default function RiderPortalPage() {
                       <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount ?? 0)}</span>
                     </div>
                     <hr className="border-slate-700 my-2" />
-                    {/* 시간제보험료 - 0원이면 미표시 */}
-                    {(selectedDetail.hourly_insurance ?? 0) > 0 && (
-                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                        <span className="text-slate-400 text-sm">시간제보험료</span>
-                        <span className="text-sm font-medium text-amber-400">-{formatKRW(selectedDetail.hourly_insurance ?? 0)}</span>
-                      </div>
-                    )}
-                    {/* 고용보험 - 0원이면 미표시 */}
-                    {((selectedDetail.excel_employment_insurance ?? 0) + (selectedDetail.employment_insurance_addition ?? 0)) > 0 && (
-                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                        <span className="text-slate-400 text-sm">고용보험</span>
-                        <span className="text-sm font-medium text-cyan-400">-{formatKRW((selectedDetail.excel_employment_insurance ?? 0) + (selectedDetail.employment_insurance_addition ?? 0))}</span>
-                      </div>
-                    )}
-                    {/* 산재보험 - 0원이면 미표시 */}
-                    {((selectedDetail.excel_accident_insurance ?? 0) + (selectedDetail.accident_insurance_addition ?? 0)) > 0 && (
-                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                        <span className="text-slate-400 text-sm">산재보험</span>
-                        <span className="text-sm font-medium text-purple-400">-{formatKRW((selectedDetail.excel_accident_insurance ?? 0) + (selectedDetail.accident_insurance_addition ?? 0))}</span>
-                      </div>
-                    )}
+                    {/* 고용/산재보험 = 고용보험 + 산재보험 */}
+                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                      <span className="text-slate-400 text-sm">고용/산재보험</span>
+                      <span className="text-sm font-medium text-amber-400">
+                        {combinedInsurance > 0 ? `-${formatKRW(combinedInsurance)}` : '-'}
+                      </span>
+                    </div>
                     {/* 소득세 */}
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">
                       <span className="text-slate-400 text-sm">소득세</span>
