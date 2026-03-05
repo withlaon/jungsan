@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useInactivityLogout } from '@/hooks/useInactivityLogout'
 import { Rider, SettlementDetail, WeeklySettlement } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -116,6 +117,9 @@ export default function RiderSiteByUserPage() {
   const currentRecoveries = advanceItems.filter(
     a => a.deducted_settlement_id === selectedDetail?.settlement_id && a.type === 'recovery'
   )
+
+  // 포털 진입 후 1시간 무활동 시 자동 로그아웃
+  useInactivityLogout(handleLogout, undefined, step === 'portal')
 
   // ── 로그인 화면 ──
   if (step === 'login') {

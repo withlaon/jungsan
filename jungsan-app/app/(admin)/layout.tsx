@@ -1,8 +1,12 @@
+'use client'
+
 import { Sidebar } from '@/components/layout/Sidebar'
+import { InactivityGuard } from '@/components/layout/InactivityGuard'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-slate-950">
+      <InactivityGuard />
       <Sidebar />
       <main className="flex-1 overflow-auto">
         {children}
