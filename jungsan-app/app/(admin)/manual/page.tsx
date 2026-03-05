@@ -142,7 +142,7 @@ export default function ManualPage() {
           <p>
             <strong className="text-white">라이더 정산 시스템</strong>은 {isBaemin ? '배달의 민족' : '쿠팡이츠'}
             {' '}라이더의 주간 정산을 자동화하는 통합 관리 플랫폼입니다.
-            엑셀 파일을 업로드하면 보험료·관리비·프로모션·원천세를 자동 계산하고 라이더별 정산서를 발행합니다.
+            엑셀 파일을 업로드하면 보험료·관리비·프로모션·소득세를 자동 계산하고 라이더별 정산서를 발행합니다.
           </p>
 
           {/* 플랫폼 배지 */}
@@ -446,7 +446,7 @@ export default function ManualPage() {
           <div className="space-y-2">
             <p className="text-white font-medium">④ 정산 결과 확인 및 확정</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>라이더별 배달건수·기본정산금액·보험료·지사프로모션·관리비·원천세·최종정산금액 확인</li>
+              <li>라이더별 배달건수·기본정산금액·보험료·지사프로모션·관리비·소득세·최종정산금액 확인</li>
               <li><strong className="text-white">임시저장:</strong> 나중에 수정 가능한 상태로 저장</li>
               <li><strong className="text-white">정산 확정:</strong> 확정 완료 (선지급금 자동 공제 처리)</li>
             </ul>
@@ -459,7 +459,7 @@ export default function ManualPage() {
               <div className="space-y-1 text-xs text-slate-300 font-mono">
                 <p>기본정산금액 = 배달료 + 추가지급(배민추가지급)</p>
                 <p>세금신고금액 = 기본정산금액 + 지사프로모션</p>
-                <p>원천세 = 세금신고금액 × 3.3% <span className="text-amber-300">(원단위 절상)</span></p>
+                <p>소득세 = 세금신고금액 × 3.6% <span className="text-amber-300">(원단위 절상)</span></p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
                   최종정산금액 = 기본정산금액<br />
                   <span className="ml-14">− 시간제보험료<br /></span>
@@ -467,7 +467,7 @@ export default function ManualPage() {
                   <span className="ml-14">− 산재보험(근로자)<br /></span>
                   <span className="ml-14">+ 지사프로모션<br /></span>
                   <span className="ml-14">− 콜관리비<br /></span>
-                  <span className="ml-14">− 원천세<br /></span>
+                  <span className="ml-14">− 소득세<br /></span>
                   <span className="ml-14">− 선지급금 공제<br /></span>
                   <span className="ml-14">+ 선지급금 회수</span>
                 </p>
@@ -476,14 +476,14 @@ export default function ManualPage() {
               <div className="space-y-1 text-xs text-slate-300 font-mono">
                 <p>기본정산금액 = 배달료 + 추가지급</p>
                 <p>세금신고금액 = 기본정산금액</p>
-                <p>원천세 = 세금신고금액 × 3.3%</p>
+                <p>소득세 = 세금신고금액 × 3.6%</p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
                   최종정산금액 = 기본정산금액<br />
                   <span className="ml-14">− 고용보험(근로자)<br /></span>
                   <span className="ml-14">− 산재보험(근로자)<br /></span>
                   <span className="ml-14">+ 지사프로모션<br /></span>
                   <span className="ml-14">− 콜관리비<br /></span>
-                  <span className="ml-14">− 원천세<br /></span>
+                  <span className="ml-14">− 소득세<br /></span>
                   <span className="ml-14">− 선지급금 공제<br /></span>
                   <span className="ml-14">+ 선지급금 회수</span>
                 </p>
@@ -687,8 +687,8 @@ export default function ManualPage() {
               a: '정산 결과 삭제 시 해당 정산에서 공제된 선지급금의 공제 상태가 "미공제"로 자동 초기화됩니다.',
             },
             ...(isBaemin ? [{
-              q: '원천세가 예상과 다르게 계산되어요.',
-              a: '배달의 민족 정산에서 원천세는 세금신고금액(기본정산금액+지사프로모션) × 3.3%를 원단위 절상(올림)하여 계산합니다.',
+              q: '소득세가 예상과 다르게 계산되어요.',
+              a: '배달의 민족 정산에서 소득세는 세금신고금액(기본정산금액+지사프로모션) × 3.6%를 원단위 절상(올림)하여 계산합니다.',
             }] : []),
             {
               q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',

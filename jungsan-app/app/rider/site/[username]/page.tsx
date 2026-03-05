@@ -271,7 +271,7 @@ export default function RiderSiteByUserPage() {
                       <span className="text-sm font-medium text-amber-400">-{formatKRW(selectedDetail.insurance_deduction)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                      <span className="text-slate-400 text-sm">소득세 (3.3%)</span>
+                      <span className="text-slate-400 text-sm">소득세 (3.6%)</span>
                       <span className="text-sm font-medium text-rose-400">-{formatKRW(selectedDetail.income_tax_deduction)}</span>
                     </div>
                     {(selectedDetail.management_fee_deduction ?? 0) > 0 && (

@@ -30,7 +30,7 @@ export interface RiderSettlementResult {
   callFeeDeduction: number            // 콜관리비
   managementFeeDeduction: number      // 일반관리비 (보관용)
   taxBaseAmount: number               // 세금신고금액
-  incomeTaxDeduction: number          // 원천세 (= taxBaseAmount × 3.3%)
+  incomeTaxDeduction: number          // 소득세 (= taxBaseAmount × 3.6%)
   advanceDeduction: number            // 선지급금
   advanceRecovery: number             // 선지급금회수
   finalAmount: number                 // 최종정산금액
@@ -136,7 +136,7 @@ export function calculateSettlement(
     // ── 원천세 ──
     let incomeTaxDeduction: number
     if (isBaemin) {
-      // [배민] 원천세 = 세금신고금액 × 3.3% (원단위 절상)
+      // [배민] 소득세 = 세금신고금액 × 3.6% (원단위 절상)
       incomeTaxDeduction = Math.ceil(taxBaseAmount * settings.income_tax_rate)
     } else {
       incomeTaxDeduction = Math.floor(taxBaseAmount * settings.income_tax_rate)
@@ -154,7 +154,7 @@ export function calculateSettlement(
     let finalAmount: number
     if (isBaemin) {
       // [배민] 최종정산금액 = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험
-      //                      + 지사프로모션 - 콜관리비 - 원천세 - 선지급금 + 선지급금회수
+      //                      + 지사프로모션 - 콜관리비 - 소득세 - 선지급금 + 선지급금회수
       finalAmount = Math.max(0,
         baseAmount
         - hourlyInsurance
@@ -167,7 +167,7 @@ export function calculateSettlement(
         + advanceRecovery
       )
     } else {
-      // [쿠팡 등] 기존 계산식: 세금신고금액 - 원천세 - 선지급금 + 선지급금회수
+      // [쿠팡 등] 기존 계산식: 세금신고금액 - 소득세 - 선지급금 + 선지급금회수
       finalAmount = Math.max(0, taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery)
     }
 
