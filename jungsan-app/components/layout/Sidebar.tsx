@@ -25,7 +25,10 @@ import {
   AlertTriangle,
   BookOpen,
   Package,
+  ImagePlus,
+  Trash2,
 } from 'lucide-react'
+import Image from 'next/image'
 import { useUser } from '@/hooks/useUser'
 
 const PLATFORM_CONFIG = {
@@ -77,6 +80,7 @@ interface Profile {
   manager_name: string
   phone: string
   email: string
+  logo_url: string
 }
 
 export function Sidebar() {
@@ -88,7 +92,7 @@ export function Sidebar() {
   const PlatformIcon = config.icon
 
   const [profileOpen, setProfileOpen] = useState(false)
-  const [profile, setProfile] = useState<Profile>({ username: '', company_name: '', business_number: '', manager_name: '', phone: '', email: '' })
+  const [profile, setProfile] = useState<Profile>({ username: '', company_name: '', business_number: '', manager_name: '', phone: '', email: '', logo_url: '' })
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -96,9 +100,20 @@ export function Sidebar() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
+  // 로고 관련 state
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string>('')
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string>('')
+
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawMsg, setWithdrawMsg] = useState('')
+
+  // 초기 로드 시 사이드바 로고 가져오기
+  useEffect(() => {
+    fetchSidebarLogo()
+  }, [])
 
   useEffect(() => {
     if (profileOpen) {
@@ -106,8 +121,17 @@ export function Sidebar() {
       setNewPassword('')
       setNewPasswordConfirm('')
       setSaveMsg('')
+      setLogoFile(null)
+      setLogoPreview('')
     }
   }, [profileOpen])
+
+  const fetchSidebarLogo = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).maybeSingle()
+    if (data?.logo_url) setSidebarLogoUrl(data.logo_url)
+  }
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -120,11 +144,65 @@ export function Sidebar() {
       manager_name: data.manager_name ?? '',
       phone: data.phone ?? '',
       email: data.email ?? '',
+      logo_url: data.logo_url ?? '',
     })
   }
 
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setSaveMsg('로고 파일은 2MB 이하여야 합니다.')
+      return
+    }
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
+    setSaveMsg('')
+  }
+
+  const handleLogoUpload = async (): Promise<string | null> => {
+    if (!logoFile) return profile.logo_url || null
+    setLogoUploading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLogoUploading(false); return null }
+
+    const ext = logoFile.name.split('.').pop()
+    const path = `${user.id}/logo.${ext}`
+
+    // 기존 로고 삭제 (덮어쓰기)
+    await supabase.storage.from('logos').remove([path])
+
+    const { error } = await supabase.storage.from('logos').upload(path, logoFile, {
+      cacheControl: '3600',
+      upsert: true,
+    })
+    setLogoUploading(false)
+    if (error) { setSaveMsg('로고 업로드 실패: ' + error.message); return null }
+
+    const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+    // 캐시 무효화용 timestamp
+    return `${publicUrl}?t=${Date.now()}`
+  }
+
+  const handleLogoDelete = async () => {
+    if (!confirm('등록된 로고를 삭제하시겠습니까?')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // storage 파일 삭제 시도 (확장자 모름 → 여러 형식 시도)
+    const exts = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg']
+    await Promise.all(exts.map(ext => supabase.storage.from('logos').remove([`${user.id}/logo.${ext}`])))
+
+    await supabase.from('profiles').update({ logo_url: null }).eq('id', user.id)
+    setProfile(p => ({ ...p, logo_url: '' }))
+    setSidebarLogoUrl('')
+    setLogoFile(null)
+    setLogoPreview('')
+    setSaveMsg('로고가 삭제되었습니다.')
+    setTimeout(() => setSaveMsg(''), 2000)
+  }
+
   const handleSaveProfile = async () => {
-    // 비밀번호 입력 시 유효성 검사
     if (newPassword) {
       if (newPassword.length < 6) { setSaveMsg('비밀번호는 6자 이상이어야 합니다.'); return }
       if (newPassword !== newPasswordConfirm) { setSaveMsg('비밀번호가 일치하지 않습니다.'); return }
@@ -134,18 +212,25 @@ export function Sidebar() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
-    // 프로필 정보 저장
-    const { error } = await supabase.from('profiles').update({
+    // 로고 업로드 (파일 선택된 경우)
+    const newLogoUrl = await handleLogoUpload()
+
+    // 프로필 정보 저장 (logo_url 포함)
+    const updatePayload: Record<string, unknown> = {
       company_name: profile.company_name,
       business_number: profile.business_number,
       manager_name: profile.manager_name,
       phone: profile.phone,
       email: profile.email,
-    }).eq('id', user.id)
+    }
+    if (newLogoUrl !== null) updatePayload.logo_url = newLogoUrl
 
+    const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
     if (error) { setSaving(false); setSaveMsg('저장 실패: ' + error.message); return }
 
-    // 비밀번호 변경 (입력한 경우만)
+    // 사이드바 로고 즉시 반영
+    if (newLogoUrl) setSidebarLogoUrl(newLogoUrl)
+
     if (newPassword) {
       const { error: pwError } = await supabase.auth.updateUser({ password: newPassword })
       if (pwError) { setSaving(false); setSaveMsg('비밀번호 변경 실패: ' + pwError.message); return }
@@ -178,8 +263,22 @@ export function Sidebar() {
     <>
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
       <div className="p-5 flex items-center gap-3 border-b border-slate-700">
-        <div className={`${config.accent} rounded-xl p-2 shrink-0`}>
-          <PlatformIcon className="h-6 w-6 text-white" />
+        <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden`}
+          style={{ width: 40, height: 40 }}>
+          {sidebarLogoUrl ? (
+            <Image
+              src={sidebarLogoUrl}
+              alt="로고"
+              width={40}
+              height={40}
+              className="w-full h-full object-contain"
+              unoptimized
+            />
+          ) : (
+            <div className={`${config.accent} w-full h-full flex items-center justify-center`}>
+              <PlatformIcon className="h-6 w-6 text-white" />
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
@@ -328,6 +427,57 @@ export function Sidebar() {
             />
           </div>
 
+          {/* 로고 등록/수정 섹션 */}
+          <div className="border-t border-slate-700 pt-3">
+            <p className="text-slate-400 text-xs mb-3">
+              사이드바 로고 <span className="text-slate-500">(PNG/JPG/WebP · 최대 2MB)</span>
+            </p>
+            <div className="flex items-center gap-3">
+              {/* 미리보기 */}
+              <div className="w-14 h-14 rounded-xl border border-slate-600 bg-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                {(logoPreview || profile.logo_url) ? (
+                  <Image
+                    src={logoPreview || profile.logo_url}
+                    alt="로고 미리보기"
+                    width={56}
+                    height={56}
+                    className="w-full h-full object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <ImagePlus className="h-6 w-6 text-slate-600" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="cursor-pointer">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium w-fit transition-colors">
+                    <Upload className="h-3.5 w-3.5" />
+                    {profile.logo_url || logoPreview ? '로고 변경' : '로고 등록'}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
+                    className="hidden"
+                    onChange={handleLogoFileChange}
+                  />
+                </label>
+                {(profile.logo_url || logoPreview) && (
+                  <button
+                    type="button"
+                    onClick={handleLogoDelete}
+                    className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 text-xs w-fit"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    로고 삭제
+                  </button>
+                )}
+              </div>
+            </div>
+            {logoFile && (
+              <p className="text-slate-500 text-xs mt-2">선택됨: {logoFile.name} — 저장 버튼을 누르면 업로드됩니다.</p>
+            )}
+          </div>
+
           {/* 비밀번호 변경 섹션 */}
           <div className="border-t border-slate-700 pt-3">
             <p className="text-slate-400 text-xs mb-3">비밀번호 변경 <span className="text-slate-500">(변경 시에만 입력)</span></p>
@@ -388,9 +538,11 @@ export function Sidebar() {
               className="flex-1 text-slate-400 hover:text-white border border-slate-700">
               취소
             </Button>
-            <Button onClick={handleSaveProfile} disabled={saving}
+            <Button onClick={handleSaveProfile} disabled={saving || logoUploading}
               className="flex-1 bg-blue-600 hover:bg-blue-700">
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />저장 중</> : '저장'}
+              {(saving || logoUploading)
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />{logoUploading ? '로고 업로드 중' : '저장 중'}</>
+                : '저장'}
             </Button>
           </div>
         </div>
