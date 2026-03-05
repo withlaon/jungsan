@@ -361,7 +361,7 @@ export default function SettingsPage() {
 
   // ── 라이더 이름 요약 ──
   const riderSummary = (items: Array<{riders: Rider|null}>) => {
-    const named=items.filter(i=>i.riders?.name).map(i=>i.riders!.name)
+    const named=items.filter(i=>i.riders?.name).map(i=>i.riders!.name).sort((a,b)=>a.localeCompare(b,'ko'))
     if (named.length===0) return '전체 라이더'
     if (named.length<=3) return named.join(', ')
     return `${named.slice(0,3).join(', ')} 외 ${named.length-3}명`
@@ -529,7 +529,7 @@ export default function SettingsPage() {
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
           {detailFee&&(()=>{
             const g=detailFee
-            const namedItems=g.items.filter(i=>i.riders?.name)
+            const namedItems=g.items.filter(i=>i.riders?.name).sort((a,b)=>a.riders!.name.localeCompare(b.riders!.name,'ko'))
             const unnamedItems=g.items.filter(i=>!i.riders?.name)
             const alreadyIds = new Set(g.items.map(i=>i.rider_id).filter(Boolean))
             return (
@@ -669,7 +669,7 @@ export default function SettingsPage() {
                         <span className="text-slate-500 text-xs">{g.items.length}명</span>
                       </div>
                       <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                        {g.items.map(i=>(
+                        {[...g.items].sort((a,b)=>(a.riders?.name??'').localeCompare(b.riders?.name??'','ko')).map(i=>(
                           <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
                             <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-slate-500"/><span className="text-white text-sm font-medium">{i.riders?.name??'-'}</span>{i.riders?.rider_username&&<span className="text-slate-500 text-xs">@{i.riders.rider_username}</span>}</div>
                             <button type="button" onClick={()=>deleteInsOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
