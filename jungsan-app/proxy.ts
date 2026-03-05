@@ -70,10 +70,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // 인증된 상태에서 루트(/) 또는 /login 접근 → 대시보드로 리다이렉트
-    if (user && (pathname === '/' || pathname === '/login')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    // ※ 루트(/)와 /login은 서버에서 리다이렉트하지 않음
+    // 이유: Supabase 쿠키는 브라우저 종료 후에도 남을 수 있어 서버에서 /dashboard로
+    //       리다이렉트하면 세션이 끊겼음에도 대시보드로 이동하는 문제가 발생함.
+    //       클라이언트(sessionStorage)가 세션 유무를 판단해 리다이렉트를 담당함.
 
     return supabaseResponse
   } catch {

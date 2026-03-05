@@ -14,24 +14,29 @@ function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
   const redirectTo = searchParams.get('redirect') ?? '/dashboard'
 
-  // 이미 로그인된 경우 → redirect 파라미터 또는 대시보드로 이동
+  // 클라이언트 sessionStorage 세션 확인 → 있으면 대시보드로, 없으면 로그인 폼 표시
+  // 서버 쿠키가 남아있어도 sessionStorage가 비어있으면(브라우저 재시작) 로그인 페이지 유지
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
-      }
-    })
     // /login 경로로 직접 접속 시 루트(/)로 이동
     if (typeof window !== 'undefined' && window.location.pathname === '/login') {
       const qs = searchParams.toString()
       router.replace(qs ? `/?${qs}` : '/')
+      return
     }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+      } else {
+        setCheckingSession(false)
+      }
+    })
   }, [router, searchParams, redirectTo])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -102,6 +107,17 @@ function LoginForm() {
     }
 
     router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="text-sm">로딩 중...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
