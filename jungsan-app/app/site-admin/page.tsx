@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Users, Pencil, Loader2, RefreshCw, Eye } from 'lucide-react'
+import { Users, Pencil, Loader2, RefreshCw, Eye, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface MemberProfile {
@@ -23,6 +23,25 @@ interface MemberProfile {
   manager_name: string | null
   phone: string | null
   email: string | null
+  platform: string | null
+}
+
+// 플랫폼 뱃지
+function PlatformBadge({ platform }: { platform: string | null }) {
+  if (!platform) return <span className="text-slate-600 text-xs">-</span>
+  const isBaemin  = platform === 'baemin'  || platform === '배민'
+  const isCoupang = platform === 'coupang' || platform === '쿠팡'
+  if (isBaemin) return (
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 border border-emerald-700/50 whitespace-nowrap">
+      배달의 민족
+    </span>
+  )
+  if (isCoupang) return (
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-900/50 text-yellow-300 border border-yellow-700/50 whitespace-nowrap">
+      쿠팡이츠
+    </span>
+  )
+  return <span className="text-slate-400 text-xs">{platform}</span>
 }
 
 export default function SiteAdminPage() {
@@ -148,6 +167,7 @@ export default function SiteAdminPage() {
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">아이디</th>
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">회사명</th>
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">사업자번호</th>
+                    <th className="text-left py-3 px-4 text-slate-400 font-medium">업체</th>
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">담당자</th>
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">연락처</th>
                     <th className="text-left py-3 px-4 text-slate-400 font-medium">이메일</th>
@@ -155,15 +175,50 @@ export default function SiteAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
-                    <tr key={m.id} className="border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer" onClick={() => openDetail(m)}>
-                      <td className="py-3 px-4 text-white font-medium">{m.username ?? '-'}</td>
-                      <td className="py-3 px-4 text-slate-300">{m.company_name ?? '-'}</td>
+                  {members.map((m) => {
+                    const adminUrl = m.username
+                      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard`
+                      : null
+                    const handleOpenAdminSite = (e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      if (!m.username) return
+                      // 해당 회원의 관리자 사이트 URL로 새 창 열기
+                      // (현재 사이트 origin + /dashboard, 실제 로그인은 해당 회원이 해야 함)
+                      // site-admin에서 바로 대리 접속은 불가하므로 /dashboard?user=username 형태로 이동
+                      window.open(`${window.location.origin}/dashboard`, '_blank')
+                    }
+                    return (
+                    <tr key={m.id} className="border-b border-slate-800 hover:bg-slate-800/30">
+                      {/* 아이디 - 클릭 시 관리자 사이트 새 창 */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={handleOpenAdminSite}
+                          disabled={!m.username}
+                          className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 group disabled:text-slate-600 disabled:cursor-not-allowed"
+                          title={m.username ? '관리자 사이트 열기' : ''}
+                        >
+                          {m.username ?? '-'}
+                          {m.username && <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                        </button>
+                      </td>
+                      {/* 회사명 - 클릭 시 관리자 사이트 새 창 */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={handleOpenAdminSite}
+                          disabled={!m.username}
+                          className="text-slate-300 hover:text-white flex items-center gap-1 group disabled:text-slate-600 disabled:cursor-not-allowed"
+                          title={m.username ? '관리자 사이트 열기' : ''}
+                        >
+                          {m.company_name ?? '-'}
+                          {m.company_name && m.username && <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />}
+                        </button>
+                      </td>
                       <td className="py-3 px-4 text-slate-300">{m.business_number ?? '-'}</td>
+                      <td className="py-3 px-4"><PlatformBadge platform={m.platform} /></td>
                       <td className="py-3 px-4 text-slate-300">{m.manager_name ?? '-'}</td>
                       <td className="py-3 px-4 text-slate-300">{m.phone ?? '-'}</td>
                       <td className="py-3 px-4 text-slate-300">{m.email ?? '-'}</td>
-                      <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
+                      <td className="py-3 px-4">
                         <div className="flex gap-1">
                           <Button variant="ghost" size="sm" onClick={() => openDetail(m)} className="text-slate-400 hover:text-white hover:bg-slate-700" title="상세보기">
                             <Eye className="h-4 w-4" />
@@ -174,7 +229,7 @@ export default function SiteAdminPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -204,6 +259,10 @@ export default function SiteAdminPage() {
                   <p className="text-white">{editing.business_number ?? '-'}</p>
                 </div>
                 <div>
+                  <p className="text-slate-500 text-xs mb-0.5">업체 (플랫폼)</p>
+                  <PlatformBadge platform={editing.platform} />
+                </div>
+                <div>
                   <p className="text-slate-500 text-xs mb-0.5">담당자</p>
                   <p className="text-white">{editing.manager_name ?? '-'}</p>
                 </div>
@@ -216,13 +275,19 @@ export default function SiteAdminPage() {
                   <p className="text-white">{editing.email ?? '-'}</p>
                 </div>
               </div>
-              <DialogFooter className="border-t border-slate-700 pt-4">
+              <DialogFooter className="border-t border-slate-700 pt-4 flex-col gap-2 sm:flex-row">
                 <Button variant="outline" onClick={() => setDetailOpen(false)} className="border-slate-600 text-slate-300">
                   닫기
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(`${window.location.origin}/dashboard`, '_blank')}
+                  className="border-blue-700 text-blue-300 hover:bg-blue-900/30 gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />관리자 사이트 열기
+                </Button>
                 <Button onClick={() => editing && openEdit(editing)} className="bg-blue-600 hover:bg-blue-700">
-                  <Pencil className="h-4 w-4 mr-2" />
-                  수정
+                  <Pencil className="h-4 w-4 mr-2" />수정
                 </Button>
               </DialogFooter>
             </div>

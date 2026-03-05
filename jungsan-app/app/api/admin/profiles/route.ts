@@ -24,7 +24,7 @@ export async function GET() {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('profiles')
-      .select('id, username, company_name, business_number, manager_name, phone, email')
+      .select('id, username, company_name, business_number, manager_name, phone, email, platform')
       .order('username', { ascending: true, nullsFirst: false })
 
     if (error) {
