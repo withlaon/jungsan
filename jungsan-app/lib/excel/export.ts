@@ -85,7 +85,7 @@ export function exportSettlementExcel(
     '라이더명', '은행', '은행코드', '계좌번호', '예금주',
     '배달건수', '배달료', '추가지급', '기본정산금액',
     '시간제보험료', '고용보험', '산재보험', '프로모션', '콜관리비',
-    '세금신고금액', '소득세(3.6%)', '선지급금', '선지급금회수', '최종정산금액',
+    '세금신고금액', '소득세', '선지급금', '선지급금회수', '최종정산금액',
   ]
 
   const rows = details.map(d => {
@@ -185,7 +185,7 @@ export function exportSettlementExcel(
       ...(callFee > 0 ? [['콜관리비', -callFee, `${d.delivery_count}건 × 단가`]] : []),
       [],
       ['세금신고금액', tb, '= 기본정산금액 - 보험 + 프로모션 - 콜관리비'],
-      ['소득세 (3.6%)', -it, '세금신고금액 × 3.6%'],
+      ['소득세', -it, '세금신고금액 × 소득세율'],
       ...(d.advance_deduction > 0 ? [['선지급금 공제', -d.advance_deduction, '']] : []),
       ...(rec > 0 ? [['선지급금회수', rec, '']] : []),
       [],
@@ -241,7 +241,7 @@ export function exportSingleRiderExcel(
     ...(callFee > 0 ? [['콜관리비', -callFee, `${d.delivery_count}건 × 단가`]] : []),
     [],
     ['세금신고금액', tb, '= 기본정산금액 - 보험 + 프로모션 - 콜관리비'],
-    ['소득세 (3.6%)', -it, '세금신고금액 × 3.6%'],
+    ['소득세', -it, '세금신고금액 × 소득세율'],
     ...(d.advance_deduction > 0 ? [['선지급금 공제', -d.advance_deduction, '']] : []),
     ...(rec > 0 ? [['선지급금회수', rec, '']] : []),
     [],

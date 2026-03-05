@@ -126,6 +126,7 @@ export interface ManagementFee {
 
 export interface FeeSettings {
   id: string
+  user_id: string | null
   insurance_rate: number
   income_tax_rate: number
   management_fee_type: 'rate' | 'fixed'

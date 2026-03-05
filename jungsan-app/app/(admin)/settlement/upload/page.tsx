@@ -125,7 +125,24 @@ export default function SettlementUploadPage() {
     if (Array.isArray(data)) setRiders((data as Rider[]).filter(r => r.status === 'active'))
   }
   const fetchSettings = async () => {
-    const { data } = await supabase.from('fee_settings').select('*').order('effective_from', { ascending: false }).limit(1).maybeSingle()
+    // 유저별 설정 우선 조회, 없으면 글로벌(user_id IS NULL) 설정 사용
+    if (userId) {
+      const { data: userSettings } = await supabase
+        .from('fee_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .order('effective_from', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (userSettings) { setSettings(userSettings); return }
+    }
+    const { data } = await supabase
+      .from('fee_settings')
+      .select('*')
+      .is('user_id', null)
+      .order('effective_from', { ascending: false })
+      .limit(1)
+      .maybeSingle()
     if (data) setSettings(data)
   }
   const fetchManagementFees = async () => {

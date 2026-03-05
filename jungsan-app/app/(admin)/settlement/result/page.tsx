@@ -237,7 +237,7 @@ export default function SettlementResultPage() {
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">소득세(3.6%)</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">소득세</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금회수</TableHead>
                       <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">최종정산금액</TableHead>
@@ -345,7 +345,7 @@ export default function SettlementResultPage() {
                     { label: '지사프로모션',     value: `+${formatKRW(d.promotion_amount)}`,color:'text-violet-400',skip: d.promotion_amount === 0 },
                     { label: '콜관리비',         value: `-${formatKRW(d.call_fee_deduction ?? 0)}`, color: 'text-orange-400', skip: !d.call_fee_deduction },
                     { label: '세금신고금액',     value: formatKRW(tb),                    color: 'text-emerald-400' },
-                    { label: '소득세 (3.6%)',    value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
+                    { label: '소득세',            value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
                     { label: '선지급금 공제',    value: `-${formatKRW(d.advance_deduction)}`, color: 'text-amber-300', skip: d.advance_deduction === 0 },
                     { label: '선지급금회수',     value: `+${formatKRW(rec)}`,              color: 'text-teal-400',   skip: rec === 0 },
                   ].filter(item => !item.skip).map(item => (

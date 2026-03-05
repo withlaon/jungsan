@@ -281,7 +281,7 @@ export default function RiderPortalPage() {
                     </div>
                     {/* 소득세 */}
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                      <span className="text-slate-400 text-sm">소득세 (3.6%)</span>
+                      <span className="text-slate-400 text-sm">소득세</span>
                       <span className="text-sm font-medium text-rose-400">-{formatKRW(selectedDetail.income_tax_deduction)}</span>
                     </div>
                     {/* 일반관리비 - 0원이면 미표시 */}

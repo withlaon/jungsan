@@ -1,10 +1,11 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useUser } from '@/hooks/useUser'
+import { createClient } from '@/lib/supabase/client'
 import {
   BookOpen, Download, BarChart3, Users, Wallet, Gift, Settings,
   Upload, FileText, Globe, ChevronRight, Info, AlertTriangle,
@@ -13,9 +14,37 @@ import {
 
 export default function ManualPage() {
   const printRef = useRef<HTMLDivElement>(null)
-  const { platform } = useUser()
+  const { platform, userId } = useUser()
   const isBaemin = platform === 'baemin'
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [incomeTaxRate, setIncomeTaxRate] = useState<number>(0.033)
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      const supabase = createClient()
+      if (userId) {
+        const { data: userSettings } = await supabase
+          .from('fee_settings')
+          .select('income_tax_rate')
+          .eq('user_id', userId)
+          .order('effective_from', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (userSettings) { setIncomeTaxRate(Number(userSettings.income_tax_rate)); return }
+      }
+      const { data } = await supabase
+        .from('fee_settings')
+        .select('income_tax_rate')
+        .is('user_id', null)
+        .order('effective_from', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (data) setIncomeTaxRate(Number(data.income_tax_rate))
+    }
+    fetchRate()
+  }, [userId])
+
+  const taxRateLabel = `${(incomeTaxRate * 100).toFixed(1)}%`
 
   const platformLabel = isBaemin ? '배달의 민족' : '쿠팡이츠'
   const platformColor = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
@@ -459,7 +488,7 @@ export default function ManualPage() {
               <div className="space-y-1 text-xs text-slate-300 font-mono">
                 <p>기본정산금액 = 배달료 + 추가지급(배민추가지급)</p>
                 <p>세금신고금액 = 기본정산금액 + 지사프로모션</p>
-                <p>소득세 = 세금신고금액 × 3.6% <span className="text-amber-300">(원단위 절상)</span></p>
+                <p>소득세 = 세금신고금액 × {taxRateLabel} <span className="text-amber-300">(원단위 절상)</span></p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
                   최종정산금액 = 기본정산금액<br />
                   <span className="ml-14">− 시간제보험료<br /></span>
@@ -476,7 +505,7 @@ export default function ManualPage() {
               <div className="space-y-1 text-xs text-slate-300 font-mono">
                 <p>기본정산금액 = 배달료 + 추가지급</p>
                 <p>세금신고금액 = 기본정산금액</p>
-                <p>소득세 = 세금신고금액 × 3.6%</p>
+                <p>소득세 = 세금신고금액 × {taxRateLabel}</p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
                   최종정산금액 = 기본정산금액<br />
                   <span className="ml-14">− 고용보험(근로자)<br /></span>
@@ -688,7 +717,7 @@ export default function ManualPage() {
             },
             ...(isBaemin ? [{
               q: '소득세가 예상과 다르게 계산되어요.',
-              a: '배달의 민족 정산에서 소득세는 세금신고금액(기본정산금액+지사프로모션) × 3.6%를 원단위 절상(올림)하여 계산합니다.',
+              a: `배달의 민족 정산에서 소득세는 세금신고금액(기본정산금액+지사프로모션) × ${taxRateLabel}를 원단위 절상(올림)하여 계산합니다.`,
             }] : []),
             {
               q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',
