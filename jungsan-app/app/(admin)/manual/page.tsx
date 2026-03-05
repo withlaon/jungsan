@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,19 +8,56 @@ import { useUser } from '@/hooks/useUser'
 import {
   BookOpen, Download, BarChart3, Users, Wallet, Gift, Settings,
   Upload, FileText, Globe, ChevronRight, Info, AlertTriangle,
-  CheckCircle, Megaphone, MessageSquare, LogOut, ImagePlus,
+  CheckCircle, Megaphone, MessageSquare, LogOut, ImagePlus, Loader2,
 } from 'lucide-react'
 
 export default function ManualPage() {
   const printRef = useRef<HTMLDivElement>(null)
   const { platform } = useUser()
   const isBaemin = platform === 'baemin'
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   const platformLabel = isBaemin ? '배달의 민족' : '쿠팡이츠'
   const platformColor = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
   const platformBg   = isBaemin ? 'bg-emerald-900/30 border-emerald-700/40' : 'bg-yellow-900/30 border-yellow-700/40'
 
-  const handlePrint = () => window.print()
+  const handleDownloadPDF = async () => {
+    if (!printRef.current || pdfLoading) return
+    setPdfLoading(true)
+
+    // PDF에 포함하지 않을 요소를 임시로 숨김
+    const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
+    noPrintEls.forEach(el => { el.style.display = 'none' })
+
+    try {
+      const html2pdf = (await import('html2pdf.js')).default
+      const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}.pdf`
+
+      await html2pdf()
+        .set({
+          margin: [12, 10, 12, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.97 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#0f172a',
+            logging: false,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(printRef.current)
+        .save()
+    } catch (err) {
+      console.error('PDF 생성 실패:', err)
+      alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      // 숨긴 요소 복원
+      noPrintEls.forEach(el => { el.style.display = '' })
+      setPdfLoading(false)
+    }
+  }
 
   /* ─ 공통 스타일 헬퍼 ─ */
   const tip   = (text: React.ReactNode) => (
@@ -649,8 +686,10 @@ export default function ManualPage() {
               <span className="ml-2 text-slate-600 text-xs">v2.0</span>
             </p>
           </div>
-          <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
-            <Download className="h-4 w-4" />PDF 저장
+          <Button onClick={handleDownloadPDF} disabled={pdfLoading}
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
           </Button>
         </div>
 
@@ -702,8 +741,10 @@ export default function ManualPage() {
 
         {/* 하단 PDF 버튼 */}
         <div className="flex justify-center pt-2 no-print">
-          <Button onClick={handlePrint} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
-            <Download className="h-5 w-5" />PDF로 저장하기
+          <Button onClick={handleDownloadPDF} disabled={pdfLoading} size="lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+            {pdfLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+            {pdfLoading ? 'PDF 생성 중...' : 'PDF로 저장하기'}
           </Button>
         </div>
       </div>
