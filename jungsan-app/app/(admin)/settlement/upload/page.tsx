@@ -66,7 +66,7 @@ const weekOptions = getWeekOptions()
 export default function SettlementUploadPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { userId, isAdmin, loading: userLoading } = useUser()
+  const { userId, isAdmin, platform, loading: userLoading } = useUser()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>('upload')
@@ -385,7 +385,7 @@ export default function SettlementUploadPage() {
     }
     const inputs = Array.from(mergedMap.values())
 
-    const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees)
+    const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, platform)
     setResults(calc)
     setStep('confirm')
   }

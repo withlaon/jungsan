@@ -57,7 +57,10 @@ export function calculateSettlement(
   weekStart = '',
   weekEnd = '',
   insuranceFees: InsuranceFee[] = [],
+  platform = 'baemin',          // 'baemin' | 'coupang'
 ): RiderSettlementResult[] {
+  const isBaemin = platform === 'baemin' || platform === '배민'
+
   return inputs.map(input => {
     const {
       riderId, riderName, deliveryCount, baseAmount,
@@ -114,18 +117,30 @@ export function calculateSettlement(
     const totalAccidentInsurance   = excelAccidentInsurance   + accidentInsuranceAddition
 
     // ── 세금신고금액 ──
-    // = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험 + 프로모션 - 콜관리비
-    const taxBaseAmount = Math.max(0,
-      baseAmount
-      - hourlyInsurance
-      - totalEmploymentInsurance
-      - totalAccidentInsurance
-      + promotionAmount
-      - callFeeDeduction
-    )
+    let taxBaseAmount: number
+    if (isBaemin) {
+      // [배민] 세금신고금액 = 기본정산금액 + 지사프로모션
+      taxBaseAmount = Math.max(0, baseAmount + promotionAmount)
+    } else {
+      // [쿠팡 등] 기존 계산식
+      taxBaseAmount = Math.max(0,
+        baseAmount
+        - hourlyInsurance
+        - totalEmploymentInsurance
+        - totalAccidentInsurance
+        + promotionAmount
+        - callFeeDeduction
+      )
+    }
 
-    // ── 원천세 (세금신고금액 × 3.3%) ──
-    const incomeTaxDeduction = Math.floor(taxBaseAmount * settings.income_tax_rate)
+    // ── 원천세 ──
+    let incomeTaxDeduction: number
+    if (isBaemin) {
+      // [배민] 원천세 = 세금신고금액 × 3.3% (원단위 절상)
+      incomeTaxDeduction = Math.ceil(taxBaseAmount * settings.income_tax_rate)
+    } else {
+      incomeTaxDeduction = Math.floor(taxBaseAmount * settings.income_tax_rate)
+    }
 
     // ── 선지급금 / 선지급금회수 ──
     const advanceDeduction = advancePayments
@@ -136,13 +151,31 @@ export function calculateSettlement(
       .reduce((s, p) => s + p.amount, 0)
 
     // ── 최종정산금액 ──
-    // = 세금신고금액 - 원천세 - 선지급금 + 선지급금회수
-    const finalAmount = Math.max(0, taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery)
+    let finalAmount: number
+    if (isBaemin) {
+      // [배민] 최종정산금액 = 기본정산금액 - 고용보험 - 산재보험 + 지사프로모션
+      //                      - 콜관리비 - 원천세 - 선지급금 + 선지급금회수
+      finalAmount = Math.max(0,
+        baseAmount
+        - totalEmploymentInsurance
+        - totalAccidentInsurance
+        + promotionAmount
+        - callFeeDeduction
+        - incomeTaxDeduction
+        - advanceDeduction
+        + advanceRecovery
+      )
+    } else {
+      // [쿠팡 등] 기존 계산식: 세금신고금액 - 원천세 - 선지급금 + 선지급금회수
+      finalAmount = Math.max(0, taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery)
+    }
 
     // 하위호환 필드
-    const grossAmount       = baseAmount + promotionAmount
+    const grossAmount        = baseAmount + promotionAmount
     const insuranceDeduction = Math.floor(grossAmount * settings.insurance_rate)
-    const totalDeduction    = hourlyInsurance + totalEmploymentInsurance + totalAccidentInsurance + incomeTaxDeduction + callFeeDeduction + advanceDeduction
+    const totalDeduction     = isBaemin
+      ? totalEmploymentInsurance + totalAccidentInsurance + callFeeDeduction + incomeTaxDeduction + advanceDeduction
+      : hourlyInsurance + totalEmploymentInsurance + totalAccidentInsurance + incomeTaxDeduction + callFeeDeduction + advanceDeduction
 
     return {
       riderId, riderName, deliveryCount, baseAmount,
