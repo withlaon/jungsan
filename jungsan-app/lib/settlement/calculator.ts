@@ -153,10 +153,11 @@ export function calculateSettlement(
     // ── 최종정산금액 ──
     let finalAmount: number
     if (isBaemin) {
-      // [배민] 최종정산금액 = 기본정산금액 - 고용보험 - 산재보험 + 지사프로모션
-      //                      - 콜관리비 - 원천세 - 선지급금 + 선지급금회수
+      // [배민] 최종정산금액 = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험
+      //                      + 지사프로모션 - 콜관리비 - 원천세 - 선지급금 + 선지급금회수
       finalAmount = Math.max(0,
         baseAmount
+        - hourlyInsurance
         - totalEmploymentInsurance
         - totalAccidentInsurance
         + promotionAmount
@@ -173,9 +174,7 @@ export function calculateSettlement(
     // 하위호환 필드
     const grossAmount        = baseAmount + promotionAmount
     const insuranceDeduction = Math.floor(grossAmount * settings.insurance_rate)
-    const totalDeduction     = isBaemin
-      ? totalEmploymentInsurance + totalAccidentInsurance + callFeeDeduction + incomeTaxDeduction + advanceDeduction
-      : hourlyInsurance + totalEmploymentInsurance + totalAccidentInsurance + incomeTaxDeduction + callFeeDeduction + advanceDeduction
+    const totalDeduction     = hourlyInsurance + totalEmploymentInsurance + totalAccidentInsurance + callFeeDeduction + incomeTaxDeduction + advanceDeduction
 
     return {
       riderId, riderName, deliveryCount, baseAmount,
