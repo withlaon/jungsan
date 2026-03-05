@@ -16,6 +16,7 @@ const PROTECTED_PREFIXES = [
   '/site-admin',
   '/manual',
   '/notice',
+  '/inquiry',
 ]
 
 export async function proxy(request: NextRequest) {

@@ -28,6 +28,7 @@ import {
   ImagePlus,
   Trash2,
   Megaphone,
+  MessageSquare,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser } from '@/hooks/useUser'
@@ -72,7 +73,8 @@ const navItems = [
 ]
 
 const bottomNavItems = [
-  { href: '/manual', label: '사용자 메뉴얼', icon: BookOpen },
+  { href: '/manual',   label: '사용자 메뉴얼', icon: BookOpen    },
+  { href: '/inquiry',  label: '문의하기',       icon: MessageSquare },
 ]
 
 interface Profile {
