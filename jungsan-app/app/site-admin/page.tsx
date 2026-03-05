@@ -73,7 +73,7 @@ function PlatformBadge({ platform }: { platform: string | null }) {
 /* ════════════════════════════════════════ */
 export default function SiteAdminPage() {
   const supabase = createClient()
-  const [activeTab, setActiveTab] = useState<'members' | 'inquiries'>('members')
+  const [activeTab, setActiveTab] = useState<'members' | 'inquiries'>('inquiries')
 
   /* ── 회원 목록 상태 ── */
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -267,20 +267,6 @@ export default function SiteAdminPage() {
       {/* 탭 */}
       <div className="flex gap-1 border-b border-slate-700">
         <button
-          onClick={() => setActiveTab('members')}
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'members'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <Users className="h-4 w-4" />
-          회원 목록
-          <span className="bg-slate-700 text-slate-300 text-xs px-1.5 py-0.5 rounded-full">
-            {members.length}
-          </span>
-        </button>
-        <button
           onClick={() => setActiveTab('inquiries')}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'inquiries'
@@ -295,6 +281,20 @@ export default function SiteAdminPage() {
               {inquiries.filter(i => i.status === 'pending').length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('members')}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'members'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          회원 목록
+          <span className="bg-slate-700 text-slate-300 text-xs px-1.5 py-0.5 rounded-full">
+            {members.length}
+          </span>
         </button>
       </div>
 
