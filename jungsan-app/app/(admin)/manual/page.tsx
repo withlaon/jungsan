@@ -29,6 +29,49 @@ export default function ManualPage() {
     const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
     noPrintEls.forEach(el => { el.style.display = 'none' })
 
+    // ─── html2canvas 미지원 색상 함수(lab, oklch, lch) 사전 변환 ───
+    // canvas fillStyle을 이용하면 브라우저가 자동으로 안전한 sRGB 값으로 변환해 준다.
+    const fixedStyles: Array<{ el: HTMLElement; prop: string; prev: string }> = []
+
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = 1; tempCanvas.height = 1
+    const ctx2d = tempCanvas.getContext('2d')
+
+    const toSafeColor = (color: string): string | null => {
+      // lab(), oklch(), lch() 포함된 값만 변환
+      if (!color || !/\blab\(|\boklch\(|\blch\(/.test(color)) return null
+      if (!ctx2d) return null
+      try {
+        ctx2d.fillStyle = color
+        return ctx2d.fillStyle // 브라우저가 rgb() / #rrggbb 형태로 변환해 반환
+      } catch {
+        return null
+      }
+    }
+
+    const CSS_PROPS: [string, string][] = [
+      ['color',              'color'],
+      ['background-color',   'backgroundColor'],
+      ['border-top-color',   'borderTopColor'],
+      ['border-right-color', 'borderRightColor'],
+      ['border-bottom-color','borderBottomColor'],
+      ['border-left-color',  'borderLeftColor'],
+    ]
+
+    const allEls = [printRef.current, ...printRef.current.querySelectorAll<HTMLElement>('*')]
+    allEls.forEach(el => {
+      const computed = window.getComputedStyle(el)
+      CSS_PROPS.forEach(([cssProp, jsProp]) => {
+        const val = computed[jsProp as keyof CSSStyleDeclaration] as string
+        const safe = toSafeColor(val)
+        if (safe) {
+          fixedStyles.push({ el, prop: cssProp, prev: el.style.getPropertyValue(cssProp) })
+          el.style.setProperty(cssProp, safe, 'important')
+        }
+      })
+    })
+    // ──────────────────────────────────────────────────────────────
+
     try {
       const html2pdf = (await import('html2pdf.js')).default
       const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}.pdf`
@@ -53,7 +96,11 @@ export default function ManualPage() {
       console.error('PDF 생성 실패:', err)
       alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
     } finally {
-      // 숨긴 요소 복원
+      // 변환했던 스타일 복원
+      fixedStyles.forEach(({ el, prop, prev }) => {
+        if (prev) el.style.setProperty(prop, prev)
+        else el.style.removeProperty(prop)
+      })
       noPrintEls.forEach(el => { el.style.display = '' })
       setPdfLoading(false)
     }
