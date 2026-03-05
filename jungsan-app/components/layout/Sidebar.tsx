@@ -27,6 +27,7 @@ import {
   Package,
   ImagePlus,
   Trash2,
+  Megaphone,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser } from '@/hooks/useUser'
@@ -64,9 +65,10 @@ const navItems = [
   { href: '/advance-payments',   label: '선지급금 관리',  icon: Wallet    },
   { href: '/promotions',         label: '프로모션 설정',  icon: Gift      },
   { href: '/settings',           label: '관리비 설정',    icon: Settings  },
-  { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload    },
-  { href: '/settlement/result',  label: '정산결과보기',   icon: FileText  },
-  { href: '/rider-site',         label: '라이더사이트',   icon: Globe     },
+  { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload     },
+  { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
+  { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
+  { href: '/rider-site',         label: '라이더사이트',   icon: Globe      },
 ]
 
 const bottomNavItems = [

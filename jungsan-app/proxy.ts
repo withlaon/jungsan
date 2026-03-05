@@ -15,6 +15,7 @@ const PROTECTED_PREFIXES = [
   '/rider-site',
   '/site-admin',
   '/manual',
+  '/notice',
 ]
 
 export async function proxy(request: NextRequest) {
