@@ -1,25 +1,53 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useUser } from '@/hooks/useUser'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Copy, ExternalLink, Smartphone, CheckCircle, Info } from 'lucide-react'
+import { Globe, Copy, ExternalLink, Smartphone, CheckCircle, Info, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function RiderSitePage() {
-  const [siteUrl, setSiteUrl] = useState('')
-  const [copied, setCopied] = useState(false)
+  const { user, loading: userLoading } = useUser()
+  const [origin, setOrigin] = useState('')
+  const [copiedPersonal, setCopiedPersonal] = useState(false)
+  const [copiedGeneral, setCopiedGeneral] = useState(false)
 
   useEffect(() => {
-    setSiteUrl(`${window.location.origin}/rider`)
+    setOrigin(window.location.origin)
   }, [])
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(siteUrl)
-    setCopied(true)
+  // profiles 테이블의 username 조회
+  const [username, setUsername] = useState<string | null>(null)
+  useEffect(() => {
+    if (!user) return
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const supabase = createClient()
+      supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.username) setUsername(data.username)
+        })
+    })
+  }, [user])
+
+  const personalUrl = username ? `${origin}/rider/site/${username}` : ''
+  const generalUrl = `${origin}/rider`
+
+  const handleCopy = (url: string, type: 'personal' | 'general') => {
+    navigator.clipboard.writeText(url)
+    if (type === 'personal') {
+      setCopiedPersonal(true)
+      setTimeout(() => setCopiedPersonal(false), 2000)
+    } else {
+      setCopiedGeneral(true)
+      setTimeout(() => setCopiedGeneral(false), 2000)
+    }
     toast.success('라이더 사이트 주소가 복사되었습니다.')
-    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -29,43 +57,70 @@ export default function RiderSitePage() {
         <p className="text-slate-400 text-sm mt-1">라이더가 정산 내역을 직접 조회하는 전용 페이지</p>
       </div>
 
-      {/* 사이트 URL 카드 */}
-      <Card className="border-blue-700/50 bg-blue-900/10">
+      {/* 개인 전용 URL (추천) */}
+      <Card className="border-blue-600/60 bg-blue-900/15">
         <CardHeader className="pb-3">
-          <CardTitle className="text-blue-300 text-base flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            라이더 전용 정산 조회 사이트
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-blue-300 text-base flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              내 전용 라이더 사이트 주소
+            </CardTitle>
+            <Badge className="bg-blue-700/60 text-blue-200 text-xs">권장</Badge>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">
+            이 주소로 접속한 라이더는 <span className="text-blue-300 font-medium">내 계정에 등록된 라이더만</span> 조회할 수 있습니다.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* URL 표시 */}
-          <div className="bg-slate-800 rounded-lg p-4 flex items-center justify-between gap-3">
-            <span className="text-white font-mono text-sm break-all">{siteUrl || 'http://localhost:3000/rider'}</span>
+        <CardContent className="space-y-3">
+          {userLoading || !username ? (
+            <div className="bg-slate-800 rounded-lg p-4 text-slate-500 text-sm text-center">
+              {userLoading ? '불러오는 중...' : '로그인 정보를 확인할 수 없습니다.'}
+            </div>
+          ) : (
+            <div className="bg-slate-800 rounded-lg p-4 flex items-center justify-between gap-3">
+              <span className="text-white font-mono text-sm break-all">{personalUrl}</span>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" onClick={() => handleCopy(personalUrl, 'personal')}
+                  className={`h-8 text-xs transition-colors ${copiedPersonal ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                  {copiedPersonal
+                    ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />복사됨</>
+                    : <><Copy className="h-3.5 w-3.5 mr-1" />복사</>}
+                </Button>
+                <Button size="sm" variant="outline"
+                  onClick={() => window.open(personalUrl, '_blank')}
+                  className="h-8 text-xs border-slate-600 text-slate-300 hover:bg-slate-700">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />열기
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 공용 URL */}
+      <Card className="border-slate-700 bg-slate-900">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-slate-300 text-base flex items-center gap-2">
+            <Globe className="h-5 w-5 text-slate-400" />
+            공용 라이더 사이트 주소
+          </CardTitle>
+          <p className="text-slate-500 text-xs mt-1">모든 계정의 라이더가 조회 가능한 공용 주소 (SSN 기반 전체 검색)</p>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-slate-800/60 rounded-lg p-4 flex items-center justify-between gap-3">
+            <span className="text-slate-400 font-mono text-sm break-all">{generalUrl || 'https://jungsan-iol8.vercel.app/rider'}</span>
             <div className="flex gap-2 shrink-0">
-              <Button size="sm" onClick={handleCopy}
-                className={`h-8 text-xs transition-colors ${copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                {copied
+              <Button size="sm" onClick={() => handleCopy(generalUrl, 'general')}
+                className={`h-8 text-xs transition-colors ${copiedGeneral ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-600 hover:bg-slate-500'}`}>
+                {copiedGeneral
                   ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />복사됨</>
                   : <><Copy className="h-3.5 w-3.5 mr-1" />복사</>}
               </Button>
               <Button size="sm" variant="outline"
-                onClick={() => window.open(siteUrl, '_blank')}
-                className="h-8 text-xs border-slate-600 text-slate-300 hover:bg-slate-700">
+                onClick={() => window.open(generalUrl, '_blank')}
+                className="h-8 text-xs border-slate-700 text-slate-400 hover:bg-slate-700">
                 <ExternalLink className="h-3.5 w-3.5 mr-1" />열기
               </Button>
-            </div>
-          </div>
-
-          {/* QR 또는 접속 안내 */}
-          <div className="grid grid-cols-1 gap-3">
-            <div className="bg-slate-800/60 rounded-lg p-3 flex items-start gap-3">
-              <Smartphone className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-white text-sm font-medium">접속 방법</p>
-                <p className="text-slate-400 text-xs mt-1">
-                  위 주소를 라이더에게 공유하면, 라이더가 본인의 <span className="text-blue-300 font-medium">주민등록번호</span>를 입력하여 자신의 정산 내역을 확인할 수 있습니다.
-                </p>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -83,8 +138,8 @@ export default function RiderSitePage() {
           {[
             {
               step: '1',
-              title: '주소 공유',
-              desc: '위 라이더 사이트 주소를 카카오톡, 문자 등으로 라이더에게 전달하세요.',
+              title: '전용 주소 공유',
+              desc: '위 내 전용 라이더 사이트 주소를 카카오톡, 문자 등으로 라이더에게 전달하세요.',
               color: 'bg-blue-600',
             },
             {
@@ -96,7 +151,7 @@ export default function RiderSitePage() {
             {
               step: '3',
               title: '정산 내역 확인',
-              desc: '라이더 관리에 등록된 주민등록번호와 일치하면 해당 라이더의 정산 내역이 표시됩니다.',
+              desc: '내 계정에 등록된 라이더의 주민등록번호와 일치하면 해당 라이더의 정산 내역이 표시됩니다.',
               color: 'bg-emerald-600',
             },
           ].map(item => (
@@ -111,16 +166,18 @@ export default function RiderSitePage() {
             </div>
           ))}
 
-          <div className="mt-2 bg-amber-900/20 border border-amber-700/40 rounded-lg p-3">
-            <p className="text-amber-300 text-xs flex items-start gap-1.5">
+          <div className="mt-2 bg-blue-900/20 border border-blue-700/40 rounded-lg p-3">
+            <p className="text-blue-300 text-xs flex items-start gap-1.5">
               <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              라이더 관리 탭에서 라이더의 <span className="font-bold mx-0.5">주민등록번호</span>가 정확히 등록되어 있어야 조회됩니다. 주민등록번호 미등록 라이더는 접속할 수 없습니다.
+              <span>
+                <span className="font-bold">전용 주소</span>를 사용하면 다른 관리자 계정의 라이더와 혼동되지 않습니다.
+                라이더 관리 탭에서 라이더의 <span className="font-bold">주민등록번호</span>가 정확히 등록되어 있어야 조회됩니다.
+              </span>
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* 상태 배지 */}
       <div className="flex items-center gap-2">
         <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
           <CheckCircle className="h-3 w-3 mr-1" />서비스 운영 중
