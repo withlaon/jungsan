@@ -45,7 +45,13 @@ export async function proxy(request: NextRequest) {
             cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
             supabaseResponse = NextResponse.next({ request })
             cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
+              // expires / maxAge 제거 → 세션 쿠키로 설정
+              // 브라우저/탭을 닫으면 쿠키가 자동 삭제되어 재접속 시 로그인 페이지로 이동
+              supabaseResponse.cookies.set(name, value, {
+                ...options,
+                expires: undefined,
+                maxAge: undefined,
+              })
             )
           },
         },

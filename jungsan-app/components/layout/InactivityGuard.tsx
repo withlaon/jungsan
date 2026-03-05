@@ -10,10 +10,24 @@ import { toast } from 'sonner'
  * 관리자 레이아웃에 삽입되는 비활성 자동 로그아웃 감시 컴포넌트
  * - 1시간 무활동 시 Supabase 세션 삭제 + 로그인 페이지 이동
  * - 5분 전 toast 경고
+ * - 브라우저 재시작 후 클라이언트 세션이 없으면 서버 쿠키도 정리 후 로그인으로 이동
  */
 export function InactivityGuard() {
   const router = useRouter()
   const supabase = createClient()
+
+  // 브라우저 종료 후 재접속 시: sessionStorage가 비어있으면(클라이언트 세션 없음)
+  // 서버 쿠키도 정리하고 로그인 페이지로 강제 이동
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        supabase.auth.signOut().finally(() => {
+          router.replace('/')
+        })
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleWarn = () => {
     toast.warning('5분 후 자동 로그아웃됩니다. 계속 사용하려면 화면을 클릭하세요.', {
