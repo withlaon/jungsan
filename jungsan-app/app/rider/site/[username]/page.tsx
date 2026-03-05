@@ -266,10 +266,27 @@ export default function RiderSiteByUserPage() {
                       <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount ?? 0)}</span>
                     </div>
                     <hr className="border-slate-700 my-2" />
-                    <div className="flex justify-between py-1.5 border-b border-slate-700/40">
-                      <span className="text-slate-400 text-sm">고용/산재보험</span>
-                      <span className="text-sm font-medium text-amber-400">-{formatKRW(selectedDetail.insurance_deduction)}</span>
-                    </div>
+                    {/* 시간제보험료 - 0원이면 미표시 */}
+                    {(selectedDetail.hourly_insurance ?? 0) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">시간제보험료</span>
+                        <span className="text-sm font-medium text-amber-400">-{formatKRW(selectedDetail.hourly_insurance ?? 0)}</span>
+                      </div>
+                    )}
+                    {/* 고용보험 - 0원이면 미표시 */}
+                    {((selectedDetail.excel_employment_insurance ?? 0) + (selectedDetail.employment_insurance_addition ?? 0)) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">고용보험</span>
+                        <span className="text-sm font-medium text-cyan-400">-{formatKRW((selectedDetail.excel_employment_insurance ?? 0) + (selectedDetail.employment_insurance_addition ?? 0))}</span>
+                      </div>
+                    )}
+                    {/* 산재보험 - 0원이면 미표시 */}
+                    {((selectedDetail.excel_accident_insurance ?? 0) + (selectedDetail.accident_insurance_addition ?? 0)) > 0 && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-700/40">
+                        <span className="text-slate-400 text-sm">산재보험</span>
+                        <span className="text-sm font-medium text-purple-400">-{formatKRW((selectedDetail.excel_accident_insurance ?? 0) + (selectedDetail.accident_insurance_addition ?? 0))}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">
                       <span className="text-slate-400 text-sm">소득세</span>
                       <span className="text-sm font-medium text-rose-400">-{formatKRW(selectedDetail.income_tax_deduction)}</span>
