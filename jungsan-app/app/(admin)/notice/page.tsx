@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Download, Megaphone, CheckCircle2, RefreshCw,
   AlignLeft, AlignCenter, AlignRight, Minus, Plus, Edit3,
+  Trash2, Pencil, Clock, SaveAll, X,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 // ──────────────────────────────────────────────
 // 상수 / 타입
@@ -44,6 +46,43 @@ const TEMPLATES = [
   { id: 3 as TemplateId, name: '에메랄드 그린', colors: ['#022c22', '#064e3b'], accent: '#34d399' },
   { id: 4 as TemplateId, name: '웜 오렌지',     colors: ['#ea580c', '#f97316'], accent: '#f97316' },
 ]
+
+// ──────────────────────────────────────────────
+// 공지사항 레코드 타입
+// ──────────────────────────────────────────────
+interface Notice {
+  id: string
+  title: string
+  content: string
+  date: string
+  company_name: string
+  template_id: TemplateId
+  styles: StyleOptions
+  thumbnail: string
+  created_at: string
+}
+
+const THUMB = 320  // 썸네일 캔버스 크기
+
+// 썸네일(320px) 생성 → base64 PNG 반환
+function generateThumbnail(
+  title: string, content: string, date: string, company: string,
+  templateId: TemplateId, styles: StyleOptions,
+): string {
+  const off = document.createElement('canvas')
+  off.width = THUMB; off.height = THUMB
+  const ctx = off.getContext('2d')!
+  // SIZE→THUMB 스케일로 동일한 draw 함수 호출하되,
+  // ctx.scale로 축소 적용
+  ctx.scale(THUMB / SIZE, THUMB / SIZE)
+  const nb: Bounds = { title: null, content: null }
+  const args = [ctx, title, content, date, company, styles, nb, null, null] as const
+  switch (templateId) {
+    case 1: drawT1(...args); break; case 2: drawT2(...args); break
+    case 3: drawT3(...args); break; case 4: drawT4(...args); break
+  }
+  return off.toDataURL('image/jpeg', 0.7)
+}
 
 // overlay 기준: left pad, right pad (canvas 좌표)
 const TPL_REGION: Record<TemplateId, { left: number; right: number }> = {
@@ -339,6 +378,10 @@ export default function NoticePage() {
   const [overlayBounds, setOverlayBounds]     = useState<{ y1: number; y2: number } | null>(null)
   const [canvasCursor, setCanvasCursor]       = useState('default')
   const [displayScale, setDisplayScale]       = useState(1)
+  const [notices, setNotices]                 = useState<Notice[]>([])
+  const [noticesLoading, setNoticesLoading]   = useState(false)
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const setStyle = <K extends keyof StyleOptions>(key: K, val: StyleOptions[K]) =>
     setStyles(prev => ({ ...prev, [key]: val }))
@@ -367,6 +410,69 @@ export default function NoticePage() {
         .then(({ data }) => { if (data?.company_name) setCompanyName(data.company_name) })
     })
   }, [])
+
+  // 공지사항 목록 로드
+  const fetchNotices = useCallback(async () => {
+    setNoticesLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setNoticesLoading(false); return }
+    const { data } = await supabase
+      .from('notices')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setNotices((data ?? []) as Notice[])
+    setNoticesLoading(false)
+  }, [])
+
+  useEffect(() => { fetchNotices() }, [fetchNotices])
+
+  // 공지사항 저장 (DB)
+  const saveNotice = async (thumbnail: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    if (editingNoticeId) {
+      // 기존 항목 수정
+      await supabase.from('notices').update({
+        title, content, date, company_name: companyName,
+        template_id: selectedTpl, styles, thumbnail,
+      }).eq('id', editingNoticeId).eq('user_id', user.id)
+      toast.success('공지사항이 업데이트되었습니다.')
+    } else {
+      // 신규 등록
+      await supabase.from('notices').insert({
+        user_id: user.id, title, content, date, company_name: companyName,
+        template_id: selectedTpl, styles, thumbnail,
+      })
+      toast.success('공지사항이 저장되었습니다.')
+    }
+    setEditingNoticeId(null)
+    fetchNotices()
+  }
+
+  // 공지사항 삭제
+  const handleDeleteNotice = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('notices').delete().eq('id', id).eq('user_id', user.id)
+    setDeleteConfirmId(null)
+    if (editingNoticeId === id) { setEditingNoticeId(null) }
+    toast.success('공지사항이 삭제되었습니다.')
+    fetchNotices()
+  }
+
+  // 공지사항 수정 (에디터에 로드)
+  const handleEditNotice = (notice: Notice) => {
+    setTitle(notice.title)
+    setContent(notice.content)
+    setDate(notice.date)
+    setCompanyName(notice.company_name)
+    setSelectedTpl(notice.template_id)
+    setStyles(notice.styles as StyleOptions)
+    setEditingNoticeId(notice.id)
+    setCanvasSelection(null); setEditingZone(null); setOverlayBounds(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // 캔버스 렌더
   const render = useCallback(() => {
@@ -432,8 +538,9 @@ export default function NoticePage() {
     if (tab !== 'layout') setEditingZone(null)
   }
 
-  // 다운로드 (선택 없는 오프스크린 캔버스)
-  const handleDownload = () => {
+  // 다운로드 + DB 저장
+  const handleDownload = async () => {
+    // 1) 전체 해상도 캔버스 → 다운로드
     const off = document.createElement('canvas'); off.width = SIZE; off.height = SIZE
     const ctx = off.getContext('2d')!
     const nb: Bounds = { title: null, content: null }
@@ -445,13 +552,16 @@ export default function NoticePage() {
     const a = document.createElement('a'); a.href = off.toDataURL('image/png')
     a.download = `공지사항_${title || '이미지'}.png`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    // 2) 썸네일 생성 → DB 저장
+    const thumb = generateThumbnail(title, content, date, companyName, selectedTpl, styles)
+    await saveNotice(thumb)
   }
 
   const handleReset = () => {
     setTitle(''); setContent('')
     setDate(new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }))
     setStyles(TEMPLATE_DEFAULTS[selectedTpl]); setCanvasSelection(null)
-    setEditingZone(null); setOverlayBounds(null)
+    setEditingZone(null); setOverlayBounds(null); setEditingNoticeId(null)
   }
 
   // 오버레이 위치 계산
@@ -550,6 +660,16 @@ export default function NoticePage() {
             </CardContent>
           </Card>
 
+          {/* 편집 중 알림 */}
+          {editingNoticeId && (
+            <div className="flex items-center gap-2 bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2">
+              <Pencil className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="text-amber-300 text-xs flex-1">저장된 공지사항 수정 중</span>
+              <button onClick={() => setEditingNoticeId(null)}
+                className="text-amber-500 hover:text-amber-300"><X className="h-4 w-4" /></button>
+            </div>
+          )}
+
           {/* 액션 */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleReset}
@@ -557,9 +677,11 @@ export default function NoticePage() {
               <RefreshCw className="h-4 w-4" />초기화
             </Button>
             <Button onClick={handleDownload} className="flex-1 gap-2"
-              style={{ background: tplConfig.accent }}
+              style={{ background: editingNoticeId ? '#d97706' : tplConfig.accent }}
               disabled={!title && !content}>
-              <Download className="h-4 w-4" />이미지 다운로드 (PNG)
+              {editingNoticeId
+                ? <><SaveAll className="h-4 w-4" />업데이트 & 다운로드</>
+                : <><Download className="h-4 w-4" />다운로드 & 저장</>}
             </Button>
           </div>
         </div>
@@ -691,6 +813,99 @@ export default function NoticePage() {
 
         </div>
       </div>
+
+      {/* ── 저장된 공지사항 목록 ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Clock className="h-5 w-5 text-slate-400" />
+            저장된 공지사항
+            <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">{notices.length}</span>
+          </h3>
+          <button onClick={fetchNotices} className="text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1">
+            <RefreshCw className="h-3 w-3" />새로고침
+          </button>
+        </div>
+
+        {noticesLoading ? (
+          <div className="text-slate-500 text-sm text-center py-8">불러오는 중...</div>
+        ) : notices.length === 0 ? (
+          <div className="border border-dashed border-slate-700 rounded-xl py-12 text-center">
+            <Megaphone className="h-10 w-10 text-slate-700 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">아직 저장된 공지사항이 없습니다</p>
+            <p className="text-slate-600 text-xs mt-1">이미지를 다운로드하면 자동으로 여기에 저장됩니다</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {notices.map(notice => {
+              const tpl = TEMPLATES.find(t => t.id === notice.template_id)!
+              const isEditing = editingNoticeId === notice.id
+              const isConfirmDelete = deleteConfirmId === notice.id
+              return (
+                <div key={notice.id}
+                  className={`rounded-xl overflow-hidden border transition-all ${
+                    isEditing
+                      ? 'border-amber-500 ring-2 ring-amber-500/30'
+                      : 'border-slate-700 hover:border-slate-500'
+                  }`}>
+                  {/* 썸네일 */}
+                  <div className="relative aspect-square overflow-hidden bg-slate-900">
+                    {notice.thumbnail
+                      ? <img src={notice.thumbnail} alt={notice.title} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"
+                          style={{ background: `linear-gradient(135deg, ${tpl.colors[0]}, ${tpl.colors[1]})` }}>
+                          <Megaphone className="h-8 w-8 opacity-40 text-white" />
+                        </div>
+                    }
+                    {isEditing && (
+                      <div className="absolute inset-0 bg-amber-900/30 flex items-center justify-center">
+                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">수정 중</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 정보 */}
+                  <div className="bg-slate-900 p-2.5 space-y-1.5">
+                    <p className="text-white text-xs font-medium truncate">{notice.title || '(제목 없음)'}</p>
+                    <p className="text-slate-500 text-xs truncate">{notice.date}</p>
+
+                    {/* 삭제 확인 */}
+                    {isConfirmDelete ? (
+                      <div className="space-y-1.5 pt-0.5">
+                        <p className="text-red-400 text-xs text-center">삭제하시겠습니까?</p>
+                        <div className="flex gap-1">
+                          <button onClick={() => handleDeleteNotice(notice.id)}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 rounded transition-colors">
+                            삭제
+                          </button>
+                          <button onClick={() => setDeleteConfirmId(null)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1 rounded transition-colors">
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 pt-0.5">
+                        <button
+                          onClick={() => handleEditNotice(notice)}
+                          className="flex-1 bg-slate-700 hover:bg-blue-700 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
+                          <Pencil className="h-3 w-3" />수정
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(notice.id)}
+                          className="flex-1 bg-slate-700 hover:bg-red-800 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
+                          <Trash2 className="h-3 w-3" />삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
