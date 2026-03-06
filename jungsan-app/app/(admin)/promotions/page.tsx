@@ -202,8 +202,8 @@ export default function PromotionsPage() {
   const setDE = (patch: Partial<ReturnType<typeof initForm>>) => setDetailEditForm(f => ({ ...f, ...patch }))
 
   useEffect(() => {
-    if (!userLoading && (isAdmin || userId)) fetchData()
-  }, [userLoading, userId, isAdmin])
+    if (isAdmin || userId) fetchData()
+  }, [userId, isAdmin])
 
   const fetchData = async () => {
     if (!userId && !isAdmin) return

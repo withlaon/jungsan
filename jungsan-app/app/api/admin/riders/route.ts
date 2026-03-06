@@ -49,7 +49,9 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, {
+      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    })
   } catch (err) {
     console.error('riders list error:', err)
     return NextResponse.json(

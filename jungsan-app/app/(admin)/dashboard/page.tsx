@@ -32,8 +32,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!userLoading && (isAdmin || userId)) fetchSettlements()
-  }, [userLoading, userId, isAdmin])
+    if (isAdmin || userId) fetchSettlements()
+  }, [userId, isAdmin])
   useEffect(() => { if (selectedId) fetchDetails(selectedId) }, [selectedId])
 
   const fetchSettlements = async () => {

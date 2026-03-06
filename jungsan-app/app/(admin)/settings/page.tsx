@@ -173,8 +173,8 @@ export default function SettingsPage() {
   const [detailSaving, setDetailSaving] = useState(false)
 
   useEffect(()=>{
-    if (!userLoading && (isAdmin || userId)) fetchData()
-  },[userLoading, userId, isAdmin])
+    if (isAdmin || userId) fetchData()
+  }, [userId, isAdmin])
 
   const fetchData = async () => {
     if (!userId && !isAdmin) return

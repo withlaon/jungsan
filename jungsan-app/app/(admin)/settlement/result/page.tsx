@@ -28,8 +28,8 @@ export default function SettlementResultPage() {
   const [currentSettlement, setCurrentSettlement] = useState<WeeklySettlement | null>(null)
 
   useEffect(() => {
-    if (!userLoading && (isAdmin || userId)) fetchSettlements()
-  }, [userLoading, userId, isAdmin])
+    if (isAdmin || userId) fetchSettlements()
+  }, [userId, isAdmin])
   useEffect(() => {
     if (selectedId) {
       fetchDetails(selectedId)

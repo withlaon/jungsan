@@ -96,10 +96,10 @@ export default function SettlementUploadPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!userLoading && (isAdmin || userId)) {
+    if (isAdmin || userId) {
       fetchRiders(); fetchSettings(); fetchManagementFees(); fetchInsuranceFees(); fetchProfileNumbers(); fetchPromotionsCache()
     }
-  }, [userLoading, userId, isAdmin])
+  }, [userId, isAdmin])
 
   // 사업자등록번호 원본 ref (서버 API에 전달용)
   const rawBizNumRef = useRef<string>('')

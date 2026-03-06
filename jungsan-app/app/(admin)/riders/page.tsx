@@ -109,12 +109,11 @@ export default function RidersPage() {
   const fetchedRef = useRef(false)
 
   useEffect(() => {
-    if (userLoading) return
     if (!isAdmin && !userId) return
     if (fetchedRef.current) return
     fetchedRef.current = true
     fetchRiders()
-  }, [userLoading, userId, isAdmin])
+  }, [userId, isAdmin])
 
   const fetchRiders = async (silent = false) => {
     if (!silent) setLoading(true)
