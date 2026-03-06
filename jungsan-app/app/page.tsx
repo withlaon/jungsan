@@ -160,9 +160,11 @@ export default function LandingPage() {
           </h1>
 
           {/* 서브 카피 */}
-          <p className="text-center text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
-            배달 플랫폼의 엑셀 데이터를 활용해 라이더의 주간 정산을 자동화하는 통합 관리 플랫폼입니다.<br className="hidden sm:block" />
-            프로모션, 보험료, 선지급금 공제를 자동 계산하고 지사 순이익 대시보드와 개인 정산서 링크 발행까지,<br className="hidden sm:block" />
+          <p className="text-center text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-loose mb-10">
+            배달 플랫폼의 엑셀 데이터를 활용해 라이더의 주간 정산을<br />
+            자동화하는 통합 관리 플랫폼입니다.<br />
+            프로모션, 보험료, 선지급금 공제를 자동 계산하고<br />
+            지사 순이익 대시보드와 개인 정산서 링크 발행까지,<br />
             정산의 투명성과 운영 효율을 동시에 확보하세요.
           </p>
 
