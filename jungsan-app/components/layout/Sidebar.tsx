@@ -31,7 +31,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import Image from 'next/image'
-import { useUser } from '@/hooks/useUser'
+import { useUser, clearUserCache } from '@/hooks/useUser'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -246,8 +246,9 @@ export function Sidebar() {
   }
 
   const handleLogout = async () => {
+    clearUserCache()
     await supabase.auth.signOut()
-    router.push('/')
+    window.location.href = '/login'
   }
 
   const handleWithdraw = async () => {
