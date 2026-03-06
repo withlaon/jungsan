@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useRiders } from '@/hooks/useRiders'
 import { ParsedRiderRow, ExcelSummary } from '@/lib/excel/baemin-parser'
 import { calculateSettlement, RiderSettlementResult } from '@/lib/settlement/calculator'
 import { Rider, FeeSettings, Promotion, AdvancePayment, ManagementFee, InsuranceFee } from '@/types'
@@ -67,6 +68,7 @@ export default function SettlementUploadPage() {
   const router = useRouter()
   const supabase = createClient()
   const { userId, isAdmin, platform, loading: userLoading } = useUser()
+  const { riders: allRiders } = useRiders()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>('upload')
@@ -86,7 +88,7 @@ export default function SettlementUploadPage() {
   // preview
   const [parsedRows, setParsedRows] = useState<ParsedRiderRow[]>([])
   const [summaryData, setSummaryData] = useState<ExcelSummary | null>(null)
-  const [riders, setRiders] = useState<Rider[]>([])
+  const riders = allRiders.filter(r => r.status === 'active')
   const [riderMapping, setRiderMapping] = useState<Record<string, string>>({})
   const [settings, setSettings] = useState<FeeSettings | null>(null)
   const [managementFees, setManagementFees] = useState<ManagementFee[]>([])
@@ -97,7 +99,7 @@ export default function SettlementUploadPage() {
 
   useEffect(() => {
     if (isAdmin || userId) {
-      fetchRiders(); fetchSettings(); fetchManagementFees(); fetchInsuranceFees(); fetchProfileNumbers(); fetchPromotionsCache()
+      fetchSettings(); fetchManagementFees(); fetchInsuranceFees(); fetchProfileNumbers(); fetchPromotionsCache()
     }
   }, [userId, isAdmin])
 
@@ -120,10 +122,6 @@ export default function SettlementUploadPage() {
     }
   }
 
-  const fetchRiders = async () => {
-    const data = await fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json())
-    if (Array.isArray(data)) setRiders((data as Rider[]).filter(r => r.status === 'active'))
-  }
   const fetchSettings = async () => {
     // 유저별 설정 우선 조회, 없으면 글로벌(user_id IS NULL) 설정 사용
     if (userId) {

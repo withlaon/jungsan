@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useRiders } from '@/hooks/useRiders'
 import { AdvancePayment, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -140,8 +141,9 @@ function RiderSearchSelect({
 export default function AdvancePaymentsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
+  const { riders: allRiders } = useRiders()
+  const riders = allRiders.filter(r => r.status === 'active')
   const [payments, setPayments] = useState<PaymentWithRider[]>([])
-  const [riders, setRiders] = useState<Rider[]>([])
   const [loading, setLoading] = useState(true)
 
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -158,18 +160,10 @@ export default function AdvancePaymentsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [paymentsRes, ridersData] = await Promise.all([
-      (() => {
-        let q = supabase.from('advance_payments').select('*, riders(*)').order('paid_date', { ascending: false })
-        if (!isAdmin && userId) q = q.eq('user_id', userId)
-        return q
-      })(),
-      fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json()),
-    ])
+    let q = supabase.from('advance_payments').select('*, riders(*)').order('paid_date', { ascending: false })
+    if (!isAdmin && userId) q = q.eq('user_id', userId)
+    const [paymentsRes] = await Promise.all([q])
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentWithRider[])
-    if (Array.isArray(ridersData)) {
-      setRiders((ridersData as Rider[]).filter(r => r.status === 'active'))
-    }
     setLoading(false)
   }
 

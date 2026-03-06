@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useRiders } from '@/hooks/useRiders'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,9 +85,8 @@ const emptyForm = {
 export default function RidersPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
-  const [riders, setRiders] = useState<Rider[]>([])
+  const { riders, loading, refresh: refreshRiders } = useRiders()
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRider, setEditingRider] = useState<Rider | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -108,27 +108,6 @@ export default function RidersPage() {
   const [page, setPage] = useState(1)
 
   const PAGE_SIZE = 15
-  const fetchedRef = useRef(false)
-
-  useEffect(() => {
-    if (!isAdmin && !userId) return
-    if (fetchedRef.current) return
-    fetchedRef.current = true
-    fetchRiders()
-  }, [userId, isAdmin])
-
-  const fetchRiders = async (silent = false) => {
-    if (!silent) setLoading(true)
-    try {
-      const res = await fetch('/api/admin/riders')
-      const data = await res.json()
-      setRiders(res.ok && Array.isArray(data) ? data : [])
-    } catch {
-      setRiders([])
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }
 
   const openCreate = () => {
     setEditingRider(null)
@@ -265,7 +244,7 @@ export default function RidersPage() {
     setSaving(false)
     setDialogOpen(false)
     setSearch('')
-    await fetchRiders(true)
+    await refreshRiders(true)
   }
 
   const toggleStatus = async (rider: Rider) => {
@@ -276,7 +255,7 @@ export default function RidersPage() {
     })
     if (error) { toast.error('상태 변경 실패: ' + error.message); return }
     toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
-    fetchRiders(true)
+    refreshRiders(true)
   }
 
   const deleteRider = async (rider: Rider) => {
@@ -284,7 +263,7 @@ export default function RidersPage() {
     if (error) { toast.error('삭제 실패: ' + error.message); return }
     toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
     setDeleteConfirmId(null)
-    fetchRiders(true)
+    refreshRiders(true)
   }
 
   const parseBulkExcel = useCallback((file: File) => {
@@ -418,7 +397,7 @@ export default function RidersPage() {
       setBulkDialogOpen(false)
       setBulkRows([])
       setBulkFileName('')
-      fetchRiders(true)
+      refreshRiders(true)
     } catch (e) {
       toast.error('저장 실패: 네트워크 오류')
     } finally {
@@ -484,7 +463,7 @@ export default function RidersPage() {
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    fetchRiders(true)
+    refreshRiders(true)
   }
 
   const handleBulkDelete = async () => {
@@ -500,7 +479,7 @@ export default function RidersPage() {
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    fetchRiders(true)
+    refreshRiders(true)
   }
 
   return (

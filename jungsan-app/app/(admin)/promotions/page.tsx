@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useRiders } from '@/hooks/useRiders'
 import { Promotion, PromoRange, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -185,8 +186,9 @@ const initForm = () => ({
 export default function PromotionsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
+  const { riders: allRiders } = useRiders()
+  const riders = allRiders.filter(r => r.status === 'active')
   const [promotions, setPromotions] = useState<PromotionWithRider[]>([])
-  const [riders, setRiders] = useState<Rider[]>([])
   const [loading, setLoading] = useState(true)
   const [regOpen, setRegOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -208,18 +210,10 @@ export default function PromotionsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [promoRes, ridersData] = await Promise.all([
-      (() => {
-        let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
-        if (!isAdmin && userId) q = q.eq('user_id', userId)
-        return q
-      })(),
-      fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json()),
-    ])
+    let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
+    if (!isAdmin && userId) q = q.eq('user_id', userId)
+    const promoRes = await q
     if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
-    if (Array.isArray(ridersData)) {
-      setRiders((ridersData as Rider[]).filter(r => r.status === 'active'))
-    }
     setLoading(false)
   }
 

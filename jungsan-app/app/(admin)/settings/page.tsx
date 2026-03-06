@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useRiders } from '@/hooks/useRiders'
 import { InsuranceFee, ManagementFee, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -149,9 +150,10 @@ const initInsurance = () => ({rider_ids:[] as string[],employment_fee:'',acciden
 export default function SettingsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
+  const { riders: allRiders } = useRiders()
+  const riders = allRiders.filter(r => r.status === 'active')
   const [fees, setFees] = useState<FeeWithRider[]>([])
   const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>([])
-  const [riders, setRiders] = useState<Rider[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogType, setDialogType] = useState<DialogType>(null)
   const [saving, setSaving] = useState(false)
@@ -179,16 +181,12 @@ export default function SettingsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [feesRes, insRes, ridersData] = await Promise.all([
+    const [feesRes, insRes] = await Promise.all([
       (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
       (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-      fetch('/api/admin/riders', { credentials: 'same-origin' }).then(r => r.json()),
     ])
     if (feesRes.data) setFees(feesRes.data as FeeWithRider[])
     if (insRes.data) setInsuranceFees(insRes.data as InsuranceFeeWithRider[])
-    if (Array.isArray(ridersData)) {
-      setRiders((ridersData as Rider[]).filter(r => r.status === 'active'))
-    }
     setLoading(false)
   }
 
