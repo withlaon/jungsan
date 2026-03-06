@@ -257,7 +257,7 @@ export function Sidebar() {
         localStorage.clear()
         sessionStorage.clear()
       } catch { /* ignore */ }
-      window.location.replace('/?logout=1')
+      window.location.replace('/login?logout=1')
     }
   }
 

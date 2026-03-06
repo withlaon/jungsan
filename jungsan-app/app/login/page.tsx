@@ -24,12 +24,6 @@ function LoginForm() {
   // 클라이언트 sessionStorage 세션 확인 → 있으면 대시보드로, 없으면 로그인 폼 표시
   // 서버 쿠키가 남아있어도 sessionStorage가 비어있으면(브라우저 재시작) 로그인 페이지 유지
   useEffect(() => {
-    // /login 경로로 직접 접속 시 루트(/)로 이동
-    if (typeof window !== 'undefined' && window.location.pathname === '/login') {
-      const qs = searchParams.toString()
-      router.replace(qs ? `/?${qs}` : '/')
-      return
-    }
     // 로그아웃 직후 접속이면 세션 체크 없이 바로 로그인 폼 표시
     if (searchParams.get('logout') === '1') {
       setCheckingSession(false)
