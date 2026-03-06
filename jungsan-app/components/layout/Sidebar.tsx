@@ -248,7 +248,7 @@ export function Sidebar() {
   const handleLogout = async () => {
     clearUserCache()
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    window.location.href = 'https://jungsan-z2so.vercel.app/'
   }
 
   const handleWithdraw = async () => {
