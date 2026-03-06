@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, UserX, UserCheck, Search, Users, FileSpreadsheet, Upload, Download, AlertTriangle, CheckCircle, Loader2, Trash2 } from 'lucide-react'
+import { Plus, UserX, UserCheck, Search, Users, FileSpreadsheet, Upload, Download, AlertTriangle, CheckCircle, Loader2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface BulkRiderRow {
@@ -105,7 +105,9 @@ export default function RidersPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkActionConfirm, setBulkActionConfirm] = useState<'deactivate' | 'delete' | null>(null)
   const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [page, setPage] = useState(1)
 
+  const PAGE_SIZE = 15
   const fetchedRef = useRef(false)
 
   useEffect(() => {
@@ -435,20 +437,30 @@ export default function RidersPage() {
     r.name.includes(search) || (r.phone ?? '').includes(search) || (r.rider_username ?? '').includes(search)
   )
 
-  const allSelected = filtered.length > 0 && filtered.every(r => selectedIds.has(r.id))
-  const someSelected = filtered.some(r => selectedIds.has(r.id))
+  // 이름순 정렬 (한국어 로케일)
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+    [filtered]
+  )
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  const allSelected = paged.length > 0 && paged.every(r => selectedIds.has(r.id))
+  const someSelected = paged.some(r => selectedIds.has(r.id))
 
   const toggleSelectAll = () => {
     if (allSelected) {
       setSelectedIds(prev => {
         const next = new Set(prev)
-        filtered.forEach(r => next.delete(r.id))
+        paged.forEach(r => next.delete(r.id))
         return next
       })
     } else {
       setSelectedIds(prev => {
         const next = new Set(prev)
-        filtered.forEach(r => next.add(r.id))
+        paged.forEach(r => next.add(r.id))
         return next
       })
     }
@@ -525,7 +537,7 @@ export default function RidersPage() {
 
       <div className="grid grid-cols-3 gap-4">
         <Card
-          onClick={() => { setActiveTab('all'); setSelectedIds(new Set()) }}
+          onClick={() => { setActiveTab('all'); setSelectedIds(new Set()); setPage(1) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'all' ? 'ring-2 ring-blue-500 bg-blue-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -537,7 +549,7 @@ export default function RidersPage() {
           </CardContent>
         </Card>
         <Card
-          onClick={() => { setActiveTab('active'); setSelectedIds(new Set()) }}
+          onClick={() => { setActiveTab('active'); setSelectedIds(new Set()); setPage(1) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'active' ? 'ring-2 ring-emerald-500 bg-emerald-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -549,7 +561,7 @@ export default function RidersPage() {
           </CardContent>
         </Card>
         <Card
-          onClick={() => { setActiveTab('inactive'); setSelectedIds(new Set()) }}
+          onClick={() => { setActiveTab('inactive'); setSelectedIds(new Set()); setPage(1) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'inactive' ? 'ring-2 ring-rose-500 bg-rose-900/10' : 'hover:bg-slate-800'}`}
         >
           <CardContent className="p-4 flex items-center gap-3">
@@ -567,7 +579,7 @@ export default function RidersPage() {
         <Input
           placeholder="라이더명, 아이디, 연락처로 검색..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           className="pl-10 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
         />
       </div>
@@ -576,7 +588,7 @@ export default function RidersPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-white text-base">
-              {activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성'} 라이더 목록 ({filtered.length}명)
+              {activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성'} 라이더 목록 ({sorted.length}명)
             </CardTitle>
             {someSelected && (
               <div className="flex items-center gap-2">
@@ -642,12 +654,12 @@ export default function RidersPage() {
                   <TableRow>
                     <TableCell colSpan={11} className="text-center text-slate-500 py-8">로딩 중...</TableCell>
                   </TableRow>
-                ) : filtered.length === 0 ? (
+                ) : paged.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center text-slate-500 py-8">등록된 라이더가 없습니다.</TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map(rider => (
+                  paged.map(rider => (
                     <TableRow
                       key={rider.id}
                       className={`border-slate-700 hover:bg-slate-800/50 ${selectedIds.has(rider.id) ? 'bg-blue-900/10' : ''}`}
@@ -707,6 +719,52 @@ export default function RidersPage() {
               </TableBody>
             </Table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
+              <p className="text-slate-400 text-sm">
+                {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} / {sorted.length}명
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm" variant="ghost"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="text-slate-400 hover:text-white h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                  .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${i}`} className="text-slate-500 px-1 text-sm">…</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        size="sm" variant="ghost"
+                        onClick={() => setPage(p as number)}
+                        className={`h-8 w-8 p-0 text-sm ${safePage === p ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {p}
+                      </Button>
+                    )
+                  )}
+                <Button
+                  size="sm" variant="ghost"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="text-slate-400 hover:text-white h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
