@@ -30,6 +30,11 @@ function LoginForm() {
       router.replace(qs ? `/?${qs}` : '/')
       return
     }
+    // 로그아웃 직후 접속이면 세션 체크 없이 바로 로그인 폼 표시
+    if (searchParams.get('logout') === '1') {
+      setCheckingSession(false)
+      return
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')

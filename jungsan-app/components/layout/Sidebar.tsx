@@ -246,9 +246,19 @@ export function Sidebar() {
   }
 
   const handleLogout = async () => {
-    clearUserCache()
-    await supabase.auth.signOut()
-    window.location.href = 'https://jungsan-z2so.vercel.app/'
+    try {
+      clearUserCache()
+      await supabase.auth.signOut({ scope: 'global' })
+    } catch {
+      // 실패해도 강제 로그아웃 진행
+    } finally {
+      // Supabase 세션 스토리지 완전 초기화
+      try {
+        localStorage.clear()
+        sessionStorage.clear()
+      } catch { /* ignore */ }
+      window.location.replace('/?logout=1')
+    }
   }
 
   const handleWithdraw = async () => {
