@@ -118,7 +118,8 @@ export default function ManualPage() {
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] },
-        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
         .from(printRef.current)
         .save()
     } catch (err) {
