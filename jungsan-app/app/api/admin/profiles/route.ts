@@ -24,7 +24,7 @@ export async function GET() {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('profiles')
-      .select('id, username, company_name, business_number, manager_name, phone, email, platform, created_at')
+      .select('id, username, company_name, business_number, manager_name, phone, email, platform, created_at, plain_password')
       .order('username', { ascending: true, nullsFirst: false })
 
     if (error) {
@@ -34,34 +34,6 @@ export async function GET() {
     return NextResponse.json(data ?? [])
   } catch (err) {
     console.error('admin profiles error:', err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Server error' },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * site-admin 전용: 회원 비밀번호 재설정
- * body: { id: string, password: string }
- */
-export async function PUT(request: NextRequest) {
-  try {
-    const auth = await verifyAdmin()
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
-
-    const { id, password } = await request.json() as { id?: string; password?: string }
-    if (!id || !password || password.length < 6) {
-      return NextResponse.json({ error: '비밀번호는 6자 이상이어야 합니다.' }, { status: 400 })
-    }
-
-    const admin = createAdminClient()
-    const { error } = await admin.auth.admin.updateUserById(id, { password })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error('admin password reset error:', err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Server error' },
       { status: 500 }

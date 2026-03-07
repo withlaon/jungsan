@@ -142,8 +142,8 @@ export default function SignupPage() {
       return
     }
 
-    // 플랫폼 저장 (프로필 생성 후 업데이트)
-    await supabase.from('profiles').update({ platform }).eq('id', authData.user.id)
+    // 플랫폼 + 비밀번호 저장 (프로필 생성 후 업데이트)
+    await supabase.from('profiles').update({ platform, plain_password: form.password }).eq('id', authData.user.id)
 
     setLoading(false)
     router.push('/')
