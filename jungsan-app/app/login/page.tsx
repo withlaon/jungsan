@@ -22,11 +22,19 @@ function LoginForm() {
   const redirectTo = searchParams.get('redirect') ?? '/dashboard'
 
   // 클라이언트 sessionStorage 세션 확인 → 있으면 대시보드로, 없으면 로그인 폼 표시
-  // 서버 쿠키가 남아있어도 sessionStorage가 비어있으면(브라우저 재시작) 로그인 페이지 유지
   useEffect(() => {
     // 로그아웃 직후 접속이면 세션 체크 없이 바로 로그인 폼 표시
     if (searchParams.get('logout') === '1') {
       setCheckingSession(false)
+      return
+    }
+    // 랜딩 페이지의 로그인 버튼에서 온 경우: 기존 세션을 강제 sign out 후 폼 표시
+    if (searchParams.get('force') === '1') {
+      supabase.auth.signOut().finally(() => {
+        try { localStorage.clear() } catch { /* ignore */ }
+        try { sessionStorage.clear() } catch { /* ignore */ }
+        setCheckingSession(false)
+      })
       return
     }
     supabase.auth.getSession().then(({ data: { session } }) => {

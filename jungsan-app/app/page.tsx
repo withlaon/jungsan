@@ -117,13 +117,13 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/login"
+              href="/login?force=1"
               className="hidden md:inline-flex px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-all"
             >
               로그인
             </Link>
             <Link
-              href="/login"
+              href="/login?force=1"
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/30"
             >
               무료로 시작하기
@@ -186,7 +186,7 @@ export default function LandingPage() {
           {/* CTA 버튼 */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link
-              href="/login"
+              href="/login?force=1"
               className="group inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-semibold bg-blue-600 hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/30 text-base"
             >
               무료로 시작하기
@@ -302,7 +302,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <Link
-                  href="/login"
+                  href="/login?force=1"
                   className="sm:ml-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-blue-600 hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/30 text-sm"
                 >
                   지금 무료로 시작하기
@@ -357,7 +357,7 @@ export default function LandingPage() {
             </div>
 
             <Link
-              href="/login"
+              href="/login?force=1"
               className="group inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-semibold bg-blue-600 hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/30"
             >
               지금 바로 시작하기
@@ -377,7 +377,7 @@ export default function LandingPage() {
             <span>JUNGSAN-TIME</span>
           </div>
           <p>© 2025 위드라온 · 라이더 정산 자동화 플랫폼 · jimcard@naver.com</p>
-          <Link href="/login" className="text-slate-500 hover:text-slate-300 transition-colors">
+          <Link href="/login?force=1" className="text-slate-500 hover:text-slate-300 transition-colors">
             관리자 로그인 →
           </Link>
         </div>
