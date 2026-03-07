@@ -338,21 +338,24 @@ export default function SettlementUploadPage() {
     const hasData = Object.values(totalSummary).some(v => v > 0)
     setSummaryData(hasData ? totalSummary : null)
 
-    // 라이더 자동 매핑: 이름 일치 → userId(배민) 일치 → rider_username(쿠팡이츠 아이디) 일치 순으로 시도
+    // 라이더 자동 매핑 우선순위:
+    // 1) 파일 userId(라이선스ID/배민ID) ↔ 사이트 rider_username
+    // 2) 파일 기사이름 ↔ 사이트 라이더명
+    // 3) 파일 기사이름 ↔ 사이트 rider_username (역방향)
     const mapping: Record<string, string> = {}
     for (const row of merged) {
       const rowNameNorm = row.name.replace(/\s/g, '').toLowerCase()
+      const rowUidNorm  = (row.userId ?? '').replace(/\s/g, '').toLowerCase()
+
       const matched = riders.find(r => {
         const rNameNorm = r.name.replace(/\s/g, '').toLowerCase()
         const rUserNorm = (r.rider_username ?? '').replace(/\s/g, '').toLowerCase()
-        // 1) 등록된 라이더명과 파일 기사이름 일치
+
+        // 1) 파일 userId(라이선스ID) ↔ 사이트 rider_username 일치 (쿠팡이츠 핵심 매핑)
+        if (rowUidNorm && rUserNorm && rUserNorm === rowUidNorm) return true
+        // 2) 파일 기사이름 ↔ 사이트 라이더명 일치
         if (rNameNorm === rowNameNorm) return true
-        // 2) 배민 userId 일치
-        if (row.userId) {
-          const uidNorm = row.userId.replace(/\s/g, '').toLowerCase()
-          if (rUserNorm && (rUserNorm === uidNorm)) return true
-        }
-        // 3) 쿠팡이츠: 파일의 기사이름이 rider_username(라이더 아이디)과 일치
+        // 3) 파일 기사이름 ↔ 사이트 rider_username 일치 (역방향 보조)
         if (rUserNorm && rUserNorm === rowNameNorm) return true
         return false
       })

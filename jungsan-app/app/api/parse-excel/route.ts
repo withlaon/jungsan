@@ -173,6 +173,12 @@ function isCoupangSheet(headers: string[]): boolean {
   return false
 }
 
+// 종합 시트 감지: "라이선스ID" 또는 "라이선스" 컬럼이 있는 시트
+function isCoupangSummarySheet(headers: string[]): boolean {
+  const norm = headers.map(h => String(h).replace(/[\s\t\r\n]/g, ''))
+  return norm.some(h => h.includes('라이선스') || h.includes('라이선스ID') || h.includes('licenseId') || h.includes('license'))
+}
+
 function extractCoupangData(workbook: XLSX.WorkBook): {
   rows: ParsedRiderRow[]
   summary: ExcelSummary
@@ -184,6 +190,48 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     settledAmount: 0, branchFee: 0, vatAmount: 0,
     employerEmploymentInsurance: 0, employerAccidentInsurance: 0,
   }
+
+  // ── 1단계: 종합 시트에서 라이선스ID ↔ 기사이름 매핑 구성 ──
+  // 종합 시트에서 "라이선스ID" 컬럼을 찾아 { 기사이름 → 라이선스ID } 맵 구성
+  const licenseMap = new Map<string, string>() // key: 기사이름(normalized), value: 라이선스ID
+
+  for (const sheetName of workbook.SheetNames) {
+    const isSummaryByName = sheetName.includes('종합') || sheetName.includes('집계') || sheetName.toLowerCase().includes('summary')
+    const sheet = workbook.Sheets[sheetName]
+    const raw   = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
+
+    // 헤더 행 탐색
+    for (let i = 0; i < Math.min(raw.length, 30); i++) {
+      const row = (raw[i] as unknown[]).map(h => String(h ?? '').trim())
+      if (!isCoupangSummarySheet(row)) continue
+
+      const norm = row.map(h => h.replace(/[\s\t\r\n]/g, ''))
+      const licIdx  = norm.findIndex(h => h.includes('라이선스') || h.toLowerCase().includes('license'))
+      const nameIdx = norm.findIndex(h => h.includes('기사이름') || h.includes('기사명') || h.includes('라이더이름') || h.includes('이름'))
+
+      if (licIdx === -1) break
+
+      // 데이터 행 순회
+      for (let j = i + 1; j < raw.length; j++) {
+        const dRow    = raw[j] as unknown[]
+        const licId   = String(dRow[licIdx] ?? '').trim()
+        const name    = nameIdx !== -1 ? String(dRow[nameIdx] ?? '').trim() : ''
+        if (!licId) continue
+        // 이름 → 라이선스ID 매핑 (이름이 없으면 라이선스ID 자체를 이름으로 간주)
+        const key = (name || licId).replace(/\s/g, '').toLowerCase()
+        licenseMap.set(key, licId)
+      }
+
+      // 종합 시트 처리 완료
+      if (!isSummaryByName) break
+    }
+  }
+
+  // ── 2단계: 주문별 시트에서 기사별 집계 ──
+  let resultRows: ParsedRiderRow[] | null = null
+  let resultWeekStart: string | undefined
+  let resultWeekEnd: string | undefined
+  let resultDebugHeaders: string[] | undefined
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName]
@@ -220,6 +268,9 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     }
     if (nameIdx === -1) continue
 
+    // 주문별 시트에 라이선스ID 컬럼이 있으면 추가 수집
+    const licIdxInOrder = ci('라이선스ID', '라이선스', 'licenseId', 'license')
+
     const finalAmtIdx  = ci('최종정산금액', '정산금액', '최종금액')
     const pickupFeeIdx = ci('픽업비용', '픽업료')
     const delivFeeIdx  = ci('배달비용', '배달료')
@@ -236,8 +287,8 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     // 금액 컬럼 중 하나라도 있어야 의미 있는 데이터
     const hasAnyAmtCol = [finalAmtIdx, pickupFeeIdx, delivFeeIdx, regionIdx, distIdx].some(x => x !== -1)
 
-    // 기사별 집계
-    const riderMap = new Map<string, { deliveryCount: number; totalAmount: number }>()
+    // 기사별 집계 (기사이름 → { count, amount, licenseId })
+    const riderMap = new Map<string, { deliveryCount: number; totalAmount: number; licenseId: string }>()
     const SKIP_NAMES = new Set(['합계', '소계', '총계', '합산', '전체', 'total', 'sum'])
 
     for (let i = headerRowIdx + 1; i < raw.length; i++) {
@@ -245,6 +296,13 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
       const name = String(row[nameIdx] ?? '').trim()
       if (!name) continue
       if (SKIP_NAMES.has(name.toLowerCase())) continue  // 합계 행 제외
+
+      // 주문별 시트에서 라이선스ID 추출 (있으면)
+      const rowLicId = licIdxInOrder !== -1 ? String(row[licIdxInOrder] ?? '').trim() : ''
+      if (rowLicId) {
+        const nameNorm = name.replace(/\s/g, '').toLowerCase()
+        if (!licenseMap.has(nameNorm)) licenseMap.set(nameNorm, rowLicId)
+      }
 
       // 주문별 정산금액: 최종정산금액 컬럼 우선, 없으면 항목 합산
       let orderAmt: number
@@ -256,7 +314,6 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
                       promo1Idx, promo2Idx, promo3Idx, promo4Idx]
         orderAmt = cols.filter(x => x !== -1).reduce((s, idx) => s + toNum(row[idx]), 0)
       } else {
-        // 금액 컬럼이 없으면 숫자 값이 있는 마지막 컬럼을 금액으로 추정
         let lastNum = 0
         for (let c = row.length - 1; c >= 0; c--) {
           const v = toNum(row[c])
@@ -268,43 +325,59 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
       const existing = riderMap.get(name)
       if (existing) {
         riderMap.set(name, {
+          ...existing,
           deliveryCount: existing.deliveryCount + 1,
           totalAmount:   existing.totalAmount   + orderAmt,
         })
       } else {
-        riderMap.set(name, { deliveryCount: 1, totalAmount: orderAmt })
+        riderMap.set(name, { deliveryCount: 1, totalAmount: orderAmt, licenseId: rowLicId })
       }
     }
 
     if (riderMap.size === 0) continue
 
-    const rows: ParsedRiderRow[] = Array.from(riderMap.entries()).map(([name, data]) => ({
-      userId:              '',
-      name,
-      deliveryCount:       data.deliveryCount,
-      baseAmount:          data.totalAmount,
-      deliveryFee:         data.totalAmount,
-      additionalPay:       0,
-      totalDeliveryFee:    data.totalAmount,
-      hourlyInsurance:     0,
-      employmentInsurance: 0,   // 계산기에서 0.9%로 계산
-      accidentInsurance:   0,   // 계산기에서 0.7%로 계산
-      settlementAmount:    data.totalAmount,
-      withholdingTax:      0,
-      payAmount:           0,
-    }))
+    // 종합 시트에서 구축한 licenseMap 으로 userId 보강
+    const rows: ParsedRiderRow[] = Array.from(riderMap.entries()).map(([name, data]) => {
+      const nameNorm = name.replace(/\s/g, '').toLowerCase()
+      const licenseId = data.licenseId || licenseMap.get(nameNorm) || ''
+      return {
+        userId:              licenseId,   // 라이선스ID → userId 로 매핑에 활용
+        name,
+        deliveryCount:       data.deliveryCount,
+        baseAmount:          data.totalAmount,
+        deliveryFee:         data.totalAmount,
+        additionalPay:       0,
+        totalDeliveryFee:    data.totalAmount,
+        hourlyInsurance:     0,
+        employmentInsurance: 0,   // 계산기에서 0.9%로 계산
+        accidentInsurance:   0,   // 계산기에서 0.7%로 계산
+        settlementAmount:    data.totalAmount,
+        withholdingTax:      0,
+        payAmount:           0,
+      }
+    })
 
     const csv = XLSX.utils.sheet_to_csv(sheet)
     const m   = csv.match(/(\d{4}[-./]\d{1,2}[-./]\d{1,2})[^0-9]*(\d{4}[-./]\d{1,2}[-./]\d{1,2})/)
-    return {
-      rows,
-      summary:      emptySum,
-      weekStart:    m?.[1].replace(/[./]/g, '-'),
-      weekEnd:      m?.[2].replace(/[./]/g, '-'),
-      debugHeaders: headers.slice(0, 25),  // 디버그: 실제 헤더 반환
+
+    // 여러 시트가 감지되면 가장 많은 라이더가 있는 시트 사용
+    if (!resultRows || rows.length > resultRows.length) {
+      resultRows         = rows
+      resultWeekStart    = m?.[1].replace(/[./]/g, '-')
+      resultWeekEnd      = m?.[2].replace(/[./]/g, '-')
+      resultDebugHeaders = headers.slice(0, 25)
     }
   }
-  return null
+
+  if (!resultRows || resultRows.length === 0) return null
+
+  return {
+    rows:         resultRows,
+    summary:      emptySum,
+    weekStart:    resultWeekStart,
+    weekEnd:      resultWeekEnd,
+    debugHeaders: resultDebugHeaders,
+  }
 }
 
 // ── 워크북에서 데이터 추출 (배민 → 쿠팡이츠 → 범용 폴백) ──
