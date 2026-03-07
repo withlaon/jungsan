@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   FileSpreadsheet,
   Calculator,
@@ -75,11 +76,25 @@ const plans = [
   { label: '무제한 라이더 등록' },
 ]
 
+// 로그아웃 후 세션 쿠키 제거 처리 컴포넌트
+function LogoutHandler() {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('logout') === '1') {
+      // 이미 Sidebar에서 스토리지를 지웠지만, 추가 보장
+      try { localStorage.clear() } catch { /* ignore */ }
+      try { sessionStorage.clear() } catch { /* ignore */ }
+    }
+  }, [searchParams])
+  return null
+}
+
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-[#070B14] text-white overflow-x-hidden">
+      <Suspense fallback={null}><LogoutHandler /></Suspense>
       {/* ── 헤더 ── */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#070B14]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">

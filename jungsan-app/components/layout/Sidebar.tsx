@@ -245,20 +245,17 @@ export function Sidebar() {
     setTimeout(() => { setSaveMsg(''); setProfileOpen(false) }, 1000)
   }
 
-  const handleLogout = async () => {
-    try {
-      clearUserCache()
-      await supabase.auth.signOut({ scope: 'global' })
-    } catch {
-      // 실패해도 강제 로그아웃 진행
-    } finally {
-      // Supabase 세션 스토리지 완전 초기화
-      try {
-        localStorage.clear()
-        sessionStorage.clear()
-      } catch { /* ignore */ }
-      window.location.replace('/login?logout=1')
-    }
+  const handleLogout = () => {
+    // 캐시 및 브라우저 스토리지 즉시 초기화
+    clearUserCache()
+    try { localStorage.clear() } catch { /* ignore */ }
+    try { sessionStorage.clear() } catch { /* ignore */ }
+
+    // signOut은 백그라운드에서 실행 (응답 기다리지 않고 즉시 이동)
+    supabase.auth.signOut({ scope: 'global' }).catch(() => {})
+
+    // 랜딩 페이지로 완전 이동 (로그인 버튼 클릭 시 세션 재사용 방지용 logout 파라미터)
+    window.location.href = 'https://jungsan-z2so.vercel.app/?logout=1'
   }
 
   const handleWithdraw = async () => {
