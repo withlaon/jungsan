@@ -151,9 +151,133 @@ function extractGenericData(workbook: XLSX.WorkBook): {
   return { rows, summary: { settledAmount: 0, branchFee: 0, vatAmount: 0, employerEmploymentInsurance: 0, employerAccidentInsurance: 0 }, weekStart: m?.[1].replace(/[./]/g, '-'), weekEnd: m?.[2].replace(/[./]/g, '-') }
 }
 
-// ── 워크북에서 데이터 추출 (배민 형식 우선, 폴백) ──
+// ──────────────────────────────────────────────────────────────
+// 쿠팡이츠 파서: 주문별 데이터 → 기사별 집계
+// ──────────────────────────────────────────────────────────────
+
+// 쿠팡이츠 파일 감지: 헤더에 기사이름 + 쿠팡 전용 컬럼이 있어야 함
+function isCoupangSheet(headers: string[]): boolean {
+  const norm = headers.map(h => String(h).replace(/\s/g, '').toLowerCase())
+  const hasName = norm.some(h => ['기사이름', '라이더이름', '기사명'].includes(h))
+  const hasSig  = norm.some(h =>
+    ['픽업비용', '배달거리할증', '픽업지할증', '도착지할증', '기상할증'].includes(h)
+  )
+  return hasName && hasSig
+}
+
+function extractCoupangData(workbook: XLSX.WorkBook): {
+  rows: ParsedRiderRow[]
+  summary: ExcelSummary
+  weekStart?: string
+  weekEnd?: string
+} | null {
+  const emptySum: ExcelSummary = {
+    settledAmount: 0, branchFee: 0, vatAmount: 0,
+    employerEmploymentInsurance: 0, employerAccidentInsurance: 0,
+  }
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName]
+    const raw   = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
+
+    // 헤더 행 탐색 (상위 5행)
+    let headerRowIdx = -1
+    let headers: string[] = []
+    for (let i = 0; i < Math.min(raw.length, 5); i++) {
+      const row = (raw[i] as unknown[]).map(h => String(h ?? '').trim())
+      if (isCoupangSheet(row)) { headerRowIdx = i; headers = row; break }
+    }
+    if (headerRowIdx === -1) continue
+
+    // 컬럼 인덱스 헬퍼
+    const norm = headers.map(h => h.replace(/\s/g, '').toLowerCase())
+    const ci = (...keys: string[]): number => {
+      for (const k of keys) {
+        const idx = norm.findIndex(h => h === k || h.includes(k))
+        if (idx !== -1) return idx
+      }
+      return -1
+    }
+
+    const nameIdx      = ci('기사이름', '라이더이름', '기사명')
+    const finalAmtIdx  = ci('최종정산금액', '정산금액')
+    const pickupFeeIdx = ci('픽업비용')
+    const delivFeeIdx  = ci('배달비용')
+    const regionIdx    = ci('지역단가')
+    const distIdx      = ci('배달거리할증')
+    const pickupSurIdx = ci('픽업지할증')
+    const destSurIdx   = ci('도착지할증')
+    const weatherIdx   = ci('기상할증')
+    const promo1Idx    = ci('기타프로모션1')
+    const promo2Idx    = ci('기타프로모션2')
+    const promo3Idx    = ci('기타프로모션3')
+    const promo4Idx    = ci('기타프로모션4')
+
+    if (nameIdx === -1) continue
+
+    // 기사별 집계
+    const riderMap = new Map<string, { deliveryCount: number; totalAmount: number }>()
+
+    for (let i = headerRowIdx + 1; i < raw.length; i++) {
+      const row  = raw[i] as unknown[]
+      const name = String(row[nameIdx] ?? '').trim()
+      if (!name) continue
+
+      // 주문별 정산금액: 최종정산금액 컬럼 우선, 없으면 항목 합산
+      let orderAmt: number
+      if (finalAmtIdx !== -1 && toNum(row[finalAmtIdx]) > 0) {
+        orderAmt = toNum(row[finalAmtIdx])
+      } else {
+        const cols = [pickupFeeIdx, delivFeeIdx, regionIdx, distIdx,
+                      pickupSurIdx, destSurIdx, weatherIdx,
+                      promo1Idx, promo2Idx, promo3Idx, promo4Idx]
+        orderAmt = cols.filter(x => x !== -1).reduce((s, idx) => s + toNum(row[idx]), 0)
+      }
+
+      const existing = riderMap.get(name)
+      if (existing) {
+        riderMap.set(name, {
+          deliveryCount: existing.deliveryCount + 1,
+          totalAmount:   existing.totalAmount   + orderAmt,
+        })
+      } else {
+        riderMap.set(name, { deliveryCount: 1, totalAmount: orderAmt })
+      }
+    }
+
+    if (riderMap.size === 0) continue
+
+    const rows: ParsedRiderRow[] = Array.from(riderMap.entries()).map(([name, data]) => ({
+      userId:              '',
+      name,
+      deliveryCount:       data.deliveryCount,
+      baseAmount:          data.totalAmount,
+      deliveryFee:         data.totalAmount,
+      additionalPay:       0,
+      totalDeliveryFee:    data.totalAmount,
+      hourlyInsurance:     0,
+      employmentInsurance: 0,   // 계산기에서 0.9%로 계산
+      accidentInsurance:   0,   // 계산기에서 0.7%로 계산
+      settlementAmount:    data.totalAmount,
+      withholdingTax:      0,
+      payAmount:           0,
+    }))
+
+    const csv = XLSX.utils.sheet_to_csv(sheet)
+    const m   = csv.match(/(\d{4}[-./]\d{1,2}[-./]\d{1,2})[^0-9]*(\d{4}[-./]\d{1,2}[-./]\d{1,2})/)
+    return {
+      rows,
+      summary:   emptySum,
+      weekStart: m?.[1].replace(/[./]/g, '-'),
+      weekEnd:   m?.[2].replace(/[./]/g, '-'),
+    }
+  }
+  return null
+}
+
+// ── 워크북에서 데이터 추출 (배민 → 쿠팡이츠 → 범용 폴백) ──
 function extractData(workbook: XLSX.WorkBook) {
-  return extractBaeminData(workbook) ?? extractGenericData(workbook)
+  return extractBaeminData(workbook) ?? extractCoupangData(workbook) ?? extractGenericData(workbook)
 }
 
 // ── 버퍼 파싱 시도 ──

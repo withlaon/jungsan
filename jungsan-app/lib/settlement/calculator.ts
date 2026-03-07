@@ -48,6 +48,10 @@ function isFeeApplicable(fee: ManagementFee | InsuranceFee, weekStart: string, w
   return false
 }
 
+// 쿠팡이츠 보험료 기준 요율
+const COUPANG_EMPLOYMENT_RATE = 0.009  // 고용보험 0.9%
+const COUPANG_ACCIDENT_RATE   = 0.007  // 산재보험 0.7%
+
 export function calculateSettlement(
   inputs: RiderSettlementInput[],
   settings: FeeSettings,
@@ -59,7 +63,8 @@ export function calculateSettlement(
   insuranceFees: InsuranceFee[] = [],
   platform = 'baemin',          // 'baemin' | 'coupang'
 ): RiderSettlementResult[] {
-  const isBaemin = platform === 'baemin' || platform === '배민'
+  const isBaemin  = platform === 'baemin' || platform === '배민'
+  const isCoupang = platform === 'coupang' || platform === '쿠팡'
 
   return inputs.map(input => {
     const {
@@ -68,7 +73,7 @@ export function calculateSettlement(
       excelEmploymentInsurance, excelAccidentInsurance,
     } = input
 
-    // ── 프로모션 계산 ──
+    // ── 프로모션 계산 (지원금) ──
     const applicablePromos = promotions.filter(p => {
       if (p.date_mode === 'week' && p.week_start !== weekStart) return false
       if (p.date_mode === 'deadline' && p.deadline_date && p.deadline_date < weekStart) return false
@@ -112,17 +117,29 @@ export function calculateSettlement(
     const employmentInsuranceAddition = applicableInsuranceFees.reduce((s, f) => s + f.employment_fee, 0)
     const accidentInsuranceAddition   = applicableInsuranceFees.reduce((s, f) => s + f.accident_fee, 0)
 
-    // ── 고용/산재보험 합계 ──
-    const totalEmploymentInsurance = excelEmploymentInsurance + employmentInsuranceAddition
-    const totalAccidentInsurance   = excelAccidentInsurance   + accidentInsuranceAddition
+    // ── 고용/산재보험 (플랫폼별 계산 방식 분기) ──
+    // [쿠팡이츠] 엑셀에 보험료가 없으므로 배달수익 기준 요율 적용
+    // [배민] 엑셀 파일의 고용/산재보험 값 직접 사용
+    const baseEmploymentInsurance = isCoupang
+      ? Math.floor(baseAmount * COUPANG_EMPLOYMENT_RATE)
+      : excelEmploymentInsurance
+    const baseAccidentInsurance = isCoupang
+      ? Math.floor(baseAmount * COUPANG_ACCIDENT_RATE)
+      : excelAccidentInsurance
+
+    const totalEmploymentInsurance = baseEmploymentInsurance + employmentInsuranceAddition
+    const totalAccidentInsurance   = baseAccidentInsurance   + accidentInsuranceAddition
 
     // ── 세금신고금액 ──
     let taxBaseAmount: number
     if (isBaemin) {
       // [배민] 세금신고금액 = 기본정산금액 + 지사프로모션
       taxBaseAmount = Math.max(0, baseAmount + promotionAmount)
+    } else if (isCoupang) {
+      // [쿠팡이츠] 세금 = 배달수익(보험 공제 없이) 기준
+      //   세금 = 배달수익 × 3.3%
+      taxBaseAmount = Math.max(0, baseAmount)
     } else {
-      // [쿠팡 등] 기존 계산식
       taxBaseAmount = Math.max(0,
         baseAmount
         - hourlyInsurance
@@ -136,13 +153,13 @@ export function calculateSettlement(
     // ── 원천세 ──
     let incomeTaxDeduction: number
     if (isBaemin) {
-      // [배민] 소득세 = 세금신고금액 × 3.6% (원단위 절상)
+      // [배민] 소득세 = 세금신고금액 × income_tax_rate (원단위 절상)
       incomeTaxDeduction = Math.ceil(taxBaseAmount * settings.income_tax_rate)
     } else {
       incomeTaxDeduction = Math.floor(taxBaseAmount * settings.income_tax_rate)
     }
 
-    // ── 선지급금 / 선지급금회수 ──
+    // ── 선지급금 / 선지급금회수 (차감금) ──
     const advanceDeduction = advancePayments
       .filter(p => p.rider_id === riderId && !p.deducted_settlement_id && p.type === 'advance')
       .reduce((s, p) => s + p.amount, 0)
@@ -153,8 +170,8 @@ export function calculateSettlement(
     // ── 최종정산금액 ──
     let finalAmount: number
     if (isBaemin) {
-      // [배민] 최종정산금액 = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험
-      //                      + 지사프로모션 - 콜관리비 - 소득세 - 선지급금 + 선지급금회수
+      // [배민] 최종 = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험
+      //             + 지사프로모션 - 콜관리비 - 소득세 - 선지급금 + 선지급금회수
       finalAmount = Math.max(0,
         baseAmount
         - hourlyInsurance
@@ -166,8 +183,19 @@ export function calculateSettlement(
         - advanceDeduction
         + advanceRecovery
       )
+    } else if (isCoupang) {
+      // [쿠팡이츠] 최종 = 배달수익 + 지원금(프로모션) - 고용보험 - 산재보험 - 세금 - 차감금 + 선지급금회수
+      finalAmount = Math.max(0,
+        baseAmount
+        + promotionAmount
+        - totalEmploymentInsurance
+        - totalAccidentInsurance
+        - incomeTaxDeduction
+        - advanceDeduction
+        + advanceRecovery
+      )
     } else {
-      // [쿠팡 등] 기존 계산식: 세금신고금액 - 소득세 - 선지급금 + 선지급금회수
+      // 기타 플랫폼: 세금신고금액 - 소득세 - 선지급금 + 선지급금회수
       finalAmount = Math.max(0, taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery)
     }
 
@@ -180,7 +208,9 @@ export function calculateSettlement(
       riderId, riderName, deliveryCount, baseAmount,
       deliveryFee, additionalPay, hourlyInsurance,
       totalEmploymentInsurance, totalAccidentInsurance,
-      excelEmploymentInsurance, excelAccidentInsurance,
+      // 쿠팡이츠는 계산된 보험료를 excel 필드로 저장 (DB 통일)
+      excelEmploymentInsurance: baseEmploymentInsurance,
+      excelAccidentInsurance:   baseAccidentInsurance,
       employmentInsuranceAddition, accidentInsuranceAddition,
       promotionAmount, callFeeDeduction, managementFeeDeduction,
       taxBaseAmount, incomeTaxDeduction,
