@@ -14,7 +14,7 @@ import {
 import {
   Users, Pencil, Loader2, RefreshCw, Eye, ExternalLink,
   MessageSquare, ChevronLeft, ChevronRight, Send,
-  Clock, CheckCircle2,
+  Clock, CheckCircle2, KeyRound, EyeOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -216,8 +216,29 @@ export default function SiteAdminPage() {
     }
   }
 
+  /* ── 비밀번호 재설정 ── */
+  const [newPw, setNewPw] = useState('')
+  const [showNewPw, setShowNewPw] = useState(false)
+  const [pwResetting, setPwResetting] = useState(false)
+  const handleResetPassword = async () => {
+    if (!editing) return
+    if (newPw.length < 6) { toast.error('비밀번호는 6자 이상이어야 합니다.'); return }
+    setPwResetting(true)
+    try {
+      const res = await fetch('/api/admin/profiles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editing.id, password: newPw }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error('재설정 실패: ' + (data?.error ?? res.statusText)); return }
+      toast.success('비밀번호가 재설정되었습니다.')
+      setNewPw('')
+    } finally { setPwResetting(false) }
+  }
+
   /* ── 회원 수정 ── */
-  const openDetail = (m: MemberProfile) => { setEditing(m); setDetailOpen(true) }
+  const openDetail = (m: MemberProfile) => { setEditing(m); setDetailOpen(true); setNewPw(''); setShowNewPw(false) }
   const openEdit = (m: MemberProfile) => {
     setEditing(m)
     setForm({ username: m.username ?? '', company_name: m.company_name ?? '',
@@ -574,6 +595,34 @@ export default function SiteAdminPage() {
                 <div className="col-span-2"><p className="text-slate-500 text-xs mb-0.5">이메일</p><p className="text-white">{editing.email ?? '-'}</p></div>
                 <div className="col-span-2"><p className="text-slate-500 text-xs mb-0.5">가입일자</p><p className="text-slate-300 text-sm">{editing.created_at ? formatDate(editing.created_at) : '-'}</p></div>
               </div>
+
+              {/* 비밀번호 재설정 */}
+              <div className="border-t border-slate-700 pt-3">
+                <p className="text-slate-400 text-xs mb-2 flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5" />비밀번호 재설정
+                </p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showNewPw ? 'text' : 'password'}
+                      placeholder="새 비밀번호 (6자 이상)"
+                      value={newPw}
+                      onChange={e => setNewPw(e.target.value)}
+                      className="bg-slate-800 border-slate-600 text-white h-9 pr-9 text-sm"
+                    />
+                    <button type="button" onClick={() => setShowNewPw(v => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                      {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <Button onClick={handleResetPassword} disabled={pwResetting || newPw.length < 6}
+                    className="bg-amber-600 hover:bg-amber-700 text-white h-9 px-3 text-sm shrink-0">
+                    {pwResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                    <span className="ml-1.5">재설정</span>
+                  </Button>
+                </div>
+              </div>
+
               <DialogFooter className="border-t border-slate-700 pt-4 flex-col gap-2 sm:flex-row">
                 <Button variant="outline" onClick={() => setDetailOpen(false)} className="border-slate-600 text-slate-300">닫기</Button>
                 <Button variant="outline" onClick={() => window.open(`${window.location.origin}/dashboard`, '_blank')}
