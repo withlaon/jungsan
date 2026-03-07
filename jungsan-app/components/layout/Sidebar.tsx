@@ -44,8 +44,8 @@ const PLATFORM_CONFIG = {
   coupang: {
     label: '쿠팡 라이더 정산',
     sub: '쿠팡이츠',
-    accent: 'bg-red-600',
-    activeNav: 'bg-red-600 text-white shadow-lg',
+    accent: 'bg-violet-600',
+    activeNav: 'bg-violet-600 text-white shadow-lg',
     icon: Package,
   },
 } as const
