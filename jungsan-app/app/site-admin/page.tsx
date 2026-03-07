@@ -30,6 +30,7 @@ interface MemberProfile {
   phone: string | null
   email: string | null
   platform: string | null
+  created_at: string | null
 }
 
 interface InquiryItem {
@@ -327,6 +328,7 @@ export default function SiteAdminPage() {
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">담당자</th>
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">연락처</th>
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">이메일</th>
+                        <th className="text-left py-3 px-4 text-slate-400 font-medium whitespace-nowrap">가입일자</th>
                         <th className="w-20 py-3 px-4"></th>
                       </tr>
                     </thead>
@@ -353,6 +355,9 @@ export default function SiteAdminPage() {
                           <td className="py-3 px-4 text-slate-300">{m.manager_name ?? '-'}</td>
                           <td className="py-3 px-4 text-slate-300">{m.phone ?? '-'}</td>
                           <td className="py-3 px-4 text-slate-300">{m.email ?? '-'}</td>
+                          <td className="py-3 px-4 text-slate-400 text-xs whitespace-nowrap">
+                            {m.created_at ? formatDate(m.created_at) : '-'}
+                          </td>
                           <td className="py-3 px-4">
                             <div className="flex gap-1">
                               <Button variant="ghost" size="sm" onClick={() => openDetail(m)}
@@ -567,6 +572,7 @@ export default function SiteAdminPage() {
                 <div><p className="text-slate-500 text-xs mb-0.5">담당자</p><p className="text-white">{editing.manager_name ?? '-'}</p></div>
                 <div className="col-span-2"><p className="text-slate-500 text-xs mb-0.5">연락처</p><p className="text-white">{editing.phone ?? '-'}</p></div>
                 <div className="col-span-2"><p className="text-slate-500 text-xs mb-0.5">이메일</p><p className="text-white">{editing.email ?? '-'}</p></div>
+                <div className="col-span-2"><p className="text-slate-500 text-xs mb-0.5">가입일자</p><p className="text-slate-300 text-sm">{editing.created_at ? formatDate(editing.created_at) : '-'}</p></div>
               </div>
               <DialogFooter className="border-t border-slate-700 pt-4 flex-col gap-2 sm:flex-row">
                 <Button variant="outline" onClick={() => setDetailOpen(false)} className="border-slate-600 text-slate-300">닫기</Button>
