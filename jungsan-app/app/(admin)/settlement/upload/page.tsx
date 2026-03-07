@@ -695,96 +695,145 @@ export default function SettlementUploadPage() {
             </div>
           )}
 
-          {/* 을지 라이더 데이터 테이블 */}
-          <Card className="border-slate-700 bg-slate-900">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center justify-between">
-                <span>라이더 정산 데이터 ({parsedRows.length}명)</span>
-                <div className="flex items-center gap-2 text-sm font-normal">
-                  {mappedCount === parsedRows.length
-                    ? <span className="text-emerald-400 flex items-center gap-1"><CheckCircle className="h-4 w-4" />{mappedCount}명 전체 매핑</span>
-                    : <span className="text-amber-400 flex items-center gap-1"><AlertTriangle className="h-4 w-4" />{mappedCount}/{parsedRows.length}명 매핑</span>}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-slate-700 hover:bg-transparent">
-                      <TableHead className="text-slate-400 whitespace-nowrap">User ID</TableHead>
-                      <TableHead className="text-slate-400 whitespace-nowrap">라이더명</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">배달료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">총배달료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별정산금액</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">원천징수액</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별지급금액</TableHead>
-                      <TableHead className="text-slate-400 whitespace-nowrap">라이더 연결 *</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {parsedRows.map((row, i) => {
-                      const mappedRider = riderMapping[row.name]
-                        ? riders.find(r => r.id === riderMapping[row.name])
-                        : null
-                      return (
-                      <TableRow key={i} className="border-slate-700 hover:bg-slate-800/50">
-                        <TableCell className="text-slate-400 text-sm whitespace-nowrap">{row.userId || row.name}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {mappedRider ? (
-                            <div>
-                              <span className="text-white font-medium">{mappedRider.name}</span>
-                              {mappedRider.name !== row.name && (
-                                <span className="text-slate-500 text-xs ml-1.5">({row.name})</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-amber-400 font-medium">{row.name}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{row.deliveryCount.toLocaleString()}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.deliveryFee)}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.additionalPay)}</TableCell>
-                        <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(row.totalDeliveryFee)}</TableCell>
-                        <TableCell className="text-amber-400 text-right whitespace-nowrap">{row.hourlyInsurance > 0 ? formatKRW(row.hourlyInsurance) : '-'}</TableCell>
-                        <TableCell className="text-violet-400 text-right whitespace-nowrap">
-                          {(() => {
-                            const rid = riderMapping[row.name]
-                            if (!rid) return <span className="text-slate-600 text-xs">미연결</span>
-                            const amt = calcPreviewPromo(rid, row.deliveryCount)
-                            return amt > 0 ? <span className="font-medium">+{formatKRW(amt)}</span> : '-'
-                          })()}
-                        </TableCell>
-                        <TableCell className="text-cyan-400 text-right whitespace-nowrap">{row.employmentInsurance > 0 ? formatKRW(row.employmentInsurance) : '-'}</TableCell>
-                        <TableCell className="text-purple-400 text-right whitespace-nowrap">{row.accidentInsurance > 0 ? formatKRW(row.accidentInsurance) : '-'}</TableCell>
-                        <TableCell className="text-blue-400 text-right whitespace-nowrap">{formatKRW(row.settlementAmount)}</TableCell>
-                        <TableCell className="text-rose-400 text-right whitespace-nowrap">{row.withholdingTax > 0 ? formatKRW(row.withholdingTax) : '-'}</TableCell>
-                        <TableCell className="text-emerald-300 text-right font-bold whitespace-nowrap">{formatKRW(row.payAmount)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <Select value={riderMapping[row.name] ?? ''} onValueChange={v => setRiderMapping(prev => ({ ...prev, [row.name]: v }))}>
-                            <SelectTrigger className={`w-40 h-8 text-sm ${riderMapping[row.name] ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800 border-slate-600'} text-white`}>
-                              <SelectValue placeholder="라이더 선택" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-slate-800 border-slate-600">
-                              <SelectItem value="none" className="text-slate-400">연결 안함</SelectItem>
-                              {riders.map(r => <SelectItem key={r.id} value={r.id} className="text-white">{r.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          {/* 라이더 정산 데이터 테이블 */}
+          {(() => {
+            const mappedRows   = parsedRows.filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
+            const unmappedRows = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none')
+
+            const RiderRow = ({ row, i }: { row: typeof parsedRows[0]; i: number }) => {
+              const mappedRider = riderMapping[row.name]
+                ? riders.find(r => r.id === riderMapping[row.name])
+                : null
+              // User ID: 사이트에 등록된 rider_username 우선, 없으면 파일의 userId
+              const displayUserId = mappedRider?.rider_username || row.userId || '-'
+              return (
+                <TableRow key={i} className="border-slate-700 hover:bg-slate-800/50">
+                  <TableCell className="text-slate-400 text-sm whitespace-nowrap">{displayUserId}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {mappedRider ? (
+                      <div>
+                        <span className="text-white font-medium">{mappedRider.name}</span>
+                        {mappedRider.name !== row.name && (
+                          <span className="text-slate-500 text-xs ml-1.5">({row.name})</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-amber-400 font-medium">{row.name}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-slate-300 text-right whitespace-nowrap">{row.deliveryCount.toLocaleString()}</TableCell>
+                  <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.deliveryFee)}</TableCell>
+                  <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.additionalPay)}</TableCell>
+                  <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(row.totalDeliveryFee)}</TableCell>
+                  <TableCell className="text-amber-400 text-right whitespace-nowrap">{row.hourlyInsurance > 0 ? formatKRW(row.hourlyInsurance) : '-'}</TableCell>
+                  <TableCell className="text-violet-400 text-right whitespace-nowrap">
+                    {(() => {
+                      const rid = riderMapping[row.name]
+                      if (!rid || rid === 'none') return <span className="text-slate-600 text-xs">미연결</span>
+                      const amt = calcPreviewPromo(rid, row.deliveryCount)
+                      return amt > 0 ? <span className="font-medium">+{formatKRW(amt)}</span> : '-'
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-cyan-400 text-right whitespace-nowrap">{row.employmentInsurance > 0 ? formatKRW(row.employmentInsurance) : '-'}</TableCell>
+                  <TableCell className="text-purple-400 text-right whitespace-nowrap">{row.accidentInsurance > 0 ? formatKRW(row.accidentInsurance) : '-'}</TableCell>
+                  <TableCell className="text-blue-400 text-right whitespace-nowrap">{formatKRW(row.settlementAmount)}</TableCell>
+                  <TableCell className="text-rose-400 text-right whitespace-nowrap">{row.withholdingTax > 0 ? formatKRW(row.withholdingTax) : '-'}</TableCell>
+                  <TableCell className="text-emerald-300 text-right font-bold whitespace-nowrap">{formatKRW(row.payAmount)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Select value={riderMapping[row.name] ?? ''} onValueChange={v => setRiderMapping(prev => ({ ...prev, [row.name]: v }))}>
+                      <SelectTrigger className={`w-40 h-8 text-sm ${riderMapping[row.name] && riderMapping[row.name] !== 'none' ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800 border-slate-600'} text-white`}>
+                        <SelectValue placeholder="라이더 선택" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-600">
+                        <SelectItem value="none" className="text-slate-400">연결 안함</SelectItem>
+                        {riders.map(r => <SelectItem key={r.id} value={r.id} className="text-white">{r.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              )
+            }
+
+            const TableColumns = () => (
+              <TableRow className="border-slate-700 hover:bg-transparent">
+                <TableHead className="text-slate-400 whitespace-nowrap">User ID</TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">라이더명</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">총배달료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별정산금액</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">원천징수액</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별지급금액</TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">라이더 연결 *</TableHead>
+              </TableRow>
+            )
+
+            return (
+              <>
+                {/* 매핑된 라이더 테이블 */}
+                <Card className="border-slate-700 bg-slate-900">
+                  <CardHeader>
+                    <CardTitle className="text-white text-base flex items-center justify-between">
+                      <span>라이더 정산 데이터 ({mappedRows.length}명)</span>
+                      <div className="flex items-center gap-2 text-sm font-normal">
+                        <span className="text-emerald-400 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />{mappedRows.length}명 매핑 완료
+                        </span>
+                        {unmappedRows.length > 0 && (
+                          <span className="text-amber-400 flex items-center gap-1">
+                            <AlertTriangle className="h-4 w-4" />{unmappedRows.length}명 미매핑
+                          </span>
+                        )}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {mappedRows.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 text-sm">
+                        매핑된 라이더가 없습니다. 아래 미매핑 라이더를 연결해주세요.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader><TableColumns /></TableHeader>
+                          <TableBody>
+                            {mappedRows.map((row, i) => <RiderRow key={i} row={row} i={i} />)}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 미매핑 라이더 — 접을 수 있는 섹션 */}
+                {unmappedRows.length > 0 && (
+                  <Card className="border-amber-700/30 bg-amber-900/5">
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-amber-400 text-sm flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        미매핑 라이더 ({unmappedRows.length}명) — 사이트에 등록되지 않았거나 자동 연결에 실패했습니다. 직접 연결하거나 무시하세요.
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader><TableColumns /></TableHeader>
+                          <TableBody>
+                            {unmappedRows.map((row, i) => <RiderRow key={i} row={row} i={i} />)}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )
+          })()}
 
           <div className="flex gap-3 flex-wrap items-center">
             <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">← 파일 업로드</Button>
