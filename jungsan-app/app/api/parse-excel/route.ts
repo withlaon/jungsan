@@ -155,19 +155,22 @@ function extractGenericData(workbook: XLSX.WorkBook): {
 // 쿠팡이츠 파서: 주문별 데이터 → 기사별 집계
 // ──────────────────────────────────────────────────────────────
 
-// 쿠팡이츠 파일 감지: 헤더에 기사이름 + 쿠팡 전용 컬럼이 있어야 함
-// includes 방식으로 컬럼명 변형도 허용
+// 쿠팡이츠 파일 감지 — 여러 조건 중 하나라도 충족하면 쿠팡이츠로 판단
 function isCoupangSheet(headers: string[]): boolean {
   const norm = headers.map(h => String(h).replace(/[\s\t\r\n]/g, ''))
-  const hasName    = norm.some(h => h.includes('기사이름') || h.includes('라이더이름'))
-  // 픽업/배달 관련 컬럼 또는 주문번호가 있으면 쿠팡이츠로 판단
-  const hasCoupang = norm.some(h =>
-    h.includes('픽업비용') || h.includes('배달비용') ||
+  const hasRiderName   = norm.some(h => h.includes('기사이름') || h.includes('라이더이름') || h.includes('기사명'))
+  const hasFee         = norm.some(h => h.includes('픽업비용') || h.includes('배달비용'))
+  const hasOrderNum    = norm.some(h => h.includes('주문번호'))
+  const hasFinalAmt    = norm.some(h => h.includes('최종정산금액'))
+  const hasSurcharge   = norm.some(h =>
     h.includes('픽업지할증') || h.includes('도착지할증') ||
     h.includes('배달거리할증') || h.includes('기상할증')
   )
-  const hasOrderNum = norm.some(h => h.includes('주문번호'))
-  return hasName && (hasCoupang || hasOrderNum)
+
+  if (hasRiderName && (hasFee || hasOrderNum || hasSurcharge || hasFinalAmt)) return true
+  if (hasFinalAmt && (hasOrderNum || hasFee)) return true
+  if (hasFee && hasOrderNum) return true
+  return false
 }
 
 function extractCoupangData(workbook: XLSX.WorkBook): {
@@ -175,6 +178,7 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
   summary: ExcelSummary
   weekStart?: string
   weekEnd?: string
+  debugHeaders?: string[]
 } | null {
   const emptySum: ExcelSummary = {
     settledAmount: 0, branchFee: 0, vatAmount: 0,
@@ -185,11 +189,12 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     const sheet = workbook.Sheets[sheetName]
     const raw   = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
 
-    // 헤더 행 탐색 (상위 10행 — 타이틀/공백 행 건너뜀)
+    // 헤더 행 탐색 — 최대 30행까지 (타이틀/빈 행 대비)
     let headerRowIdx = -1
     let headers: string[] = []
-    for (let i = 0; i < Math.min(raw.length, 10); i++) {
+    for (let i = 0; i < Math.min(raw.length, 30); i++) {
       const row = (raw[i] as unknown[]).map(h => String(h ?? '').trim())
+      if (row.filter(Boolean).length < 3) continue  // 3개 미만 컬럼이면 스킵
       if (isCoupangSheet(row)) { headerRowIdx = i; headers = row; break }
     }
     if (headerRowIdx === -1) continue
@@ -205,39 +210,59 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
       return -1
     }
 
-    const nameIdx      = ci('기사이름', '라이더이름', '기사명')
-    const finalAmtIdx  = ci('최종정산금액', '정산금액')
-    const pickupFeeIdx = ci('픽업비용')
-    const delivFeeIdx  = ci('배달비용')
+    // 이름 컬럼: 넓은 후보군
+    let nameIdx = ci('기사이름', '라이더이름', '기사명', '라이더명', '이름', '기사', '라이더')
+    // 그래도 없으면 첫 번째 비어있지 않은 문자열 컬럼 추정
+    if (nameIdx === -1) {
+      for (let col = 0; col < headers.length; col++) {
+        if (headers[col].trim()) { nameIdx = col; break }
+      }
+    }
+    if (nameIdx === -1) continue
+
+    const finalAmtIdx  = ci('최종정산금액', '정산금액', '최종금액')
+    const pickupFeeIdx = ci('픽업비용', '픽업료')
+    const delivFeeIdx  = ci('배달비용', '배달료')
     const regionIdx    = ci('지역단가')
-    const distIdx      = ci('배달거리할증')
+    const distIdx      = ci('배달거리할증', '거리할증')
     const pickupSurIdx = ci('픽업지할증')
     const destSurIdx   = ci('도착지할증')
     const weatherIdx   = ci('기상할증')
-    const promo1Idx    = ci('기타프로모션1')
-    const promo2Idx    = ci('기타프로모션2')
-    const promo3Idx    = ci('기타프로모션3')
-    const promo4Idx    = ci('기타프로모션4')
+    const promo1Idx    = ci('기타프로모션1', '프로모션1')
+    const promo2Idx    = ci('기타프로모션2', '프로모션2')
+    const promo3Idx    = ci('기타프로모션3', '프로모션3')
+    const promo4Idx    = ci('기타프로모션4', '프로모션4')
 
-    if (nameIdx === -1) continue
+    // 금액 컬럼 중 하나라도 있어야 의미 있는 데이터
+    const hasAnyAmtCol = [finalAmtIdx, pickupFeeIdx, delivFeeIdx, regionIdx, distIdx].some(x => x !== -1)
 
     // 기사별 집계
     const riderMap = new Map<string, { deliveryCount: number; totalAmount: number }>()
+    const SKIP_NAMES = new Set(['합계', '소계', '총계', '합산', '전체', 'total', 'sum'])
 
     for (let i = headerRowIdx + 1; i < raw.length; i++) {
       const row  = raw[i] as unknown[]
       const name = String(row[nameIdx] ?? '').trim()
       if (!name) continue
+      if (SKIP_NAMES.has(name.toLowerCase())) continue  // 합계 행 제외
 
       // 주문별 정산금액: 최종정산금액 컬럼 우선, 없으면 항목 합산
       let orderAmt: number
       if (finalAmtIdx !== -1 && toNum(row[finalAmtIdx]) > 0) {
         orderAmt = toNum(row[finalAmtIdx])
-      } else {
+      } else if (hasAnyAmtCol) {
         const cols = [pickupFeeIdx, delivFeeIdx, regionIdx, distIdx,
                       pickupSurIdx, destSurIdx, weatherIdx,
                       promo1Idx, promo2Idx, promo3Idx, promo4Idx]
         orderAmt = cols.filter(x => x !== -1).reduce((s, idx) => s + toNum(row[idx]), 0)
+      } else {
+        // 금액 컬럼이 없으면 숫자 값이 있는 마지막 컬럼을 금액으로 추정
+        let lastNum = 0
+        for (let c = row.length - 1; c >= 0; c--) {
+          const v = toNum(row[c])
+          if (v > 0) { lastNum = v; break }
+        }
+        orderAmt = lastNum
       }
 
       const existing = riderMap.get(name)
@@ -273,23 +298,30 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     const m   = csv.match(/(\d{4}[-./]\d{1,2}[-./]\d{1,2})[^0-9]*(\d{4}[-./]\d{1,2}[-./]\d{1,2})/)
     return {
       rows,
-      summary:   emptySum,
-      weekStart: m?.[1].replace(/[./]/g, '-'),
-      weekEnd:   m?.[2].replace(/[./]/g, '-'),
+      summary:      emptySum,
+      weekStart:    m?.[1].replace(/[./]/g, '-'),
+      weekEnd:      m?.[2].replace(/[./]/g, '-'),
+      debugHeaders: headers.slice(0, 25),  // 디버그: 실제 헤더 반환
     }
   }
   return null
 }
 
 // ── 워크북에서 데이터 추출 (배민 → 쿠팡이츠 → 범용 폴백) ──
-// 반환값에 detectedPlatform 포함
-function extractData(workbook: XLSX.WorkBook): ReturnType<typeof extractBaeminData> & { detectedPlatform?: string } | null {
+function extractData(workbook: XLSX.WorkBook) {
+  // 디버그: 모든 시트의 첫 행 헤더 수집 (어떤 파서도 감지 못할 경우 원인 파악용)
+  const debugAllSheets = workbook.SheetNames.map(name => {
+    const raw = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, defval: '' })
+    const firstNonEmpty = (raw as unknown[][]).find(r => r.filter(Boolean).length > 2)
+    return { sheet: name, headers: (firstNonEmpty ?? []).slice(0, 20).map(h => String(h ?? '').trim()) }
+  })
+
   const baemin  = extractBaeminData(workbook)
-  if (baemin)  return { ...baemin, detectedPlatform: 'baemin' }
+  if (baemin)  return { ...baemin,  detectedPlatform: 'baemin',  debugAllSheets }
   const coupang = extractCoupangData(workbook)
-  if (coupang) return { ...coupang, detectedPlatform: 'coupang' }
+  if (coupang) return { ...coupang, detectedPlatform: 'coupang', debugAllSheets }
   const generic = extractGenericData(workbook)
-  return { ...generic, detectedPlatform: 'unknown' }
+  return { ...generic, detectedPlatform: 'unknown', debugAllSheets }
 }
 
 // ── 버퍼 파싱 시도 ──

@@ -206,6 +206,10 @@ export default function SettlementUploadPage() {
       const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
+        // 디버그: 실제 파일 시트/헤더 구조 콘솔 출력 (쿠팡이츠 파싱 문제 분석용)
+        console.log('[parse-excel] detectedPlatform:', data.detectedPlatform)
+        console.log('[parse-excel] rows:', data.rows?.length)
+        console.log('[parse-excel] debugAllSheets:', JSON.stringify(data.debugAllSheets, null, 2))
         return {
           success: true, rows: data.rows, summary: data.summary,
           detectedPlatform: data.detectedPlatform,
