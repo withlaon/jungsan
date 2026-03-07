@@ -372,7 +372,17 @@ export default function SettlementUploadPage() {
 
   // ── 정산 계산 ──
   const handlePreviewConfirm = async () => {
-    if (!settings) { toast.error('보험/세금 설정이 없습니다. 설정 탭에서 먼저 등록해주세요.'); return }
+    // settings가 없으면 기본 세율로 fallback (3.3% 원천세)
+    const effectiveSettings = settings ?? {
+      id: 'default', user_id: null,
+      insurance_rate: 0, income_tax_rate: 0.033,
+      management_fee_type: 'fixed' as const, management_fee_value: 0,
+      effective_from: '', note: null, created_at: '',
+    }
+    if (!settings) {
+      toast('설정값이 없어 기본 세율(원천세 3.3%)로 계산합니다.', { icon: '⚠️' })
+    }
+
     const [promoRes, advanceRes] = await Promise.all([
       (() => { let q = supabase.from('promotions').select('*').or('settlement_id.is.null'); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
       (() => { let q = supabase.from('advance_payments').select('*').is('deducted_settlement_id', null); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
@@ -385,7 +395,6 @@ export default function SettlementUploadPage() {
       .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
       .map(r => {
         const rId = riderMapping[r.name]
-        // DB 라이더 목록에서 공식 이름 조회 (없으면 파일의 이름 사용)
         const officialName = riders.find(rd => rd.id === rId)?.name ?? r.name
         return {
           riderId:                  rId,
@@ -400,8 +409,17 @@ export default function SettlementUploadPage() {
         }
       })
 
-    // 같은 riderId 가 여러 행에 연결된 경우(파일 중복 등) riderId 기준으로 합산
-    // → 합산된 배달건수·금액을 기준으로 프로모션/관리비가 올바르게 적용됨
+    if (rawInputs.length === 0) {
+      const unmapped = parsedRows.length
+      if (unmapped === 0) {
+        toast.error('파싱된 라이더 데이터가 없습니다. 파일을 다시 업로드해주세요.')
+      } else {
+        toast.error(`${unmapped}명의 라이더가 모두 미연결 상태입니다. 우측 "라이더 연결" 드롭다운에서 연결해주세요.`)
+      }
+      return
+    }
+
+    // 같은 riderId가 여러 행인 경우 합산
     const mergedMap = new Map<string, typeof rawInputs[0]>()
     for (const input of rawInputs) {
       const existing = mergedMap.get(input.riderId)
@@ -426,7 +444,7 @@ export default function SettlementUploadPage() {
     const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
     const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
 
-    const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
+    const calc = calculateSettlement(inputs, effectiveSettings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
     setResults(calc)
     setStep('confirm')
   }
@@ -768,9 +786,28 @@ export default function SettlementUploadPage() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap items-center">
             <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">← 파일 업로드</Button>
-            <Button onClick={handlePreviewConfirm} className="bg-blue-600 hover:bg-blue-700">정산 계산하기 →</Button>
+
+            {/* 미연결 라이더 수 경고 */}
+            {parsedRows.length > 0 && (() => {
+              const unmapped = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none').length
+              if (unmapped === 0) return null
+              return (
+                <span className="text-amber-400 text-sm flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  {unmapped}명 미연결 — 연결 후 계산해주세요
+                </span>
+              )
+            })()}
+
+            <Button
+              onClick={handlePreviewConfirm}
+              disabled={parsedRows.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 ml-auto disabled:opacity-50"
+            >
+              정산 계산하기 →
+            </Button>
           </div>
         </div>
       )}
@@ -778,93 +815,111 @@ export default function SettlementUploadPage() {
       {/* ── STEP 3: 정산 결과 ── */}
       {step === 'confirm' && (
         <div className="space-y-4">
-          <Card className="border-slate-700 bg-slate-900">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-emerald-400" />
-                정산 계산 완료 ({weekStart} ~ {weekEnd})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-4 gap-3 mb-4">
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">총 라이더</p>
-                  <p className="text-white font-bold text-xl">{results.length}명</p>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">총 세금신고금액</p>
-                  <p className="text-emerald-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.taxBaseAmount, 0))}</p>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">총 원천세</p>
-                  <p className="text-rose-400 font-bold">-{formatKRW(results.reduce((s, r) => s + r.incomeTaxDeduction, 0))}</p>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">총 최종정산금액</p>
-                  <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {results.length === 0 ? (
+            <Card className="border-amber-700/40 bg-amber-900/10">
+              <CardContent className="p-6 text-center">
+                <AlertTriangle className="h-10 w-10 text-amber-400 mx-auto mb-3" />
+                <p className="text-white font-semibold mb-1">정산 계산할 라이더가 없습니다</p>
+                <p className="text-slate-400 text-sm mb-4">
+                  데이터 확인 단계에서 우측 <strong className="text-white">라이더 연결</strong> 드롭다운을 통해<br />
+                  파일의 기사와 사이트 등록 라이더를 연결한 후 다시 계산해주세요.
+                </p>
+                <Button onClick={() => setStep('preview')} variant="outline" className="border-slate-600 text-slate-300">
+                  ← 데이터 확인으로 돌아가기
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card className="border-slate-700 bg-slate-900">
+                <CardHeader>
+                  <CardTitle className="text-white text-base flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                    정산 계산 완료 ({weekStart} ~ {weekEnd})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-3 mb-4">
+                    <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                      <p className="text-slate-400 text-xs">총 라이더</p>
+                      <p className="text-white font-bold text-xl">{results.length}명</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                      <p className="text-slate-400 text-xs">총 세금신고금액</p>
+                      <p className="text-emerald-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.taxBaseAmount, 0))}</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                      <p className="text-slate-400 text-xs">총 원천세</p>
+                      <p className="text-rose-400 font-bold">-{formatKRW(results.reduce((s, r) => s + r.incomeTaxDeduction, 0))}</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                      <p className="text-slate-400 text-xs">총 최종정산금액</p>
+                      <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="border-slate-700 bg-slate-900">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-slate-700 hover:bg-transparent">
-                      <TableHead className="text-slate-400 whitespace-nowrap">라이더</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">기본정산금액</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ배달료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ추가지급</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금회수</TableHead>
-                      <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">최종정산금액</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.map(r => (
-                      <TableRow key={r.riderId} className="border-slate-700 hover:bg-slate-800/50">
-                        <TableCell className="text-white font-medium whitespace-nowrap">{r.riderName}</TableCell>
-                        <TableCell className="text-slate-300 text-right whitespace-nowrap">{r.deliveryCount.toLocaleString()}</TableCell>
-                        <TableCell className="text-blue-400 text-right whitespace-nowrap font-medium">{formatKRW(r.baseAmount)}</TableCell>
-                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.deliveryFee)}</TableCell>
-                        <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.additionalPay)}</TableCell>
-                        <TableCell className="text-amber-400 text-right whitespace-nowrap">{r.hourlyInsurance > 0 ? `-${formatKRW(r.hourlyInsurance)}` : '-'}</TableCell>
-                        <TableCell className="text-cyan-400 text-right whitespace-nowrap">{r.totalEmploymentInsurance > 0 ? `-${formatKRW(r.totalEmploymentInsurance)}` : '-'}</TableCell>
-                        <TableCell className="text-purple-400 text-right whitespace-nowrap">{r.totalAccidentInsurance > 0 ? `-${formatKRW(r.totalAccidentInsurance)}` : '-'}</TableCell>
-                        <TableCell className="text-violet-400 text-right whitespace-nowrap">{r.promotionAmount > 0 ? `+${formatKRW(r.promotionAmount)}` : '-'}</TableCell>
-                        <TableCell className="text-orange-400 text-right whitespace-nowrap">{r.callFeeDeduction > 0 ? `-${formatKRW(r.callFeeDeduction)}` : '-'}</TableCell>
-                        <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(r.taxBaseAmount)}</TableCell>
-                        <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(r.incomeTaxDeduction)}</TableCell>
-                        <TableCell className="text-amber-300 text-right whitespace-nowrap">{r.advanceDeduction > 0 ? `-${formatKRW(r.advanceDeduction)}` : '-'}</TableCell>
-                        <TableCell className="text-teal-400 text-right whitespace-nowrap">{r.advanceRecovery > 0 ? `+${formatKRW(r.advanceRecovery)}` : '-'}</TableCell>
-                        <TableCell className="text-emerald-400 font-bold text-right whitespace-nowrap">{formatKRW(r.finalAmount)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="border-slate-700 bg-slate-900">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-slate-700 hover:bg-transparent">
+                          <TableHead className="text-slate-400 whitespace-nowrap">라이더</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">기본정산금액</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ배달료</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ추가지급</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금회수</TableHead>
+                          <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">최종정산금액</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {results.map(r => (
+                          <TableRow key={r.riderId} className="border-slate-700 hover:bg-slate-800/50">
+                            <TableCell className="text-white font-medium whitespace-nowrap">{r.riderName}</TableCell>
+                            <TableCell className="text-slate-300 text-right whitespace-nowrap">{r.deliveryCount.toLocaleString()}</TableCell>
+                            <TableCell className="text-blue-400 text-right whitespace-nowrap font-medium">{formatKRW(r.baseAmount)}</TableCell>
+                            <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.deliveryFee)}</TableCell>
+                            <TableCell className="text-slate-400 text-right whitespace-nowrap text-xs">{formatKRW(r.additionalPay)}</TableCell>
+                            <TableCell className="text-amber-400 text-right whitespace-nowrap">{r.hourlyInsurance > 0 ? `-${formatKRW(r.hourlyInsurance)}` : '-'}</TableCell>
+                            <TableCell className="text-cyan-400 text-right whitespace-nowrap">{r.totalEmploymentInsurance > 0 ? `-${formatKRW(r.totalEmploymentInsurance)}` : '-'}</TableCell>
+                            <TableCell className="text-purple-400 text-right whitespace-nowrap">{r.totalAccidentInsurance > 0 ? `-${formatKRW(r.totalAccidentInsurance)}` : '-'}</TableCell>
+                            <TableCell className="text-violet-400 text-right whitespace-nowrap">{r.promotionAmount > 0 ? `+${formatKRW(r.promotionAmount)}` : '-'}</TableCell>
+                            <TableCell className="text-orange-400 text-right whitespace-nowrap">{r.callFeeDeduction > 0 ? `-${formatKRW(r.callFeeDeduction)}` : '-'}</TableCell>
+                            <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(r.taxBaseAmount)}</TableCell>
+                            <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(r.incomeTaxDeduction)}</TableCell>
+                            <TableCell className="text-amber-300 text-right whitespace-nowrap">{r.advanceDeduction > 0 ? `-${formatKRW(r.advanceDeduction)}` : '-'}</TableCell>
+                            <TableCell className="text-teal-400 text-right whitespace-nowrap">{r.advanceRecovery > 0 ? `+${formatKRW(r.advanceRecovery)}` : '-'}</TableCell>
+                            <TableCell className="text-emerald-400 font-bold text-right whitespace-nowrap">{formatKRW(r.finalAmount)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">← 이전으로</Button>
-            <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}임시저장
-            </Button>
-            <Button onClick={() => handleSave('confirmed')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}정산 확정 저장
-            </Button>
-          </div>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">← 이전으로</Button>
+                <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}임시저장
+                </Button>
+                <Button onClick={() => handleSave('confirmed')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}정산 확정 저장
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
