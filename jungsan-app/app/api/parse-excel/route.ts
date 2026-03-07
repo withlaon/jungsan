@@ -96,7 +96,7 @@ function extractBaeminData(workbook: XLSX.WorkBook): {
 // ──────────────────────────────────────────────────────────────
 // 범용 파서 (갑지/을지 없는 일반 엑셀 폴백)
 // ──────────────────────────────────────────────────────────────
-const NAME_COLUMNS   = ['라이더명', '기사명', '이름', '성명', '라이더 이름', '배달원명', 'name', 'rider']
+const NAME_COLUMNS   = ['라이더명', '기사명', '기사이름', '기사 이름', '이름', '성명', '라이더 이름', '배달원명', 'name', 'rider']
 const COUNT_COLUMNS  = ['배달건수', '건수', '배달 건수', '배달횟수', '주문건수', 'count', 'delivery_count']
 const AMOUNT_COLUMNS = ['정산금액', '배달금액', '수수료', '지급금액', '배달료', 'amount', 'settlement_amount', '합계금액', '총금액']
 
@@ -156,13 +156,18 @@ function extractGenericData(workbook: XLSX.WorkBook): {
 // ──────────────────────────────────────────────────────────────
 
 // 쿠팡이츠 파일 감지: 헤더에 기사이름 + 쿠팡 전용 컬럼이 있어야 함
+// includes 방식으로 컬럼명 변형도 허용
 function isCoupangSheet(headers: string[]): boolean {
-  const norm = headers.map(h => String(h).replace(/\s/g, '').toLowerCase())
-  const hasName = norm.some(h => ['기사이름', '라이더이름', '기사명'].includes(h))
-  const hasSig  = norm.some(h =>
-    ['픽업비용', '배달거리할증', '픽업지할증', '도착지할증', '기상할증'].includes(h)
+  const norm = headers.map(h => String(h).replace(/[\s\t\r\n]/g, ''))
+  const hasName    = norm.some(h => h.includes('기사이름') || h.includes('라이더이름'))
+  // 픽업/배달 관련 컬럼 또는 주문번호가 있으면 쿠팡이츠로 판단
+  const hasCoupang = norm.some(h =>
+    h.includes('픽업비용') || h.includes('배달비용') ||
+    h.includes('픽업지할증') || h.includes('도착지할증') ||
+    h.includes('배달거리할증') || h.includes('기상할증')
   )
-  return hasName && hasSig
+  const hasOrderNum = norm.some(h => h.includes('주문번호'))
+  return hasName && (hasCoupang || hasOrderNum)
 }
 
 function extractCoupangData(workbook: XLSX.WorkBook): {
@@ -180,20 +185,21 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
     const sheet = workbook.Sheets[sheetName]
     const raw   = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
 
-    // 헤더 행 탐색 (상위 5행)
+    // 헤더 행 탐색 (상위 10행 — 타이틀/공백 행 건너뜀)
     let headerRowIdx = -1
     let headers: string[] = []
-    for (let i = 0; i < Math.min(raw.length, 5); i++) {
+    for (let i = 0; i < Math.min(raw.length, 10); i++) {
       const row = (raw[i] as unknown[]).map(h => String(h ?? '').trim())
       if (isCoupangSheet(row)) { headerRowIdx = i; headers = row; break }
     }
     if (headerRowIdx === -1) continue
 
-    // 컬럼 인덱스 헬퍼
-    const norm = headers.map(h => h.replace(/\s/g, '').toLowerCase())
+    // 컬럼 인덱스 헬퍼 (공백 제거 후 부분 매칭)
+    const norm = headers.map(h => h.replace(/[\s\t\r\n]/g, ''))
     const ci = (...keys: string[]): number => {
       for (const k of keys) {
-        const idx = norm.findIndex(h => h === k || h.includes(k))
+        const kn  = k.replace(/\s/g, '')
+        const idx = norm.findIndex(h => h === kn || h.includes(kn) || kn.includes(h))
         if (idx !== -1) return idx
       }
       return -1
@@ -276,8 +282,14 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
 }
 
 // ── 워크북에서 데이터 추출 (배민 → 쿠팡이츠 → 범용 폴백) ──
-function extractData(workbook: XLSX.WorkBook) {
-  return extractBaeminData(workbook) ?? extractCoupangData(workbook) ?? extractGenericData(workbook)
+// 반환값에 detectedPlatform 포함
+function extractData(workbook: XLSX.WorkBook): ReturnType<typeof extractBaeminData> & { detectedPlatform?: string } | null {
+  const baemin  = extractBaeminData(workbook)
+  if (baemin)  return { ...baemin, detectedPlatform: 'baemin' }
+  const coupang = extractCoupangData(workbook)
+  if (coupang) return { ...coupang, detectedPlatform: 'coupang' }
+  const generic = extractGenericData(workbook)
+  return { ...generic, detectedPlatform: 'unknown' }
 }
 
 // ── 버퍼 파싱 시도 ──

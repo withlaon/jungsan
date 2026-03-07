@@ -30,6 +30,7 @@ interface UploadedFile {
   status: FileStatus
   rows: ParsedRiderRow[]
   summary?: ExcelSummary
+  detectedPlatform?: string
   errorMsg?: string
 }
 
@@ -194,6 +195,7 @@ export default function SettlementUploadPage() {
     success: boolean
     rows: ParsedRiderRow[]
     summary?: ExcelSummary
+    detectedPlatform?: string
     isPasswordRequired: boolean
     errorMsg?: string
   }> => {
@@ -204,7 +206,11 @@ export default function SettlementUploadPage() {
       const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
-        return { success: true, rows: data.rows, summary: data.summary, isPasswordRequired: false }
+        return {
+          success: true, rows: data.rows, summary: data.summary,
+          detectedPlatform: data.detectedPlatform,
+          isPasswordRequired: false,
+        }
       }
       return {
         success: false, rows: [],
@@ -225,7 +231,9 @@ export default function SettlementUploadPage() {
     if (!rawBizNumRef.current) await fetchProfileNumbers()
     const result = await parseFileCore(file)
     if (result.success) {
-      setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'success', rows: result.rows, summary: result.summary, errorMsg: undefined } : f))
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === id ? { ...f, status: 'success', rows: result.rows, summary: result.summary, detectedPlatform: result.detectedPlatform, errorMsg: undefined } : f
+      ))
     } else {
       setUploadedFiles(prev => prev.map(f =>
         f.id === id ? { ...f, status: 'error', rows: [], errorMsg: result.errorMsg } : f
@@ -400,7 +408,11 @@ export default function SettlementUploadPage() {
     }
     const inputs = Array.from(mergedMap.values())
 
-    const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, platform)
+    // 업로드된 파일 중 쿠팡이츠로 감지된 파일이 있으면 platform을 'coupang'으로 override
+    const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
+    const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
+
+    const calc = calculateSettlement(inputs, settings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
     setResults(calc)
     setStep('confirm')
   }
