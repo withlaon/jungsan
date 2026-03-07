@@ -338,14 +338,24 @@ export default function SettlementUploadPage() {
     const hasData = Object.values(totalSummary).some(v => v > 0)
     setSummaryData(hasData ? totalSummary : null)
 
-    // 라이더 자동 매핑 (이름 또는 userId로)
+    // 라이더 자동 매핑: 이름 일치 → userId(배민) 일치 → rider_username(쿠팡이츠 아이디) 일치 순으로 시도
     const mapping: Record<string, string> = {}
     for (const row of merged) {
-      const matched = riders.find(r =>
-        r.name === row.name ||
-        r.name.replace(/\s/g, '') === row.name.replace(/\s/g, '') ||
-        (row.userId && (r.rider_username === row.userId || r.rider_username?.replace(/\s/g, '') === row.userId.replace(/\s/g, '')))
-      )
+      const rowNameNorm = row.name.replace(/\s/g, '').toLowerCase()
+      const matched = riders.find(r => {
+        const rNameNorm = r.name.replace(/\s/g, '').toLowerCase()
+        const rUserNorm = (r.rider_username ?? '').replace(/\s/g, '').toLowerCase()
+        // 1) 등록된 라이더명과 파일 기사이름 일치
+        if (rNameNorm === rowNameNorm) return true
+        // 2) 배민 userId 일치
+        if (row.userId) {
+          const uidNorm = row.userId.replace(/\s/g, '').toLowerCase()
+          if (rUserNorm && (rUserNorm === uidNorm)) return true
+        }
+        // 3) 쿠팡이츠: 파일의 기사이름이 rider_username(라이더 아이디)과 일치
+        if (rUserNorm && rUserNorm === rowNameNorm) return true
+        return false
+      })
       if (matched) mapping[row.name] = matched.id
     }
     setRiderMapping(mapping)
@@ -701,10 +711,25 @@ export default function SettlementUploadPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedRows.map((row, i) => (
+                    {parsedRows.map((row, i) => {
+                      const mappedRider = riderMapping[row.name]
+                        ? riders.find(r => r.id === riderMapping[row.name])
+                        : null
+                      return (
                       <TableRow key={i} className="border-slate-700 hover:bg-slate-800/50">
-                        <TableCell className="text-slate-400 text-sm whitespace-nowrap">{row.userId || '-'}</TableCell>
-                        <TableCell className="text-white font-medium whitespace-nowrap">{row.name}</TableCell>
+                        <TableCell className="text-slate-400 text-sm whitespace-nowrap">{row.userId || row.name}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {mappedRider ? (
+                            <div>
+                              <span className="text-white font-medium">{mappedRider.name}</span>
+                              {mappedRider.name !== row.name && (
+                                <span className="text-slate-500 text-xs ml-1.5">({row.name})</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-amber-400 font-medium">{row.name}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{row.deliveryCount.toLocaleString()}</TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.deliveryFee)}</TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{formatKRW(row.additionalPay)}</TableCell>
@@ -735,7 +760,8 @@ export default function SettlementUploadPage() {
                           </Select>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>
