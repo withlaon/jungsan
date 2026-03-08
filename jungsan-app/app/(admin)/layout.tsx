@@ -8,7 +8,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen bg-slate-950">
       <InactivityGuard />
       <Sidebar />
-      {/* ëª¨ë°”?¼ì—?œëŠ” ?ë‹¨ ?¤ë”(56px) ?„ë˜ë¶€??ì½˜í…ì¸??œì‘, ?°ìŠ¤?¬íƒ‘?ì„œ???¬ë°± ?†ìŒ */}
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
         {children}
       </main>
