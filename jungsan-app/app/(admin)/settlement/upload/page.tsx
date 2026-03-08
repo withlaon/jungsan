@@ -34,7 +34,7 @@ interface UploadedFile {
   errorMsg?: string
 }
 
-// ?�?� 주간 ?�션 (???? ?�?�
+// ?? 二쇨컙 ?듭뀡 (???? ??
 function getWeekOptions() {
   const options: { label: string; value: string; endValue: string }[] = []
   const today = new Date()
@@ -42,7 +42,7 @@ function getWeekOptions() {
   const daysBack = (today.getDay() - 3 + 7) % 7
   const baseWed = new Date(today)
   baseWed.setDate(today.getDate() - daysBack)
-  const dl = ['??, '??, '??, '??, '�?, '�?, '??]
+  const dl = ['??, '??, '??, '??, '紐?, '湲?, '??]
   const fmt = (d: Date) => {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -75,15 +75,15 @@ export default function SettlementUploadPage() {
   const [step, setStep] = useState<Step>('upload')
   const [dragging, setDragging] = useState(false)
 
-  // ?�업?�등록번???�자�? - ?�호???�일 ?�동 비�?번호 (ref�???�� 최신�??��?)
+  // ?ъ뾽?먮벑濡앸쾲???レ옄留? - ?뷀샇???뚯씪 ?먮룞 鍮꾨?踰덊샇 (ref濡???긽 理쒖떊媛??좎?)
   const autoPasswordRef = useRef<string>('')
 
-  // 기간 ?�택
+  // 湲곌컙 ?좏깮
   const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? '')
   const weekStart = selectedWeek
   const weekEnd = weekOptions.find(w => w.value === selectedWeek)?.endValue ?? ''
 
-  // ?�일 목록
+  // ?뚯씪 紐⑸줉
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   // preview
@@ -104,10 +104,10 @@ export default function SettlementUploadPage() {
     }
   }, [userId, isAdmin])
 
-  // ?�업?�등록번???�본 ref (?�버 API???�달??
+  // ?ъ뾽?먮벑濡앸쾲???먮낯 ref (?쒕쾭 API???꾨떖??
   const rawBizNumRef = useRef<string>('')
 
-  // ?�로?�에???�업?�등록번??캐시
+  // ?꾨줈?꾩뿉???ъ뾽?먮벑濡앸쾲??罹먯떆
   const fetchProfileNumbers = async () => {
     if (rawBizNumRef.current) return
     const { data: { user } } = await supabase.auth.getUser()
@@ -124,7 +124,7 @@ export default function SettlementUploadPage() {
   }
 
   const fetchSettings = async () => {
-    // ?��?�??�정 ?�선 조회, ?�으�?글로벌(user_id IS NULL) ?�정 ?�용
+    // ?좎?蹂??ㅼ젙 ?곗꽑 議고쉶, ?놁쑝硫?湲濡쒕쾶(user_id IS NULL) ?ㅼ젙 ?ъ슜
     if (userId) {
       const { data: userSettings } = await supabase
         .from('fee_settings')
@@ -163,7 +163,7 @@ export default function SettlementUploadPage() {
     if (data) setPromotionsCache(data as Promotion[])
   }
 
-  // ?�?� ?�로모션 미리보기 계산 ?�?�
+  // ?? ?꾨줈紐⑥뀡 誘몃━蹂닿린 怨꾩궛 ??
   const calcPreviewPromo = (riderId: string, deliveryCount: number): number => {
     const applicable = promotionsCache.filter(p => {
       if (p.date_mode === 'none') return true
@@ -190,7 +190,7 @@ export default function SettlementUploadPage() {
     )
   }
 
-  // ?�?� ?�심 ?�싱 로직 (?�버 API ?�출) ?�?�
+  // ?? ?듭떖 ?뚯떛 濡쒖쭅 (?쒕쾭 API ?몄텧) ??
   const parseFileCore = async (file: File): Promise<{
     success: boolean
     rows: ParsedRiderRow[]
@@ -206,7 +206,7 @@ export default function SettlementUploadPage() {
       const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
-        // ?�버�? ?�제 ?�일 ?�트/?�더 구조 콘솔 출력 (쿠팡?�츠 ?�싱 문제 분석??
+        // ?붾쾭洹? ?ㅼ젣 ?뚯씪 ?쒗듃/?ㅻ뜑 援ъ“ 肄섏넄 異쒕젰 (荑좏뙜?댁툩 ?뚯떛 臾몄젣 遺꾩꽍??
         console.log('[parse-excel] detectedPlatform:', data.detectedPlatform)
         console.log('[parse-excel] rows:', data.rows?.length)
         console.log('[parse-excel] debugAllSheets:', JSON.stringify(data.debugAllSheets, null, 2))
@@ -219,19 +219,19 @@ export default function SettlementUploadPage() {
       return {
         success: false, rows: [],
         isPasswordRequired: !!data.isPasswordRequired,
-        errorMsg: data.error ?? '?�싱 ?�패',
+        errorMsg: data.error ?? '?뚯떛 ?ㅽ뙣',
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      return { success: false, rows: [], isPasswordRequired: false, errorMsg: '?�청 ?�패: ' + msg }
+      return { success: false, rows: [], isPasswordRequired: false, errorMsg: '?붿껌 ?ㅽ뙣: ' + msg }
     }
   }
 
-  // ?�?� ?�일 ?�일 ?�싱 (state ?�데?�트) ?�?�
-  // ?�버(API)?�서 ?�업?�등록번???�러 ?�식?�로 ?�동 ?�도?��?�??�라?�언?�는 1???�출�?
+  // ?? ?⑥씪 ?뚯씪 ?뚯떛 (state ?낅뜲?댄듃) ??
+  // ?쒕쾭(API)?먯꽌 ?ъ뾽?먮벑濡앸쾲???щ윭 ?뺤떇?쇰줈 ?먮룞 ?쒕룄?섎?濡??대씪?댁뼵?몃뒗 1???몄텧留?
   const parseFile = async (id: string, file: File) => {
     setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'parsing', errorMsg: undefined } : f))
-    // bizNum???�직 �?가?�왔?�면 먼�? 조회
+    // bizNum???꾩쭅 紐?媛?몄솕?쇰㈃ 癒쇱? 議고쉶
     if (!rawBizNumRef.current) await fetchProfileNumbers()
     const result = await parseFileCore(file)
     if (result.success) {
@@ -245,7 +245,7 @@ export default function SettlementUploadPage() {
     }
   }
 
-  // ?�?� ?�일 추�? ?�?�
+  // ?? ?뚯씪 異붽? ??
   const addFiles = useCallback((files: File[]) => {
     const newEntries: UploadedFile[] = files
       .filter(f => /\.(xlsx|xls|csv)$/i.test(f.name))
@@ -255,7 +255,7 @@ export default function SettlementUploadPage() {
         status: 'pending' as FileStatus,
         rows: [],
       }))
-    if (newEntries.length === 0) { toast.error('.xlsx, .xls, .csv ?�일�??�로??가?�합?�다.'); return }
+    if (newEntries.length === 0) { toast.error('.xlsx, .xls, .csv ?뚯씪留??낅줈??媛?ν빀?덈떎.'); return }
     setUploadedFiles(prev => [...prev, ...newEntries])
     for (const entry of newEntries) {
       parseFile(entry.id, entry.file)
@@ -275,13 +275,13 @@ export default function SettlementUploadPage() {
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id))
 
-  // ?�?� ?�일 목록?�로 preview ?�동 ?�?�
+  // ?? ?뚯씪 紐⑸줉?쇰줈 preview ?대룞 ??
   const goToPreviewWithFiles = (files: UploadedFile[]) => {
     const successFiles = files.filter(f => f.status === 'success')
     if (successFiles.length === 0) return
 
-    // ?�?� 1?�계: ?�름 ??userId ??��???�덱??구축 ?�?�
-    // ?�떤 ?�일?�든 userId 가 ?�는 ?�이 ?�으�?�?userId �??�규 ?�로 ?�용
+    // ?? 1?④퀎: ?대쫫 ??userId ??갑???몃뜳??援ъ텞 ??
+    // ?대뼡 ?뚯씪?대뱺 userId 媛 ?덈뒗 ?됱씠 ?덉쑝硫?洹?userId 瑜??뺢퇋 ?ㅻ줈 ?ъ슜
     const nameToUserId = new Map<string, string>()
     for (const uf of successFiles) {
       for (const row of uf.rows) {
@@ -291,8 +291,8 @@ export default function SettlementUploadPage() {
       }
     }
 
-    // ?�?� 2?�계: ?�이?�별 ?�산 (?�러 ?�일 ?�일 ?�이???�이??병합) ?�?�
-    // ?�규 ?? userId > ?�름?�로 ??��?�된 userId > ?�규?�된 ?�름
+    // ?? 2?④퀎: ?쇱씠?붾퀎 ?⑹궛 (?щ윭 ?뚯씪 ?숈씪 ?쇱씠???곗씠??蹂묓빀) ??
+    // ?뺢퇋 ?? userId > ?대쫫?쇰줈 ??“?뚮맂 userId > ?뺢퇋?붾맂 ?대쫫
     const mergedMap = new Map<string, ParsedRiderRow>()
     for (const uf of successFiles) {
       for (const row of uf.rows) {
@@ -324,7 +324,7 @@ export default function SettlementUploadPage() {
     const merged = Array.from(mergedMap.values())
     setParsedRows(merged)
 
-    // 갑�? summary ?�산
+    // 媛묒? summary ?⑹궛
     const totalSummary = successFiles.reduce(
       (acc, f) => ({
         settledAmount:                acc.settledAmount                + (f.summary?.settledAmount                ?? 0),
@@ -338,10 +338,10 @@ export default function SettlementUploadPage() {
     const hasData = Object.values(totalSummary).some(v => v > 0)
     setSummaryData(hasData ? totalSummary : null)
 
-    // ?�이???�동 매핑 ?�선?�위:
-    // 1) ?�일 userId(?�이?�스ID/배�?ID) ???�이??rider_username
-    // 2) ?�일 기사?�름 ???�이???�이?�명
-    // 3) ?�일 기사?�름 ???�이??rider_username (??��??
+    // ?쇱씠???먮룞 留ㅽ븨 ?곗꽑?쒖쐞:
+    // 1) ?뚯씪 userId(?쇱씠?좎뒪ID/諛곕?ID) ???ъ씠??rider_username
+    // 2) ?뚯씪 湲곗궗?대쫫 ???ъ씠???쇱씠?붾챸
+    // 3) ?뚯씪 湲곗궗?대쫫 ???ъ씠??rider_username (??갑??
     const mapping: Record<string, string> = {}
     for (const row of merged) {
       const rowNameNorm = row.name.replace(/\s/g, '').toLowerCase()
@@ -351,11 +351,11 @@ export default function SettlementUploadPage() {
         const rNameNorm = r.name.replace(/\s/g, '').toLowerCase()
         const rUserNorm = (r.rider_username ?? '').replace(/\s/g, '').toLowerCase()
 
-        // 1) ?�일 userId(?�이?�스ID) ???�이??rider_username ?�치 (쿠팡?�츠 ?�심 매핑)
+        // 1) ?뚯씪 userId(?쇱씠?좎뒪ID) ???ъ씠??rider_username ?쇱튂 (荑좏뙜?댁툩 ?듭떖 留ㅽ븨)
         if (rowUidNorm && rUserNorm && rUserNorm === rowUidNorm) return true
-        // 2) ?�일 기사?�름 ???�이???�이?�명 ?�치
+        // 2) ?뚯씪 湲곗궗?대쫫 ???ъ씠???쇱씠?붾챸 ?쇱튂
         if (rNameNorm === rowNameNorm) return true
-        // 3) ?�일 기사?�름 ???�이??rider_username ?�치 (??��??보조)
+        // 3) ?뚯씪 湲곗궗?대쫫 ???ъ씠??rider_username ?쇱튂 (??갑??蹂댁“)
         if (rUserNorm && rUserNorm === rowNameNorm) return true
         return false
       })
@@ -365,17 +365,17 @@ export default function SettlementUploadPage() {
     setStep('preview')
   }
 
-  // ?�?� ?�음 ?�계 버튼 ?�?�
+  // ?? ?ㅼ쓬 ?④퀎 踰꾪듉 ??
   const handleGoToPreview = () => {
     if (uploadedFiles.filter(f => f.status === 'success').length === 0) {
-      toast.error('?�싱 ?�료???�일???�습?�다.'); return
+      toast.error('?뚯떛 ?꾨즺???뚯씪???놁뒿?덈떎.'); return
     }
     goToPreviewWithFiles(uploadedFiles)
   }
 
-  // ?�?� ?�산 계산 ?�?�
+  // ?? ?뺤궛 怨꾩궛 ??
   const handlePreviewConfirm = async () => {
-    // settings가 ?�으�?기본 ?�율�?fallback (3.3% ?�천??
+    // settings媛 ?놁쑝硫?湲곕낯 ?몄쑉濡?fallback (3.3% ?먯쿇??
     const effectiveSettings = settings ?? {
       id: 'default', user_id: null,
       insurance_rate: 0, income_tax_rate: 0.033,
@@ -383,7 +383,7 @@ export default function SettlementUploadPage() {
       effective_from: '', note: null, created_at: '',
     }
     if (!settings) {
-      toast('?�정값이 ?�어 기본 ?�율(?�천??3.3%)�?계산?�니??', { icon: '?�️' })
+      toast('?ㅼ젙媛믪씠 ?놁뼱 湲곕낯 ?몄쑉(?먯쿇??3.3%)濡?怨꾩궛?⑸땲??', { icon: '?좑툘' })
     }
 
     const [promoRes, advanceRes] = await Promise.all([
@@ -393,7 +393,7 @@ export default function SettlementUploadPage() {
     const promotions: Promotion[] = promoRes.data ?? []
     const advances: AdvancePayment[] = advanceRes.data ?? []
 
-    // ?�이???�결???�만 추출
+    // ?쇱씠???곌껐???됰쭔 異붿텧
     const rawInputs = parsedRows
       .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
       .map(r => {
@@ -415,14 +415,14 @@ export default function SettlementUploadPage() {
     if (rawInputs.length === 0) {
       const unmapped = parsedRows.length
       if (unmapped === 0) {
-        toast.error('?�싱???�이???�이?��? ?�습?�다. ?�일???�시 ?�로?�해주세??')
+        toast.error('?뚯떛???쇱씠???곗씠?곌? ?놁뒿?덈떎. ?뚯씪???ㅼ떆 ?낅줈?쒗빐二쇱꽭??')
       } else {
-        toast.error(`${unmapped}명의 ?�이?��? 모두 미연�??�태?�니?? ?�측 "?�이???�결" ?�롭?�운?�서 ?�결?�주?�요.`)
+        toast.error(`${unmapped}紐낆쓽 ?쇱씠?붽? 紐⑤몢 誘몄뿰寃??곹깭?낅땲?? ?곗륫 "?쇱씠???곌껐" ?쒕∼?ㅼ슫?먯꽌 ?곌껐?댁＜?몄슂.`)
       }
       return
     }
 
-    // 같�? riderId가 ?�러 ?�인 경우 ?�산
+    // 媛숈? riderId媛 ?щ윭 ?됱씤 寃쎌슦 ?⑹궛
     const mergedMap = new Map<string, typeof rawInputs[0]>()
     for (const input of rawInputs) {
       const existing = mergedMap.get(input.riderId)
@@ -443,7 +443,7 @@ export default function SettlementUploadPage() {
     }
     const inputs = Array.from(mergedMap.values())
 
-    // ?�로?�된 ?�일 �?쿠팡?�츠�?감�????�일???�으�?platform??'coupang'?�로 override
+    // ?낅줈?쒕맂 ?뚯씪 以?荑좏뙜?댁툩濡?媛먯????뚯씪???덉쑝硫?platform??'coupang'?쇰줈 override
     const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
     const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
 
@@ -452,9 +452,9 @@ export default function SettlementUploadPage() {
     setStep('confirm')
   }
 
-  // ?�?� ?�산 ?�???�?�
+  // ?? ?뺤궛 ?????
   const handleSave = async (status: 'draft' | 'confirmed') => {
-    if (results.length === 0) { toast.error('?�?�할 ?�산 ?�이?��? ?�습?�다.'); return }
+    if (results.length === 0) { toast.error('??ν븷 ?뺤궛 ?곗씠?곌? ?놁뒿?덈떎.'); return }
     setSaving(true)
     const fileNames = uploadedFiles.filter(f => f.status === 'success').map(f => f.file.name).join(', ')
 
@@ -473,7 +473,7 @@ export default function SettlementUploadPage() {
       .select().single()
 
     if (settlementError || !settlement) {
-      toast.error('?�산 ?�성 ?�패: ' + settlementError?.message)
+      toast.error('?뺤궛 ?앹꽦 ?ㅽ뙣: ' + settlementError?.message)
       setSaving(false); return
     }
 
@@ -502,7 +502,7 @@ export default function SettlementUploadPage() {
 
     const { error: detailError } = await supabase.from('settlement_details').insert(details)
     if (detailError) {
-      toast.error('?�세 ?�이???�???�패: ' + detailError.message)
+      toast.error('?곸꽭 ?곗씠??????ㅽ뙣: ' + detailError.message)
       await supabase.from('weekly_settlements').delete().eq('id', settlement.id)
       setSaving(false); return
     }
@@ -518,7 +518,7 @@ export default function SettlementUploadPage() {
       }
     }
 
-    toast.success('?�산???�?�되?�습?�다.')
+    toast.success('?뺤궛????λ릺?덉뒿?덈떎.')
     setSaving(false)
     router.push('/settlement/result')
   }
@@ -536,33 +536,33 @@ export default function SettlementUploadPage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">?�산?�일 ?�록</h2>
-        <p className="text-slate-400 text-sm mt-1">?�산 기간???�택?�고 ?��? ?�일???�로?�하?�요</p>
+        <h2 className="text-2xl font-bold text-white">?뺤궛?뚯씪 ?깅줉</h2>
+        <p className="text-slate-400 text-sm mt-1">?뺤궛 湲곌컙???좏깮?섍퀬 ?묒? ?뚯씪???낅줈?쒗븯?몄슂</p>
       </div>
 
-      {/* 진행 ?�계 */}
+      {/* 吏꾪뻾 ?④퀎 */}
       <div className="flex items-center gap-2">
         {(['upload', 'preview', 'confirm'] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
               ${step === s ? 'bg-blue-600 text-white' : (step === 'confirm' || (step === 'preview' && s === 'upload')) ? 'bg-emerald-800 text-emerald-300' : 'bg-slate-800 text-slate-500'}`}>
-              {i + 1}. {s === 'upload' ? '?�일 ?�로?? : s === 'preview' ? '?�이???�인' : '?�산 결과'}
+              {i + 1}. {s === 'upload' ? '?뚯씪 ?낅줈?? : s === 'preview' ? '?곗씠???뺤씤' : '?뺤궛 寃곌낵'}
             </div>
             {i < 2 && <ChevronRight className="h-4 w-4 text-slate-600" />}
           </div>
         ))}
       </div>
 
-      {/* ?�?� STEP 1: ?�로???�?� */}
+      {/* ?? STEP 1: ?낅줈???? */}
       {step === 'upload' && (
         <div className="space-y-5">
-          {/* ?�산 기간 ?�택 */}
+          {/* ?뺤궛 湲곌컙 ?좏깮 */}
           <Card className="border-blue-700/40 bg-blue-900/10">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-blue-400 shrink-0" />
                 <div className="flex-1">
-                  <Label className="text-blue-300 text-sm font-medium block mb-1.5">?�산 기간 ?�택 <span className="text-red-400">*</span></Label>
+                  <Label className="text-blue-300 text-sm font-medium block mb-1.5">?뺤궛 湲곌컙 ?좏깮 <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <select value={selectedWeek} onChange={e => setSelectedWeek(e.target.value)}
                       className="w-full px-3 py-2.5 bg-slate-800 border border-blue-700/50 rounded-md text-sm text-white appearance-none cursor-pointer hover:border-blue-600 pr-8 focus:outline-none focus:border-blue-500">
@@ -577,10 +577,10 @@ export default function SettlementUploadPage() {
             </CardContent>
           </Card>
 
-          {/* ?�일 ?�로???�역 */}
+          {/* ?뚯씪 ?낅줈???곸뿭 */}
           <Card className="border-slate-700 bg-slate-900">
             <CardContent className="p-4 md:p-6 space-y-4">
-              {/* ?�래�??�롭 �?*/}
+              {/* ?쒕옒洹??쒕∼ 議?*/}
               <div
                 onDrop={handleDrop}
                 onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -593,12 +593,12 @@ export default function SettlementUploadPage() {
                   multiple onChange={handleFileInput} />
                 <FileSpreadsheet className="h-10 w-10 text-slate-500 mx-auto mb-3" />
                 <p className="text-white text-sm font-medium mb-1">
-                  ?�일???�래그하거나 ?�릭?�여 ?�로??
+                  ?뚯씪???쒕옒洹명븯嫄곕굹 ?대┃?섏뿬 ?낅줈??
                 </p>
-                <p className="text-slate-500 text-xs">?�러 ?�일 ?�시 ?�로??가??· .xlsx, .xls, .csv</p>
+                <p className="text-slate-500 text-xs">?щ윭 ?뚯씪 ?숈떆 ?낅줈??媛??쨌 .xlsx, .xls, .csv</p>
               </div>
 
-              {/* ?�로?�된 ?�일 목록 */}
+              {/* ?낅줈?쒕맂 ?뚯씪 紐⑸줉 */}
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2">
                   {uploadedFiles.map(uf => (
@@ -606,7 +606,7 @@ export default function SettlementUploadPage() {
                       ${uf.status === 'success' ? 'border-emerald-700/50 bg-emerald-900/10'
                         : uf.status === 'error' ? 'border-rose-700/50 bg-rose-900/10'
                         : 'border-slate-700 bg-slate-800/50'}`}>
-                      {/* ?�일 ?�보 ??*/}
+                      {/* ?뚯씪 ?뺣낫 ??*/}
                       <div className="flex items-center gap-2">
                         {statusIcon(uf.status)}
                         <FileSpreadsheet className="h-4 w-4 text-slate-400 shrink-0" />
@@ -620,7 +620,7 @@ export default function SettlementUploadPage() {
                         </button>
                       </div>
 
-                      {/* ?�러 메시지 */}
+                      {/* ?먮윭 硫붿떆吏 */}
                       {uf.errorMsg && (
                         <p className="text-rose-400 text-xs pl-6 flex items-center gap-1">
                           <Lock className="h-3 w-3 shrink-0" />{uf.errorMsg}
@@ -631,41 +631,41 @@ export default function SettlementUploadPage() {
                 </div>
               )}
 
-              {/* 추�? ?�로??버튼 (?�일 ?�을 ?? */}
+              {/* 異붽? ?낅줈??踰꾪듉 (?뚯씪 ?덉쓣 ?? */}
               {uploadedFiles.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}
                   className="border-slate-600 text-slate-300 hover:bg-slate-800 h-8 text-xs">
-                  <Plus className="h-3.5 w-3.5 mr-1" />?�일 추�?
+                  <Plus className="h-3.5 w-3.5 mr-1" />?뚯씪 異붽?
                 </Button>
               )}
             </CardContent>
           </Card>
 
-          {/* ?�음 ?�계 버튼 */}
+          {/* ?ㅼ쓬 ?④퀎 踰꾪듉 */}
           {uploadedFiles.length > 0 && (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm">
-                {successCount > 0 && <span className="text-emerald-400 font-medium">?�싱 ?�료 {successCount}�?/span>}
-                {pendingCount > 0 && <span className="text-blue-400">처리 �?{pendingCount}�?/span>}
+                {successCount > 0 && <span className="text-emerald-400 font-medium">?뚯떛 ?꾨즺 {successCount}媛?/span>}
+                {pendingCount > 0 && <span className="text-blue-400">泥섎━ 以?{pendingCount}媛?/span>}
               </div>
               <Button onClick={handleGoToPreview} disabled={successCount === 0 || pendingCount > 0}
                 className="bg-blue-600 hover:bg-blue-700 ml-auto">
-                {pendingCount > 0 ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />?�싱 �?..</> : '?�이???�인 ??}
+                {pendingCount > 0 ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />?뚯떛 以?..</> : '?곗씠???뺤씤 ??}
               </Button>
             </div>
           )}
         </div>
       )}
 
-      {/* ?�?� STEP 2: ?�이???�인 ?�?� */}
+      {/* ?? STEP 2: ?곗씠???뺤씤 ?? */}
       {step === 'preview' && (
         <div className="space-y-4">
-          {/* 기간 + ?�일�?*/}
+          {/* 湲곌컙 + ?뚯씪紐?*/}
           <Card className="border-blue-700/40 bg-blue-900/10">
             <CardContent className="p-4 flex items-center gap-3 flex-wrap">
               <CalendarDays className="h-5 w-5 text-blue-400 shrink-0" />
               <div>
-                <p className="text-blue-300 text-xs mb-0.5">?�산 기간</p>
+                <p className="text-blue-300 text-xs mb-0.5">?뺤궛 湲곌컙</p>
                 <p className="text-white font-bold">{weekStart} ~ {weekEnd}</p>
               </div>
               <div className="ml-auto flex items-center gap-2 text-xs text-slate-400 flex-wrap">
@@ -678,15 +678,15 @@ export default function SettlementUploadPage() {
             </CardContent>
           </Card>
 
-          {/* 갑�? ?�약 */}
+          {/* 媛묒? ?붿빟 */}
           {summaryData && (
             <div className="grid grid-cols-5 gap-2">
               {[
-                { label: '?�산?�정금액 (P25)', value: summaryData.settledAmount,               color: 'violet' },
-                { label: '지?��?리비 (F25)',   value: summaryData.branchFee,                   color: 'blue' },
-                { label: '부가??(C31)',        value: summaryData.vatAmount,                   color: 'amber' },
-                { label: '고용보험?�업�?(I25)',value: summaryData.employerEmploymentInsurance, color: 'cyan' },
-                { label: '?�재보험?�업�?(K25)',value: summaryData.employerAccidentInsurance,   color: 'purple' },
+                { label: '?뺤궛?덉젙湲덉븸 (P25)', value: summaryData.settledAmount,               color: 'violet' },
+                { label: '吏?ш?由щ퉬 (F25)',   value: summaryData.branchFee,                   color: 'blue' },
+                { label: '遺媛??(C31)',        value: summaryData.vatAmount,                   color: 'amber' },
+                { label: '怨좎슜蹂댄뿕?ъ뾽二?(I25)',value: summaryData.employerEmploymentInsurance, color: 'cyan' },
+                { label: '?곗옱蹂댄뿕?ъ뾽二?(K25)',value: summaryData.employerAccidentInsurance,   color: 'purple' },
               ].map(item => (
                 <Card key={item.label} className={`border-${item.color}-700/40 bg-${item.color}-900/10`}>
                   <CardContent className="p-3">
@@ -698,7 +698,7 @@ export default function SettlementUploadPage() {
             </div>
           )}
 
-          {/* ?�이???�산 ?�이???�이�?*/}
+          {/* ?쇱씠???뺤궛 ?곗씠???뚯씠釉?*/}
           {(() => {
             const mappedRows   = parsedRows.filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
             const unmappedRows = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none')
@@ -707,7 +707,7 @@ export default function SettlementUploadPage() {
               const mappedRider = riderMapping[row.name]
                 ? riders.find(r => r.id === riderMapping[row.name])
                 : null
-              // User ID: ?�이?�에 ?�록??rider_username ?�선, ?�으�??�일??userId
+              // User ID: ?ъ씠?몄뿉 ?깅줉??rider_username ?곗꽑, ?놁쑝硫??뚯씪??userId
               const displayUserId = mappedRider?.rider_username || row.userId || '-'
               return (
                 <TableRow key={i} className="border-slate-700 hover:bg-slate-800/50">
@@ -732,7 +732,7 @@ export default function SettlementUploadPage() {
                   <TableCell className="text-violet-400 text-right whitespace-nowrap">
                     {(() => {
                       const rid = riderMapping[row.name]
-                      if (!rid || rid === 'none') return <span className="text-slate-600 text-xs">미연�?/span>
+                      if (!rid || rid === 'none') return <span className="text-slate-600 text-xs">誘몄뿰寃?/span>
                       const amt = calcPreviewPromo(rid, row.deliveryCount)
                       return amt > 0 ? <span className="font-medium">+{formatKRW(amt)}</span> : '-'
                     })()}
@@ -745,10 +745,10 @@ export default function SettlementUploadPage() {
                   <TableCell className="whitespace-nowrap">
                     <Select value={riderMapping[row.name] ?? ''} onValueChange={v => setRiderMapping(prev => ({ ...prev, [row.name]: v }))}>
                       <SelectTrigger className={`w-40 h-8 text-sm ${riderMapping[row.name] && riderMapping[row.name] !== 'none' ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800 border-slate-600'} text-white`}>
-                        <SelectValue placeholder="?�이???�택" />
+                        <SelectValue placeholder="?쇱씠???좏깮" />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-600">
-                        <SelectItem value="none" className="text-slate-400">?�결 ?�함</SelectItem>
+                        <SelectItem value="none" className="text-slate-400">?곌껐 ?덊븿</SelectItem>
                         {riders.map(r => <SelectItem key={r.id} value={r.id} className="text-white">{r.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -760,36 +760,36 @@ export default function SettlementUploadPage() {
             const TableColumns = () => (
               <TableRow className="border-slate-700 hover:bg-transparent">
                 <TableHead className="text-slate-400 whitespace-nowrap">User ID</TableHead>
-                <TableHead className="text-slate-400 whitespace-nowrap">?�이?�명</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달�?/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">추�?지�?/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">총배?�료</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?�간?�보?�료</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">지?�프로모??/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?�재보험</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?�이?�별?�산금액</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?�천징수??/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?�이?�별지급금??/TableHead>
-                <TableHead className="text-slate-400 whitespace-nowrap">?�이???�결 *</TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠?붾챸</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖嫄댁닔</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖猷?/TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">異붽?吏湲?/TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">珥앸같?щ즺</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쒓컙?쒕낫?섎즺</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">吏?ы봽濡쒕え??/TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">怨좎슜蹂댄뿕</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">?곗옱蹂댄뿕</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쇱씠?붾퀎?뺤궛湲덉븸</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">?먯쿇吏뺤닔??/TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쇱씠?붾퀎吏湲됯툑??/TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠???곌껐 *</TableHead>
               </TableRow>
             )
 
             return (
               <>
-                {/* 매핑???�이???�이�?*/}
+                {/* 留ㅽ븨???쇱씠???뚯씠釉?*/}
                 <Card className="border-slate-700 bg-slate-900">
                   <CardHeader>
                     <CardTitle className="text-white text-base flex items-center justify-between">
-                      <span>?�이???�산 ?�이??({mappedRows.length}�?</span>
+                      <span>?쇱씠???뺤궛 ?곗씠??({mappedRows.length}紐?</span>
                       <div className="flex items-center gap-2 text-sm font-normal">
                         <span className="text-emerald-400 flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4" />{mappedRows.length}�?매핑 ?�료
+                          <CheckCircle className="h-4 w-4" />{mappedRows.length}紐?留ㅽ븨 ?꾨즺
                         </span>
                         {unmappedRows.length > 0 && (
                           <span className="text-amber-400 flex items-center gap-1">
-                            <AlertTriangle className="h-4 w-4" />{unmappedRows.length}�?미매??
+                            <AlertTriangle className="h-4 w-4" />{unmappedRows.length}紐?誘몃ℓ??
                           </span>
                         )}
                       </div>
@@ -798,7 +798,7 @@ export default function SettlementUploadPage() {
                   <CardContent className="p-0">
                     {mappedRows.length === 0 ? (
                       <div className="p-6 text-center text-slate-500 text-sm">
-                        매핑???�이?��? ?�습?�다. ?�래 미매???�이?��? ?�결?�주?�요.
+                        留ㅽ븨???쇱씠?붽? ?놁뒿?덈떎. ?꾨옒 誘몃ℓ???쇱씠?붾? ?곌껐?댁＜?몄슂.
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -813,13 +813,13 @@ export default function SettlementUploadPage() {
                   </CardContent>
                 </Card>
 
-                {/* 미매???�이?????�을 ???�는 ?�션 */}
+                {/* 誘몃ℓ???쇱씠?????묒쓣 ???덈뒗 ?뱀뀡 */}
                 {unmappedRows.length > 0 && (
                   <Card className="border-amber-700/30 bg-amber-900/5">
                     <CardHeader className="py-3">
                       <CardTitle className="text-amber-400 text-sm flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                        미매???�이??({unmappedRows.length}�? ???�이?�에 ?�록?��? ?�았거나 ?�동 ?�결???�패?�습?�다. 직접 ?�결?�거??무시?�세??
+                        誘몃ℓ???쇱씠??({unmappedRows.length}紐? ???ъ씠?몄뿉 ?깅줉?섏? ?딆븯嫄곕굹 ?먮룞 ?곌껐???ㅽ뙣?덉뒿?덈떎. 吏곸젒 ?곌껐?섍굅??臾댁떆?섏꽭??
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -839,16 +839,16 @@ export default function SettlementUploadPage() {
           })()}
 
           <div className="flex gap-3 flex-wrap items-center">
-            <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">???�일 ?�로??/Button>
+            <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">???뚯씪 ?낅줈??/Button>
 
-            {/* 미연�??�이????경고 */}
+            {/* 誘몄뿰寃??쇱씠????寃쎄퀬 */}
             {parsedRows.length > 0 && (() => {
               const unmapped = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none').length
               if (unmapped === 0) return null
               return (
                 <span className="text-amber-400 text-sm flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4" />
-                  {unmapped}�?미연�????�결 ??계산?�주?�요
+                  {unmapped}紐?誘몄뿰寃????곌껐 ??怨꾩궛?댁＜?몄슂
                 </span>
               )
             })()}
@@ -858,26 +858,26 @@ export default function SettlementUploadPage() {
               disabled={parsedRows.length === 0}
               className="bg-blue-600 hover:bg-blue-700 ml-auto disabled:opacity-50"
             >
-              ?�산 계산?�기 ??
+              ?뺤궛 怨꾩궛?섍린 ??
             </Button>
           </div>
         </div>
       )}
 
-      {/* ?�?� STEP 3: ?�산 결과 ?�?� */}
+      {/* ?? STEP 3: ?뺤궛 寃곌낵 ?? */}
       {step === 'confirm' && (
         <div className="space-y-4">
           {results.length === 0 ? (
             <Card className="border-amber-700/40 bg-amber-900/10">
               <CardContent className="p-6 text-center">
                 <AlertTriangle className="h-10 w-10 text-amber-400 mx-auto mb-3" />
-                <p className="text-white font-semibold mb-1">?�산 계산???�이?��? ?�습?�다</p>
+                <p className="text-white font-semibold mb-1">?뺤궛 怨꾩궛???쇱씠?붽? ?놁뒿?덈떎</p>
                 <p className="text-slate-400 text-sm mb-4">
-                  ?�이???�인 ?�계?�서 ?�측 <strong className="text-white">?�이???�결</strong> ?�롭?�운???�해<br />
-                  ?�일??기사?� ?�이???�록 ?�이?��? ?�결?????�시 계산?�주?�요.
+                  ?곗씠???뺤씤 ?④퀎?먯꽌 ?곗륫 <strong className="text-white">?쇱씠???곌껐</strong> ?쒕∼?ㅼ슫???듯빐<br />
+                  ?뚯씪??湲곗궗? ?ъ씠???깅줉 ?쇱씠?붾? ?곌껐?????ㅼ떆 怨꾩궛?댁＜?몄슂.
                 </p>
                 <Button onClick={() => setStep('preview')} variant="outline" className="border-slate-600 text-slate-300">
-                  ???�이???�인?�로 ?�아가�?
+                  ???곗씠???뺤씤?쇰줈 ?뚯븘媛湲?
                 </Button>
               </CardContent>
             </Card>
@@ -887,25 +887,25 @@ export default function SettlementUploadPage() {
                 <CardHeader>
                   <CardTitle className="text-white text-base flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-400" />
-                    ?�산 계산 ?�료 ({weekStart} ~ {weekEnd})
+                    ?뺤궛 怨꾩궛 ?꾨즺 ({weekStart} ~ {weekEnd})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-4 gap-3 mb-4">
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">�??�이??/p>
-                      <p className="text-white font-bold text-xl">{results.length}�?/p>
+                      <p className="text-slate-400 text-xs">珥??쇱씠??/p>
+                      <p className="text-white font-bold text-xl">{results.length}紐?/p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">�??�금?�고금액</p>
+                      <p className="text-slate-400 text-xs">珥??멸툑?좉퀬湲덉븸</p>
                       <p className="text-emerald-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.taxBaseAmount, 0))}</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">�??�천??/p>
+                      <p className="text-slate-400 text-xs">珥??먯쿇??/p>
                       <p className="text-rose-400 font-bold">-{formatKRW(results.reduce((s, r) => s + r.incomeTaxDeduction, 0))}</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">�?최종?�산금액</p>
+                      <p className="text-slate-400 text-xs">珥?理쒖쥌?뺤궛湲덉븸</p>
                       <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
                     </div>
                   </div>
@@ -918,21 +918,21 @@ export default function SettlementUploadPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-slate-700 hover:bg-transparent">
-                          <TableHead className="text-slate-400 whitespace-nowrap">?�이??/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">기본?�산금액</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?�배?�료</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?�추가지�?/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?�간?�보?�료</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?�재보험</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">지?�프로모??/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">콜�?리비</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?�금?�고금액</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?�천??3.3%)</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?��?급금</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?��?급금?�수</TableHead>
-                          <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">최종?�산금액</TableHead>
+                          <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠??/TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖嫄댁닔</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">湲곕낯?뺤궛湲덉븸</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?대같?щ즺</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?댁텛媛吏湲?/TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?쒓컙?쒕낫?섎즺</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">怨좎슜蹂댄뿕</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?곗옱蹂댄뿕</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">吏?ы봽濡쒕え??/TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">肄쒓?由щ퉬</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?멸툑?좉퀬湲덉븸</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?먯쿇??3.3%)</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?좎?湲됯툑</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?좎?湲됯툑?뚯닔</TableHead>
+                          <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">理쒖쥌?뺤궛湲덉븸</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -962,12 +962,12 @@ export default function SettlementUploadPage() {
               </Card>
 
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">???�전?�로</Button>
+                <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">???댁쟾?쇰줈</Button>
                 <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}?�시?�??
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}?꾩떆???
                 </Button>
                 <Button onClick={() => handleSave('confirmed')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}?�산 ?�정 ?�??
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}?뺤궛 ?뺤젙 ???
                 </Button>
               </div>
             </>
