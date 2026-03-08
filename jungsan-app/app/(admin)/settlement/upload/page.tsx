@@ -534,7 +534,7 @@ export default function SettlementUploadPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">정산파일 등록</h2>
         <p className="text-slate-400 text-sm mt-1">정산 기간을 선택하고 엑셀 파일을 업로드하세요</p>
