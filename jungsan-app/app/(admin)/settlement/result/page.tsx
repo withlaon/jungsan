@@ -64,13 +64,13 @@ export default function SettlementResultPage() {
       .from('weekly_settlements')
       .update({ status: 'confirmed', updated_at: new Date().toISOString() })
       .eq('id', id)
-    if (error) { toast.error('??? ???'); return }
-    toast.success('????????????????')
+    if (error) { toast.error('?? ??'); return }
+    toast.success('??? ???????.')
     fetchSettlements()
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('???????????????????? ?????????? ??? ????????')) return
+    if (!confirm('? ?? ???? ????????? ??? ???? ??? ? ????.')) return
     try {
       const res = await fetch(`/api/admin/settlement?id=${id}`, {
         method: 'DELETE',
@@ -78,34 +78,33 @@ export default function SettlementResultPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error('??? ???: ' + (data?.error ?? res.statusText))
+        toast.error('?? ??: ' + (data?.error ?? res.statusText))
         return
       }
-      toast.success('????????????????')
+      toast.success('?? ???? ???????.')
       setDetails([])
       setSelectedId('')
       setCurrentSettlement(null)
       fetchSettlements()
     } catch {
-      toast.error('??? ???: ?????? ???')
+      toast.error('?? ??: ???? ??')
     }
   }
 
   const handleExportAll = () => {
     if (!currentSettlement || details.length === 0) return
     exportSettlementExcel(currentSettlement, details)
-    toast.success('??? ??? ???????????????????')
+    toast.success('?? ?? ??? ?????????.')
   }
 
   const handleExportSingle = (detail: DetailWithRider) => {
     if (!currentSettlement) return
     exportSingleRiderExcel(currentSettlement, detail)
-    toast.success(`${detail.riders?.name} ?????? ??????????????`)
+    toast.success(`${detail.riders?.name} ???? ?????????.`)
   }
 
   const handlePrint = () => { window.print() }
 
-  // ???? ??? ??? ??? ????
   const totalEmp  = (d: DetailWithRider) => (d.excel_employment_insurance ?? 0) + (d.employment_insurance_addition ?? 0)
   const totalAcc  = (d: DetailWithRider) => (d.excel_accident_insurance   ?? 0) + (d.accident_insurance_addition   ?? 0)
   const taxBase   = (d: DetailWithRider) => d.tax_base_amount ?? (d.base_amount + d.promotion_amount - (d.hourly_insurance ?? 0) - totalEmp(d) - totalAcc(d) - (d.call_fee_deduction ?? 0))
@@ -172,7 +171,7 @@ export default function SettlementResultPage() {
             </Badge>
             <Button size="sm" variant="ghost" onClick={() => handleDelete(selectedId)}
               className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8">
-              <Trash2 className="h-4 w-4 mr-1" />???
+              <Trash2 className="h-4 w-4 mr-1" />??
             </Button>
           </>
         )}
@@ -181,44 +180,44 @@ export default function SettlementResultPage() {
       {loading ? null : settlements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-500">
           <FileText className="h-16 w-16 mb-4 opacity-30" />
-          <p className="text-lg">????? ??? ????? ??????.</p>
-          <p className="text-sm mt-1">?????? ??? ???????? ??????????? ?????</p>
+          <p className="text-lg">??? ?? ???? ????.</p>
+          <p className="text-sm mt-1">???? ?? ??? ?? ??? ???? ???.</p>
         </div>
       ) : (
         <>
-          {/* ??? ??? */}
+          {/* ?? ?? */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="border-slate-700 bg-slate-900">
               <CardContent className="p-4">
-                <p className="text-slate-400 text-xs">???????????</p>
+                <p className="text-slate-400 text-xs">??????</p>
                 <p className="text-blue-400 font-bold text-lg">{formatKRW(summary.total_base)}</p>
               </CardContent>
             </Card>
             <Card className="border-violet-700/40 bg-violet-900/10">
               <CardContent className="p-4">
-                <p className="text-slate-400 text-xs">???????????</p>
+                <p className="text-slate-400 text-xs">??????</p>
                 <p className="text-violet-400 font-bold text-lg">{formatKRW(summary.total_tax_base)}</p>
               </CardContent>
             </Card>
             <Card className="border-rose-900/30 bg-rose-900/10">
               <CardContent className="p-4">
-                <p className="text-slate-400 text-xs">???????/p>
+                <p className="text-slate-400 text-xs">???</p>
                 <p className="text-rose-400 font-bold text-lg">-{formatKRW(summary.total_income_tax)}</p>
               </CardContent>
             </Card>
             <Card className="border-emerald-900/30 bg-emerald-900/10">
               <CardContent className="p-4">
-                <p className="text-slate-400 text-xs">???????????</p>
+                <p className="text-slate-400 text-xs">??????</p>
                 <p className="text-emerald-400 font-bold text-lg">{formatKRW(summary.total_final)}</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* ?????? ??? ??? ?????*/}
+          {/* ???? ?? ?? ??? */}
           <Card className="border-slate-700 bg-slate-900 print:shadow-none">
             <CardHeader>
               <CardTitle className="text-white text-base">
-                ?????? ??? ??? ({details.length}??
+                ???? ?? ?? ({details.length}?)
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -226,22 +225,22 @@ export default function SettlementResultPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-transparent">
-                      <TableHead className="text-slate-400 whitespace-nowrap">??????</TableHead>
+                      <TableHead className="text-slate-400 whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">???</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?????????/TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">???</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">????</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">??????????/TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????/TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">??????</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">?????????</TableHead>
-                      <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">?????????</TableHead>
-                      <TableHead className="text-slate-400 print:hidden whitespace-nowrap">????/TableHead>
+                      <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">????</TableHead>
+                      <TableHead className="text-slate-400 print:hidden whitespace-nowrap">??</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -272,9 +271,9 @@ export default function SettlementResultPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {/* ??? ??*/}
+                    {/* ?? ? */}
                     <TableRow className="border-slate-700 bg-slate-800/30 font-bold">
-                      <TableCell className="text-white">???</TableCell>
+                      <TableCell className="text-white">??</TableCell>
                       <TableCell className="text-slate-300 text-right">{details.reduce((s, d) => s + d.delivery_count, 0).toLocaleString()}</TableCell>
                       <TableCell className="text-blue-400 text-right">{formatKRW(summary.total_base)}</TableCell>
                       <TableCell className="text-slate-400 text-right text-xs">{formatKRW(summary.total_delivery)}</TableCell>
@@ -299,11 +298,11 @@ export default function SettlementResultPage() {
         </>
       )}
 
-      {/* ?????? ??????????? */}
+      {/* ???? ??? ???? */}
       <Dialog open={!!previewDetail} onOpenChange={() => setPreviewDetail(null)}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white">{previewDetail?.riders?.name} ?????/DialogTitle>
+            <DialogTitle className="text-white">{previewDetail?.riders?.name} ???</DialogTitle>
           </DialogHeader>
           {previewDetail && currentSettlement && (() => {
             const d = previewDetail
@@ -315,39 +314,37 @@ export default function SettlementResultPage() {
             return (
               <div className="space-y-3">
                 <div className="text-sm text-slate-400">
-                  ??? ???: {currentSettlement.week_start} ~ {currentSettlement.week_end}
+                  ?? ??: {currentSettlement.week_start} ~ {currentSettlement.week_end}
                 </div>
                 <div className="space-y-1.5">
-                  {/* ?????? */}
+                  <div className="flex justify-between py-1.5 border-b border-slate-700/50">
+                    <span className="text-slate-400 text-sm">????</span>
+                    <span className="font-medium text-sm text-white">{d.delivery_count}?</span>
+                  </div>
                   <div className="flex justify-between py-1.5 border-b border-slate-700/50">
                     <span className="text-slate-400 text-sm">??????</span>
-                    <span className="font-medium text-sm text-white">{d.delivery_count}??/span>
-                  </div>
-                  {/* ????????? (?????+ ??????????) */}
-                  <div className="flex justify-between py-1.5 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm">?????????</span>
                     <span className="font-medium text-sm text-blue-400">{formatKRW(d.base_amount)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-700/30 pl-4">
-                    <span className="text-slate-500 text-xs">???????/span>
+                    <span className="text-slate-500 text-xs">???</span>
                     <span className="text-slate-400 text-xs">{formatKRW(d.delivery_fee ?? 0)}</span>
                   </div>
                   {(d.additional_pay ?? 0) > 0 && (
                     <div className="flex justify-between py-1 border-b border-slate-700/30 pl-4">
-                      <span className="text-slate-500 text-xs">?????????/span>
+                      <span className="text-slate-500 text-xs">?????</span>
                       <span className="text-slate-400 text-xs">{formatKRW(d.additional_pay ?? 0)}</span>
                     </div>
                   )}
                   {[
-                    { label: '?????????',     value: `-${formatKRW(d.hourly_insurance ?? 0)}`, color: 'text-amber-400', skip: !d.hourly_insurance },
-                    { label: '??????',         value: `-${formatKRW(empTotal)}`,         color: 'text-cyan-400',   skip: empTotal === 0 },
-                    { label: '??????',         value: `-${formatKRW(accTotal)}`,         color: 'text-purple-400', skip: accTotal === 0 },
-                    { label: '??????',  value: `+${formatKRW(d.promotion_amount)}`,color:'text-violet-400',skip: d.promotion_amount === 0 },
-                    { label: '??????',         value: `-${formatKRW(d.call_fee_deduction ?? 0)}`, color: 'text-orange-400', skip: !d.call_fee_deduction },
-                    { label: '?????????',     value: formatKRW(tb),                    color: 'text-emerald-400' },
-                    { label: '???',           value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
-                    { label: '?????? ???',    value: `-${formatKRW(d.advance_deduction)}`, color: 'text-amber-300', skip: d.advance_deduction === 0 },
-                    { label: '?????????',     value: `+${formatKRW(rec)}`,              color: 'text-teal-400',   skip: rec === 0 },
+                    { label: '?????',     value: `-${formatKRW(d.hourly_insurance ?? 0)}`, color: 'text-amber-400', skip: !d.hourly_insurance },
+                    { label: '????',       value: `-${formatKRW(empTotal)}`,         color: 'text-cyan-400',   skip: empTotal === 0 },
+                    { label: '????',       value: `-${formatKRW(accTotal)}`,         color: 'text-purple-400', skip: accTotal === 0 },
+                    { label: '??????',   value: `+${formatKRW(d.promotion_amount)}`, color: 'text-violet-400', skip: d.promotion_amount === 0 },
+                    { label: '????',       value: `-${formatKRW(d.call_fee_deduction ?? 0)}`, color: 'text-orange-400', skip: !d.call_fee_deduction },
+                    { label: '??????',   value: formatKRW(tb),                    color: 'text-emerald-400' },
+                    { label: '???',         value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
+                    { label: '???? ??',  value: `-${formatKRW(d.advance_deduction)}`, color: 'text-amber-300', skip: d.advance_deduction === 0 },
+                    { label: '??????',   value: `+${formatKRW(rec)}`,              color: 'text-teal-400',   skip: rec === 0 },
                   ].filter(item => !item.skip).map(item => (
                     <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-700/50">
                       <span className="text-slate-400 text-sm">{item.label}</span>
@@ -355,17 +352,17 @@ export default function SettlementResultPage() {
                     </div>
                   ))}
                   <div className="flex justify-between py-2 bg-emerald-900/20 rounded-lg px-3 mt-2">
-                    <span className="text-emerald-400 font-bold">??? ??????</span>
+                    <span className="text-emerald-400 font-bold">?? ????</span>
                     <span className="text-emerald-400 font-bold text-lg">{formatKRW(d.final_amount)}</span>
                   </div>
                 </div>
                 <div className="text-sm text-slate-400 border-t border-slate-700 pt-3 space-y-1">
-                  <div>???? {d.riders?.bank_name ?? '-'}</div>
-                  <div>??????: {d.riders?.bank_account ?? '-'}</div>
-                  <div>????? {d.riders?.account_holder ?? '-'}</div>
+                  <div>??: {d.riders?.bank_name ?? '-'}</div>
+                  <div>????: {d.riders?.bank_account ?? '-'}</div>
+                  <div>???: {d.riders?.account_holder ?? '-'}</div>
                 </div>
                 <Button onClick={() => handleExportSingle(d)} className="w-full bg-blue-600 hover:bg-blue-700">
-                  <FileDown className="h-4 w-4 mr-2" />???????? ??????
+                  <FileDown className="h-4 w-4 mr-2" />?? ??? ????
                 </Button>
               </div>
             )
