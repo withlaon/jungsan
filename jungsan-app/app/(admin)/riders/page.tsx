@@ -193,7 +193,18 @@ export default function RidersPage() {
       const res = await fetch('/api/admin/rider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: rider.id, ...rider, status: newStatus }),
+        body: JSON.stringify({
+          id: rider.id,
+          join_date: rider.join_date ?? null,
+          name: rider.name,
+          rider_username: rider.rider_username ?? null,
+          id_number: rider.id_number ?? null,
+          phone: rider.phone ?? null,
+          bank_name: rider.bank_name ?? null,
+          bank_account: rider.bank_account ?? null,
+          account_holder: rider.account_holder ?? null,
+          status: newStatus,
+        }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
       toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
