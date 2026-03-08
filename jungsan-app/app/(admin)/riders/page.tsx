@@ -142,128 +142,68 @@ export default function RidersPage() {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) {
-      toast.error('라이더명을 입력해주세요.')
-      return
-    }
+    if (!form.name.trim()) { toast.error('라이더명을 입력해주세요.'); return }
 
-    // 저장 직전 아이디 중복 최종 검증
     if (form.rider_username.trim()) {
       const dup = riders.some(
         r => (r.rider_username ?? '').toLowerCase() === form.rider_username.trim().toLowerCase()
           && r.id !== editingRider?.id
       )
-      if (dup) {
-        setUsernameError('이미 사용 중인 아이디입니다.')
-        toast.error('이미 사용 중인 아이디입니다. 다른 아이디를 사용해주세요.')
-        return
-      }
+      if (dup) { setUsernameError('이미 사용 중인 아이디입니다.'); toast.error('이미 사용 중인 아이디입니다.'); return }
     }
+    if (usernameError) { toast.error('아이디 중복을 확인해주세요.'); return }
 
-    if (usernameError) {
-      toast.error('아이디 중복을 확인해주세요.')
-      return
-    }
     setSaving(true)
-
-    if (editingRider) {
-      const { error } = await supabase.rpc('update_rider', {
-        p_id: editingRider.id,
-        p_join_date: form.join_date || null,
-        p_name: form.name.trim(),
-        p_rider_username: form.rider_username.trim() || null,
-        p_id_number: form.id_number.trim() || null,
-        p_phone: form.phone.trim() || null,
-        p_bank_name: form.bank_name.trim() || null,
-        p_bank_account: form.bank_account.trim() || null,
-        p_account_holder: form.account_holder.trim() || null,
-        p_status: form.status,
-      })
-      if (error) {
-        const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : '수정 실패: ' + error.message
-        toast.error(msg); setSaving(false); return
-      }
-      toast.success('라이더 정보가 수정되었습니다.')
-    } else {
-      let error: { message: string } | null = null
-      if (userId) {
-        const res = await supabase.rpc('insert_rider', {
-          p_user_id: userId,
-          p_join_date: form.join_date || null,
-          p_name: form.name.trim(),
-          p_rider_username: form.rider_username.trim() || null,
-          p_id_number: form.id_number.trim() || null,
-          p_phone: form.phone.trim() || null,
-          p_bank_name: form.bank_name.trim() || null,
-          p_bank_account: form.bank_account.trim() || null,
-          p_account_holder: form.account_holder.trim() || null,
-          p_status: form.status,
-        })
-        error = res.error
-      } else {
-        const res = await supabase.rpc('insert_rider', {
-          p_join_date: form.join_date || null,
-          p_name: form.name.trim(),
-          p_rider_username: form.rider_username.trim() || null,
-          p_id_number: form.id_number.trim() || null,
-          p_phone: form.phone.trim() || null,
-          p_bank_name: form.bank_name.trim() || null,
-          p_bank_account: form.bank_account.trim() || null,
-          p_account_holder: form.account_holder.trim() || null,
-          p_status: form.status,
-        })
-        error = res.error
-      }
-      if (error) {
-        const res = await fetch('/api/admin/rider', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            join_date: form.join_date || null,
-            name: form.name.trim(),
-            rider_username: form.rider_username.trim() || null,
-            id_number: form.id_number.trim() || null,
-            phone: form.phone.trim() || null,
-            bank_name: form.bank_name.trim() || null,
-            bank_account: form.bank_account.trim() || null,
-            account_holder: form.account_holder.trim() || null,
-            status: form.status,
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          const msg = data?.error ?? (/unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : '등록 실패')
-          toast.error(msg)
-          setSaving(false)
-          return
-        }
-      }
-      toast.success('라이더가 등록되었습니다.')
+    const payload = {
+      join_date: form.join_date || null,
+      name: form.name.trim(),
+      rider_username: form.rider_username.trim() || null,
+      id_number: form.id_number.trim() || null,
+      phone: form.phone.trim() || null,
+      bank_name: form.bank_name.trim() || null,
+      bank_account: form.bank_account.trim() || null,
+      account_holder: form.account_holder.trim() || null,
+      status: form.status,
     }
 
+    const res = await fetch('/api/admin/rider', {
+      method: editingRider ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editingRider ? { id: editingRider.id, ...payload } : payload),
+    })
+    const data = await res.json().catch(() => ({}))
     setSaving(false)
+
+    if (!res.ok) { toast.error(data?.error ?? '저장 실패'); return }
+
+    toast.success(editingRider ? '라이더 정보가 수정되었습니다.' : '라이더가 등록되었습니다.')
     setDialogOpen(false)
     setSearch('')
-    await refreshRiders(true)
+    await refreshRiders()
   }
 
   const toggleStatus = async (rider: Rider) => {
     const newStatus = rider.status === 'active' ? 'inactive' : 'active'
-    const { error } = await supabase.rpc('update_rider_status', {
-      p_id: rider.id,
-      p_status: newStatus,
+    const res = await fetch('/api/admin/rider', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: rider.id, ...rider, status: newStatus }),
     })
-    if (error) { toast.error('상태 변경 실패: ' + error.message); return }
+    if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
     toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
-    refreshRiders(true)
+    refreshRiders()
   }
 
   const deleteRider = async (rider: Rider) => {
-    const { error } = await supabase.rpc('delete_rider', { p_id: rider.id })
-    if (error) { toast.error('삭제 실패: ' + error.message); return }
+    const res = await fetch('/api/admin/rider', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: rider.id }),
+    })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('삭제 실패: ' + (d?.error ?? '')); return }
     toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
     setDeleteConfirmId(null)
-    refreshRiders(true)
+    refreshRiders()
   }
 
   const parseBulkExcel = useCallback((file: File) => {
@@ -455,31 +395,38 @@ export default function RidersPage() {
 
   const handleBulkDeactivate = async () => {
     setBulkProcessing(true)
-    const ids = filtered.filter(r => selectedIds.has(r.id) && r.status === 'active').map(r => r.id)
-    for (const id of ids) {
-      await supabase.rpc('update_rider_status', { p_id: id, p_status: 'inactive' })
-    }
-    toast.success(`${ids.length}명을 비활성화했습니다.`)
+    const targets = filtered.filter(r => selectedIds.has(r.id) && r.status === 'active')
+    await Promise.all(targets.map(r =>
+      fetch('/api/admin/rider', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: r.id, ...r, status: 'inactive' }),
+      })
+    ))
+    toast.success(`${targets.length}명을 비활성화했습니다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    refreshRiders(true)
+    refreshRiders()
   }
 
   const handleBulkDelete = async () => {
     setBulkProcessing(true)
     const ids = filtered.filter(r => selectedIds.has(r.id)).map(r => r.id)
-    let failCount = 0
-    for (const id of ids) {
-      const { error } = await supabase.rpc('delete_rider', { p_id: id })
-      if (error) failCount++
-    }
+    const results = await Promise.all(ids.map(id =>
+      fetch('/api/admin/rider', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+    ))
+    const failCount = results.filter(r => !r.ok).length
     if (failCount > 0) toast.error(`${failCount}명 삭제 실패`)
     else toast.success(`${ids.length}명을 삭제했습니다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    refreshRiders(true)
+    refreshRiders()
   }
 
   return (
