@@ -341,11 +341,11 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
               <a
-                href="tel:010-5949-7469"
+                href="tel:070-8949-7469"
                 className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-medium border border-white/10 text-slate-300 hover:bg-white/5 hover:text-white transition-all text-sm"
               >
                 <Phone className="w-4 h-4 text-blue-400" />
-                010-5949-7469
+                070-8949-7469
               </a>
               <a
                 href="mailto:jimcard@naver.com"
