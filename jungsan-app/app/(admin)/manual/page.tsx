@@ -46,7 +46,7 @@ export default function ManualPage() {
 
   const taxRateLabel = `${(incomeTaxRate * 100).toFixed(1)}%`
 
-  const platformLabel = isBaemin ? '諛곕떖??誘쇱”' : '荑좏뙜?댁툩'
+  const platformLabel = isBaemin ? '배달의 민족' : '쿠팡이츠'
   const platformColor = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
   const platformBg   = isBaemin ? 'bg-emerald-900/30 border-emerald-700/40' : 'bg-yellow-900/30 border-yellow-700/40'
 
@@ -54,12 +54,12 @@ export default function ManualPage() {
     if (!printRef.current || pdfLoading) return
     setPdfLoading(true)
 
-    // PDF???ы븿?섏? ?딆쓣 ?붿냼瑜??꾩떆濡??④?
+    // PDF에 포함하지 않을 요소를 임시로 숨김
     const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
     noPrintEls.forEach(el => { el.style.display = 'none' })
 
-    // ??? html2canvas 誘몄????됱긽 ?⑥닔(lab, oklch, lch) ?ъ쟾 蹂?????
-    // canvas fillStyle???댁슜?섎㈃ 釉뚮씪?곗?媛 ?먮룞?쇰줈 ?덉쟾??sRGB 媛믪쑝濡?蹂?섑빐 以??
+    // ─── html2canvas 미지원 색상 함수(lab, oklch, lch) 사전 변환 ───
+    // canvas fillStyle을 이용하면 브라우저가 자동으로 안전한 sRGB 값으로 변환해 준다.
     const fixedStyles: Array<{ el: HTMLElement; prop: string; prev: string }> = []
 
     const tempCanvas = document.createElement('canvas')
@@ -67,12 +67,12 @@ export default function ManualPage() {
     const ctx2d = tempCanvas.getContext('2d')
 
     const toSafeColor = (color: string): string | null => {
-      // lab(), oklch(), lch() ?ы븿??媛믩쭔 蹂??
+      // lab(), oklch(), lch() 포함된 값만 변환
       if (!color || !/\blab\(|\boklch\(|\blch\(/.test(color)) return null
       if (!ctx2d) return null
       try {
         ctx2d.fillStyle = color
-        return ctx2d.fillStyle // 釉뚮씪?곗?媛 rgb() / #rrggbb ?뺥깭濡?蹂?섑빐 諛섑솚
+        return ctx2d.fillStyle // 브라우저가 rgb() / #rrggbb 형태로 변환해 반환
       } catch {
         return null
       }
@@ -99,11 +99,11 @@ export default function ManualPage() {
         }
       })
     })
-    // ??????????????????????????????????????????????????????????????
+    // ──────────────────────────────────────────────────────────────
 
     try {
       const html2pdf = (await import('html2pdf.js')).default
-      const filename = `?쇱씠?붿젙?곗떆?ㅽ뀥_?ъ슜?먮찓?댁뼹_${platformLabel}.pdf`
+      const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}.pdf`
 
       await html2pdf()
         .set({
@@ -123,10 +123,10 @@ export default function ManualPage() {
         .from(printRef.current)
         .save()
     } catch (err) {
-      console.error('PDF ?앹꽦 ?ㅽ뙣:', err)
-      alert('PDF ?앹꽦???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.')
+      console.error('PDF 생성 실패:', err)
+      alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
     } finally {
-      // 蹂?섑뻽???ㅽ???蹂듭썝
+      // 변환했던 스타일 복원
       fixedStyles.forEach(({ el, prop, prev }) => {
         if (prev) el.style.setProperty(prop, prev)
         else el.style.removeProperty(prop)
@@ -136,7 +136,7 @@ export default function ManualPage() {
     }
   }
 
-  /* ? 怨듯넻 ?ㅽ????ы띁 ? */
+  /* ─ 공통 스타일 헬퍼 ─ */
   const tip   = (text: React.ReactNode) => (
     <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-3 text-xs flex items-start gap-2">
       <Info className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-0.5" />
@@ -162,38 +162,38 @@ export default function ManualPage() {
   }
 
   const sections: Section[] = [
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       1. ?쒖뒪??媛쒖슂
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       1. 시스템 개요
+    ══════════════════════════════════════════ */
     {
-      id: 'overview', title: '?쒖뒪??媛쒖슂', icon: BookOpen,
+      id: 'overview', title: '시스템 개요', icon: BookOpen,
       content: (
         <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
           <p>
-            <strong className="text-white">?쇱씠???뺤궛 ?쒖뒪??/strong>? {isBaemin ? '諛곕떖??誘쇱”' : '荑좏뙜?댁툩'}
-            {' '}?쇱씠?붿쓽 二쇨컙 ?뺤궛???먮룞?뷀븯???듯빀 愿由??뚮옯?쇱엯?덈떎.
-            ?묒? ?뚯씪???낅줈?쒗븯硫?蹂댄뿕猷뙿룰?由щ퉬쨌?꾨줈紐⑥뀡쨌?뚮뱷?몃? ?먮룞 怨꾩궛?섍퀬 ?쇱씠?붾퀎 ?뺤궛?쒕? 諛쒗뻾?⑸땲??
+            <strong className="text-white">라이더 정산 시스템</strong>은 {isBaemin ? '배달의 민족' : '쿠팡이츠'}
+            {' '}라이더의 주간 정산을 자동화하는 통합 관리 플랫폼입니다.
+            엑셀 파일을 업로드하면 보험료·관리비·프로모션·소득세를 자동 계산하고 라이더별 정산서를 발행합니다.
           </p>
 
-          {/* ?뚮옯??諛곗? */}
+          {/* 플랫폼 배지 */}
           <div className={`border rounded-lg p-3 ${platformBg}`}>
-            <p className={`text-xs font-medium ${platformColor}`}>?꾩옱 怨꾩젙 ?뚮옯?? {platformLabel}</p>
+            <p className={`text-xs font-medium ${platformColor}`}>현재 계정 플랫폼: {platformLabel}</p>
           </div>
 
           <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4">
             <p className="text-blue-300 font-medium mb-2 flex items-center gap-2">
-              <Info className="h-4 w-4" /> 二쇱슂 湲곕뒫
+              <Info className="h-4 w-4" /> 주요 기능
             </p>
             <ul className="space-y-1.5 text-slate-300">
               {[
-                '?쇱씠???깅줉 諛?愿由?(媛쒕퀎/?묒? ?쇨큵?깅줉, ?ㅼ쨷 ?좏깮 ?쇨큵泥섎━)',
-                '二쇨컙 ?뺤궛 ?뚯씪 ?낅줈??諛??먮룞 怨꾩궛 (蹂듭닔 ?뚯씪 ?⑹궛 吏??',
-                '?꾨줈紐⑥뀡(吏?ы봽濡쒕え?? 쨌 愿由щ퉬 쨌 蹂댄뿕猷??먮룞 諛섏쁺',
-                '?좎?湲됯툑 ?깅줉쨌怨듭젣쨌?뚯닔 泥섎━',
-                '?쇱씠?붾퀎 媛쒖씤 ?뺤궛??留곹겕 諛쒗뻾 (怨꾩젙蹂??꾩슜 URL)',
-                '怨듭??ы빆 ?대?吏 ?앹꽦 쨌 ???쨌 愿由?,
-                '?꾩껜愿由ъ옄?먭쾶 臾몄쓽?섍린 (?ㅼ떆媛??듬?)',
-                '二쇨컙 吏???쒖씠????쒕낫??,
+                '라이더 등록 및 관리 (개별/엑셀 일괄등록, 다중 선택 일괄처리)',
+                '주간 정산 파일 업로드 및 자동 계산 (복수 파일 합산 지원)',
+                '프로모션(지사프로모션) · 관리비 · 보험료 자동 반영',
+                '선지급금 등록·공제·회수 처리',
+                '라이더별 개인 정산서 링크 발행 (계정별 전용 URL)',
+                '공지사항 이미지 생성 · 저장 · 관리',
+                '전체관리자에게 문의하기 (실시간 답변)',
+                '주간 지사 순이익 대시보드',
               ].map((t, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <ChevronRight className="h-3.5 w-3.5 mt-0.5 text-blue-400 shrink-0" />{t}
@@ -203,187 +203,187 @@ export default function ManualPage() {
           </div>
 
           {warn(
-            <><strong>沅뚯옣 ?ъ슜 ?쒖꽌:</strong> ?쇱씠???깅줉 ??愿由щ퉬쨌?꾨줈紐⑥뀡 ?ㅼ젙 ??蹂댄뿕猷??ㅼ젙 ???뺤궛?뚯씪 ?깅줉 ???뺤궛 ?뺤젙 ???쇱씠?붿궗?댄듃?먯꽌 ?뺤궛??怨듭쑀</>
+            <><strong>권장 사용 순서:</strong> 라이더 등록 → 관리비·프로모션 설정 → 보험료 설정 → 정산파일 등록 → 정산 확정 → 라이더사이트에서 정산서 공유</>
           )}
 
           <div className="bg-slate-800 rounded-lg p-4 space-y-2">
-            <p className="text-white font-medium text-sm">蹂댁븞 諛??몄뀡 ?뺤콉</p>
+            <p className="text-white font-medium text-sm">보안 및 세션 정책</p>
             <ul className="space-y-1 text-xs text-slate-400">
-              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" />釉뚮씪?곗?쨌??쓣 ?レ쑝硫?<strong className="text-white">?먮룞 濡쒓렇?꾩썐</strong>?⑸땲?? ?ъ젒????濡쒓렇?몄씠 ?꾩슂?⑸땲??</li>
-              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" /><strong className="text-white">1?쒓컙 ?댁긽 誘몄궗??/strong> ???먮룞 濡쒓렇?꾩썐?⑸땲?? (5遺???寃쎄퀬 ?뚮┝)</li>
-              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" />媛?怨꾩젙???곗씠?곕뒗 ?꾩쟾???낅┰?곸쑝濡?愿由щ맗?덈떎.</li>
+              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" />브라우저·탭을 닫으면 <strong className="text-white">자동 로그아웃</strong>됩니다. 재접속 시 로그인이 필요합니다.</li>
+              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" /><strong className="text-white">1시간 이상 미사용</strong> 시 자동 로그아웃됩니다. (5분 전 경고 알림)</li>
+              <li className="flex items-start gap-2"><ChevronRight className="h-3 w-3 mt-0.5 text-slate-500 shrink-0" />각 계정의 데이터는 완전히 독립적으로 관리됩니다.</li>
             </ul>
           </div>
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       2. ?뺣낫?섏젙 & 濡쒓퀬 ?깅줉
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       2. 정보수정 & 로고 등록
+    ══════════════════════════════════════════ */
     {
-      id: 'profile', title: '?뺣낫?섏젙 & 濡쒓퀬 ?깅줉', icon: ImagePlus,
-      badge: '怨꾩젙 ?ㅼ젙', badgeColor: 'bg-slate-600',
+      id: 'profile', title: '정보수정 & 로고 등록', icon: ImagePlus,
+      badge: '계정 설정', badgeColor: 'bg-slate-600',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?ъ씠?쒕컮 ?섎떒 <strong className="text-white">濡쒓렇?꾩썐</strong> 踰꾪듉 ?꾨옒??<strong className="text-white">?뺣낫?섏젙</strong> 踰꾪듉???대┃?섎㈃ 怨꾩젙 ?뺣낫? 濡쒓퀬瑜?愿由ы븷 ???덉뒿?덈떎.</p>
+          <p>사이드바 하단 <strong className="text-white">로그아웃</strong> 버튼 아래의 <strong className="text-white">정보수정</strong> 버튼을 클릭하면 계정 정보와 로고를 관리할 수 있습니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">??湲곕낯 ?뺣낫 ?섏젙</p>
+            <p className="text-white font-medium">① 기본 정보 수정</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>?뚯궗紐? ?ъ뾽?먮벑濡앸쾲?? ?대떦?먮챸, ?곕씫泥? ?대찓???섏젙 媛??/li>
-              <li>鍮꾨?踰덊샇 蹂寃?????鍮꾨?踰덊샇瑜???踰??낅젰 ?????/li>
+              <li>회사명, 사업자등록번호, 담당자명, 연락처, 이메일 수정 가능</li>
+              <li>비밀번호 변경 시 새 비밀번호를 두 번 입력 후 저장</li>
             </ul>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">??濡쒓퀬 ?깅줉</p>
+            <p className="text-white font-medium">② 로고 등록</p>
             <ol className="space-y-1.5 list-decimal list-inside ml-2 text-xs">
-              <li>?뺣낫?섏젙 ?ㅼ씠?쇰줈洹몄뿉??濡쒓퀬 ?대?吏 ?뚯씪 ?좏깮 (PNG, JPG 沅뚯옣)</li>
-              <li>誘몃━蹂닿린 ?뺤씤 ?????/li>
-              <li>?깅줉??濡쒓퀬??<strong className="text-white">?ъ씠?쒕컮 ?곷떒 ?꾩씠肄?/strong>???泥댄빀?덈떎.</li>
+              <li>정보수정 다이얼로그에서 로고 이미지 파일 선택 (PNG, JPG 권장)</li>
+              <li>미리보기 확인 후 저장</li>
+              <li>등록된 로고는 <strong className="text-white">사이드바 상단 아이콘</strong>을 대체합니다.</li>
             </ol>
           </div>
 
-          {tip('?뚯궗 濡쒓퀬瑜??깅줉?섎㈃ ?ъ씠?쒕컮? ?쇱씠???뺤궛?쒖뿉 釉뚮옖?⑹씠 ?곸슜?⑸땲??')}
+          {tip('회사 로고를 등록하면 사이드바와 라이더 정산서에 브랜딩이 적용됩니다.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       3. 二쇨컙?뺤궛?꾪솴 ??쒕낫??
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       3. 주간정산현황 대시보드
+    ══════════════════════════════════════════ */
     {
-      id: 'dashboard', title: '二쇨컙?뺤궛?꾪솴 ??쒕낫??, icon: BarChart3,
-      badge: '?꾪솴 ?뺤씤', badgeColor: 'bg-violet-700',
+      id: 'dashboard', title: '주간정산현황 대시보드', icon: BarChart3,
+      badge: '현황 확인', badgeColor: 'bg-violet-700',
       content: (
         <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
-          <p>?뺤궛???뺤젙??二쇨컙??吏???쒖씠?듦낵 ??ぉ蹂??섏튂瑜??쒕늿???뺤씤?⑸땲??</p>
+          <p>정산이 확정된 주간의 지사 순이익과 항목별 수치를 한눈에 확인합니다.</p>
           <ul className="space-y-2 ml-2">
             <li className="flex items-start gap-2">
-              <Badge className="mt-0.5 bg-slate-700 text-slate-300 text-xs shrink-0">二쇱감 ?좏깮</Badge>
-              <span>?곗륫 ?곷떒 ?쒕∼?ㅼ슫?먯꽌 議고쉶 二쇨컙???좏깮?⑸땲??</span>
+              <Badge className="mt-0.5 bg-slate-700 text-slate-300 text-xs shrink-0">주차 선택</Badge>
+              <span>우측 상단 드롭다운에서 조회 주간을 선택합니다.</span>
             </li>
             <li className="flex items-start gap-2">
-              <Badge className="mt-0.5 bg-emerald-800 text-emerald-300 text-xs shrink-0">吏???쒖씠??/Badge>
-              <span>吏?ш?由щ퉬 ??怨좎슜쨌?곗옱蹂댄뿕(?ъ뾽二? ???꾨줈紐⑥뀡鍮?+ 肄쒓?由щ퉬 + 蹂댄뿕愿由щ퉬濡?怨꾩궛?⑸땲??</span>
+              <Badge className="mt-0.5 bg-emerald-800 text-emerald-300 text-xs shrink-0">지사 순이익</Badge>
+              <span>지사관리비 − 고용·산재보험(사업주) − 프로모션비 + 콜관리비 + 보험관리비로 계산됩니다.</span>
             </li>
             <li className="flex items-start gap-2">
-              <Badge className="mt-0.5 bg-blue-800 text-blue-300 text-xs shrink-0">留됰?洹몃옒??/Badge>
-              <span>理쒓렐 12二쇨컙??吏???쒖씠??異붿씠瑜??쒓컖?곸쑝濡??뺤씤?????덉뒿?덈떎.</span>
+              <Badge className="mt-0.5 bg-blue-800 text-blue-300 text-xs shrink-0">막대그래프</Badge>
+              <span>최근 12주간의 지사 순이익 추이를 시각적으로 확인할 수 있습니다.</span>
             </li>
           </ul>
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       4. ?쇱씠??愿由?
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       4. 라이더 관리
+    ══════════════════════════════════════════ */
     {
-      id: 'riders', title: '?쇱씠??愿由?, icon: Users,
-      badge: '?꾩닔 ?ㅼ젙', badgeColor: 'bg-blue-700',
+      id: 'riders', title: '라이더 관리', icon: Users,
+      badge: '필수 설정', badgeColor: 'bg-blue-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p><strong className="text-white">?뺤궛 ?쒖옉 ?꾩뿉 諛섎뱶???쇱씠?붾? 癒쇱? ?깅줉</strong>?댁빞 ?⑸땲??</p>
+          <p><strong className="text-white">정산 시작 전에 반드시 라이더를 먼저 등록</strong>해야 합니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???쇱씠??媛쒕퀎 ?깅줉</p>
+            <p className="text-white font-medium">① 라이더 개별 등록</p>
             <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li>?곗륫 ?곷떒 <strong className="text-white">+ ?쇱씠??異붽?</strong> 踰꾪듉 ?대┃</li>
-              <li>?쇱씠?붾챸(?꾩닔), ?꾩씠??濡쒓렇?몄슜, 以묐났遺덇?), ?곕씫泥??낅젰</li>
-              <li><strong className="text-white">???/strong> ?대┃ ??紐⑸줉??利됱떆 ?쒖떆</li>
+              <li>우측 상단 <strong className="text-white">+ 라이더 추가</strong> 버튼 클릭</li>
+              <li>라이더명(필수), 아이디(로그인용, 중복불가), 연락처 입력</li>
+              <li><strong className="text-white">저장</strong> 클릭 → 목록에 즉시 표시</li>
             </ol>
-            {warn('?꾩씠???쇱씠??ID)??以묐났 ?ъ슜 遺덇?. ?숈씪 ?꾩씠???낅젰 ???ㅻ쪟 硫붿떆吏媛 ?쒖떆?⑸땲??')}
+            {warn('아이디(라이더 ID)는 중복 사용 불가. 동일 아이디 입력 시 오류 메시지가 표시됩니다.')}
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???묒? ?쇨큵 ?깅줉</p>
+            <p className="text-white font-medium">② 엑셀 일괄 등록</p>
             <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li>?곗륫 ?곷떒 <strong className="text-white">?묒? ?낅줈??/strong> 踰꾪듉 ?대┃</li>
-              <li>?묒떇 ?ㅼ슫濡쒕뱶 ???대쫫쨌?꾩씠?붋룹뿰?쎌쿂 ?쒖꽌濡??묒꽦</li>
-              <li>?묒꽦???뚯씪 ?좏깮 ???먮룞 ?쇨큵 ?깅줉</li>
+              <li>우측 상단 <strong className="text-white">엑셀 업로드</strong> 버튼 클릭</li>
+              <li>양식 다운로드 후 이름·아이디·연락처 순서로 작성</li>
+              <li>작성한 파일 선택 → 자동 일괄 등록</li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???쇱씠??寃??/p>
-            <p className="text-xs ml-2">?곷떒 寃?됱갹???대쫫쨌?꾩씠?붾? ?낅젰?섎㈃ 利됱떆 ?꾪꽣留곷맗?덈떎. ?덈줈 ?깅줉???쇱씠?붾룄 利됱떆 寃??媛?ν빀?덈떎.</p>
+            <p className="text-white font-medium">③ 라이더 검색</p>
+            <p className="text-xs ml-2">상단 검색창에 이름·아이디를 입력하면 즉시 필터링됩니다. 새로 등록한 라이더도 즉시 검색 가능합니다.</p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???ㅼ쨷 ?좏깮 ?쇨큵 泥섎━</p>
+            <p className="text-white font-medium">④ 다중 선택 일괄 처리</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>紐⑸줉 ?곷떒 泥댄겕諛뺤뒪濡??꾩껜 ?좏깮 ?먮뒗 媛쒕퀎 泥댄겕諛뺤뒪濡??좏깮</li>
-              <li>?좏깮 ??<strong className="text-white">?쇨큵 鍮꾪솢??/strong> / <strong className="text-rose-400">?쇨큵 ??젣</strong> 踰꾪듉 ?ъ슜</li>
+              <li>목록 상단 체크박스로 전체 선택 또는 개별 체크박스로 선택</li>
+              <li>선택 후 <strong className="text-white">일괄 비활성</strong> / <strong className="text-rose-400">일괄 삭제</strong> 버튼 사용</li>
             </ul>
-            {warn('?꾩쟾 ??젣 ???대떦 ?쇱씠?붿쓽 ?뺤궛쨌?좎?湲됯툑쨌?꾨줈紐⑥뀡쨌愿由щ퉬 ?곗씠?곌? 紐⑤몢 ??젣?⑸땲??')}
+            {warn('완전 삭제 시 해당 라이더의 정산·선지급금·프로모션·관리비 데이터가 모두 삭제됩니다.')}
           </div>
 
           <div className="space-y-1">
-            <p className="text-white font-medium">???곹깭 遺꾨쪟</p>
+            <p className="text-white font-medium">⑤ 상태 분류</p>
             <div className="flex gap-3 ml-2 text-xs">
-              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">?쒖꽦</Badge> ?뺤궛 ???/span>
-              <span className="flex items-center gap-1.5"><Badge className="bg-slate-700 text-slate-400 text-xs">鍮꾪솢??/Badge> ?뺤궛 ?쒖쇅 (?곗씠??蹂댁〈)</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">활성</Badge> 정산 대상</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-slate-700 text-slate-400 text-xs">비활성</Badge> 정산 제외 (데이터 보존)</span>
             </div>
           </div>
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       5. ?좎?湲됯툑 愿由?
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       5. 선지급금 관리
+    ══════════════════════════════════════════ */
     {
-      id: 'advance-payments', title: '?좎?湲됯툑 愿由?, icon: Wallet,
-      badge: '?좏깮 ?ㅼ젙', badgeColor: 'bg-orange-700',
+      id: 'advance-payments', title: '선지급금 관리', icon: Wallet,
+      badge: '선택 설정', badgeColor: 'bg-orange-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?쇱씠?붿뿉寃?誘몃━ 吏湲됲븳 湲덉븸???깅줉?섎㈃ ?뺤궛 ???먮룞?쇰줈 怨듭젣?⑸땲??</p>
+          <p>라이더에게 미리 지급한 금액을 등록하면 정산 시 자동으로 공제됩니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?깅줉</p>
+            <p className="text-white font-medium">등록</p>
             <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li>?곗륫 ?곷떒 <strong className="text-white">?좎?湲됯툑 ?깅줉</strong> 踰꾪듉 ?대┃</li>
-              <li>?쇱씠??寃?????좏깮, 湲덉븸쨌吏湲?二쇨컙쨌硫붾え ?낅젰</li>
-              <li>?????誘멸났???꾪솴???쒖떆</li>
+              <li>우측 상단 <strong className="text-white">선지급금 등록</strong> 버튼 클릭</li>
+              <li>라이더 검색 후 선택, 금액·지급 주간·메모 입력</li>
+              <li>저장 → 미공제 현황에 표시</li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?뚯닔 ?깅줉</p>
-            <p className="text-xs ml-2">?쇱씠?붽? ?좎?湲됯툑???먯껜 諛섑솚??寃쎌슦 <strong className="text-white">?뚯닔 ?깅줉</strong> 踰꾪듉?쇰줈 湲곕줉?⑸땲?? ?뺤궛?쒖뿉 硫붾え? ?④퍡 ?뚯닔 湲덉븸???쒖떆?⑸땲??</p>
+            <p className="text-white font-medium">회수 등록</p>
+            <p className="text-xs ml-2">라이더가 선지급금을 자체 반환한 경우 <strong className="text-white">회수 등록</strong> 버튼으로 기록합니다. 정산서에 메모와 함께 회수 금액이 표시됩니다.</p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?곹깭 諛???젣</p>
+            <p className="text-white font-medium">상태 및 삭제</p>
             <div className="flex gap-3 ml-2 text-xs mb-2">
-              <span className="flex items-center gap-1.5"><Badge className="bg-orange-800 text-orange-300 text-xs">誘멸났??/Badge> ?뺤궛 ???먮룞 李④컧 ???/span>
-              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">怨듭젣?꾨즺</Badge> ?대? 諛섏쁺????ぉ</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-orange-800 text-orange-300 text-xs">미공제</Badge> 정산 시 자동 차감 대상</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">공제완료</Badge> 이미 반영된 항목</span>
             </div>
-            {tip('怨듭젣 ?꾨즺????ぉ????젣 踰꾪듉?쇰줈 ??젣?????덉뒿?덈떎. ??젣?대룄 ?대? ?뺤젙???뺤궛?먮뒗 ?곹뼢???놁뒿?덈떎.')}
+            {tip('공제 완료된 항목도 삭제 버튼으로 삭제할 수 있습니다. 삭제해도 이미 확정된 정산에는 영향이 없습니다.')}
           </div>
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       6. ?꾨줈紐⑥뀡 ?ㅼ젙
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       6. 프로모션 설정
+    ══════════════════════════════════════════ */
     {
-      id: 'promotions', title: '?꾨줈紐⑥뀡 ?ㅼ젙 (吏?ы봽濡쒕え??', icon: Gift,
-      badge: '?좏깮 ?ㅼ젙', badgeColor: 'bg-rose-700',
+      id: 'promotions', title: '프로모션 설정 (지사프로모션)', icon: Gift,
+      badge: '선택 설정', badgeColor: 'bg-rose-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>諛곕떖嫄댁닔 湲곕컲 ?몄꽱?곕툕(吏?ы봽濡쒕え??瑜??ㅼ젙?섎㈃ ?뺤궛 ???먮룞 ?곸슜?⑸땲?? ?뺤궛?쒖뿉??<strong className="text-white">吏?ы봽濡쒕え??/strong>?쇰줈 ?쒓린?⑸땲??</p>
+          <p>배달건수 기반 인센티브(지사프로모션)를 설정하면 정산 시 자동 적용됩니다. 정산서에는 <strong className="text-white">지사프로모션</strong>으로 표기됩니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?꾨줈紐⑥뀡 醫낅쪟</p>
+            <p className="text-white font-medium">프로모션 종류</p>
             <ul className="space-y-2 ml-2 text-xs">
               {[
-                ['怨좎젙湲덉븸', '?ㅼ젙 議곌굔 異⑹” ???쇱젙 湲덉븸 吏湲?, '?? 100嫄??댁긽?대㈃ 50,000??吏湲?],
-                ['援ш컙蹂?湲덉븸', '諛곕떖嫄댁닔 援ш컙???곕씪 ?ㅻⅨ 湲덉븸 ?곸슜', '?? 50~99嫄? 20,000?? 100嫄닳넁: 50,000??],
-                ['嫄대떦 湲덉븸', '湲곗? 嫄댁닔 珥덇낵遺꾩뿉 ?④? ?곸슜', '?? 50嫄?珥덇낵 ??嫄대떦 500??],
+                ['고정금액', '설정 조건 충족 시 일정 금액 지급', '예) 100건 이상이면 50,000원 지급'],
+                ['구간별 금액', '배달건수 구간에 따라 다른 금액 적용', '예) 50~99건: 20,000원, 100건↑: 50,000원'],
+                ['건당 금액', '기준 건수 초과분에 단가 적용', '예) 50건 초과 시 건당 500원'],
               ].map(([t, d, ex]) => (
                 <li key={t}>
                   <span className="text-white font-medium">{t}:</span> {d}
@@ -394,128 +394,128 @@ export default function ManualPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?곸슜 踰붿쐞 & 湲곌컙</p>
+            <p className="text-white font-medium">적용 범위 & 기간</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li><strong className="text-white">?꾩껜/媛쒕퀎 ?곸슜:</strong> 紐⑤뱺 ?쇱씠???먮뒗 吏???쇱씠?붿뿉寃??곸슜</li>
-              <li><strong className="text-white">湲곌컙:</strong> ?꾩껜 湲곌컙 / ?뱀젙 二쇨컙 / 留덇컧?쇨퉴吏</li>
+              <li><strong className="text-white">전체/개별 적용:</strong> 모든 라이더 또는 지정 라이더에게 적용</li>
+              <li><strong className="text-white">기간:</strong> 전체 기간 / 특정 주간 / 마감일까지</li>
             </ul>
           </div>
 
-          {tip('湲곗〈 ?꾨줈紐⑥뀡???대┃?섎㈃ ?곸꽭蹂닿린, ?쇱씠??異붽?, ?댁슜 ?섏젙??媛?ν빀?덈떎.')}
+          {tip('기존 프로모션을 클릭하면 상세보기, 라이더 추가, 내용 수정이 가능합니다.')}
 
           {isBaemin && (
             <div className={`border rounded-lg p-3 ${platformBg}`}>
-              <p className={`text-xs font-medium ${platformColor} mb-1`}>諛곕떖??誘쇱” ?뺤궛 怨듭떇?먯꽌????븷</p>
-              <p className="text-xs text-slate-300">?멸툑?좉퀬湲덉븸 = 湲곕낯?뺤궛湲덉븸 + <strong className="text-white">吏?ы봽濡쒕え??/strong><br />理쒖쥌?뺤궛湲덉븸?먮룄 吏?ы봽濡쒕え?섏씠 媛?곕맗?덈떎.</p>
+              <p className={`text-xs font-medium ${platformColor} mb-1`}>배달의 민족 정산 공식에서의 역할</p>
+              <p className="text-xs text-slate-300">세금신고금액 = 기본정산금액 + <strong className="text-white">지사프로모션</strong><br />최종정산금액에도 지사프로모션이 가산됩니다.</p>
             </div>
           )}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       7. 愿由щ퉬 ?ㅼ젙
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       7. 관리비 설정
+    ══════════════════════════════════════════ */
     {
-      id: 'settings', title: '愿由щ퉬 ?ㅼ젙', icon: Settings,
-      badge: '?좏깮 ?ㅼ젙', badgeColor: 'bg-slate-600',
+      id: 'settings', title: '관리비 설정', icon: Settings,
+      badge: '선택 설정', badgeColor: 'bg-slate-600',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>肄쒓?由щ퉬, ?쇰컲愿由щ퉬, ?쒓컙?쒕낫?섎즺瑜??ㅼ젙?⑸땲?? ?뺤궛 怨꾩궛 ???먮룞?쇰줈 李④컧?⑸땲??</p>
+          <p>콜관리비, 일반관리비, 시간제보험료를 설정합니다. 정산 계산 시 자동으로 차감됩니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">愿由щ퉬 醫낅쪟</p>
+            <p className="text-white font-medium">관리비 종류</p>
             <ul className="space-y-2 ml-2 text-xs">
-              <li><span className="text-white font-medium">肄쒓?由щ퉬:</span> 嫄대떦 ?④? 횞 諛곕떖嫄댁닔<br /><span className="text-slate-500">?? 200??횞 150嫄?= 30,000??李④컧</span></li>
-              <li><span className="text-white font-medium">?쇰컲愿由щ퉬:</span> 怨좎젙 湲덉븸 李④컧<br /><span className="text-slate-500">?? ??5,000???뺤븸 李④컧</span></li>
+              <li><span className="text-white font-medium">콜관리비:</span> 건당 단가 × 배달건수<br /><span className="text-slate-500">예) 200원 × 150건 = 30,000원 차감</span></li>
+              <li><span className="text-white font-medium">일반관리비:</span> 고정 금액 차감<br /><span className="text-slate-500">예) 월 5,000원 정액 차감</span></li>
               {isBaemin && (
-                <li><span className="text-white font-medium">?쒓컙?쒕낫?섎즺:</span> ?쇱씠?붾퀎 ?ㅼ젙 湲덉븸??理쒖쥌?뺤궛湲덉븸?먯꽌 李④컧<br /><span className="text-slate-500">諛곕떖??誘쇱” ?꾩슜 ??ぉ</span></li>
+                <li><span className="text-white font-medium">시간제보험료:</span> 라이더별 설정 금액을 최종정산금액에서 차감<br /><span className="text-slate-500">배달의 민족 전용 항목</span></li>
               )}
             </ul>
           </div>
 
-          {tip('湲곗〈 愿由щ퉬 ??ぉ???대┃?섎㈃ ?쇱씠??異붽? 諛??댁슜 ?섏젙??媛?ν빀?덈떎.')}
+          {tip('기존 관리비 항목을 클릭하면 라이더 추가 및 내용 수정이 가능합니다.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       8. ?뺤궛?뚯씪 ?깅줉
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       8. 정산파일 등록
+    ══════════════════════════════════════════ */
     {
-      id: 'upload', title: '?뺤궛?뚯씪 ?깅줉', icon: Upload,
-      badge: '?듭떖 湲곕뒫', badgeColor: 'bg-emerald-700',
+      id: 'upload', title: '정산파일 등록', icon: Upload,
+      badge: '핵심 기능', badgeColor: 'bg-emerald-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>諛곕떖 ?뚮옯?쇱뿉??諛쏆? ?묒? ?뺤궛 ?뚯씪???낅줈?쒗븯???뺤궛湲덉븸???먮룞 怨꾩궛?⑸땲??</p>
+          <p>배달 플랫폼에서 받은 엑셀 정산 파일을 업로드하여 정산금액을 자동 계산합니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???뺤궛 二쇨컙 ?ㅼ젙</p>
-            <p className="text-xs ml-2">?뺤궛??二쇨컙???쒖옉?쇨낵 醫낅즺?쇱쓣 ?ㅼ젙?⑸땲??</p>
+            <p className="text-white font-medium">① 정산 주간 설정</p>
+            <p className="text-xs ml-2">정산할 주간의 시작일과 종료일을 설정합니다.</p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???묒? ?뚯씪 ?낅줈??/p>
+            <p className="text-white font-medium">② 엑셀 파일 업로드</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>?뚯씪 ?좏깮 ?곸뿭???묒? ?뚯씪(.xlsx, .xls)???쒕옒洹명븯嫄곕굹 ?대┃?섏뿬 ?좏깮</li>
-              <li><strong className="text-white">2媛??댁긽???뚯씪</strong>???숈떆 ?낅줈?쒗븯硫??숈씪 ?쇱씠???곗씠?곕? <strong className="text-white">?먮룞 ?⑹궛</strong></li>
-              <li>?뚯떛 ?꾨즺 ??<span className="text-emerald-400">???깃났</span> ?쒖떆 ?뺤씤</li>
+              <li>파일 선택 영역에 엑셀 파일(.xlsx, .xls)을 드래그하거나 클릭하여 선택</li>
+              <li><strong className="text-white">2개 이상의 파일</strong>을 동시 업로드하면 동일 라이더 데이터를 <strong className="text-white">자동 합산</strong></li>
+              <li>파싱 완료 후 <span className="text-emerald-400">✓ 성공</span> 표시 확인</li>
             </ul>
-            {warn('?뚯떛 ?ㅽ뙣 ???뚯씪 ?뺤떇???뺤씤?섏꽭?? 諛곕떖 ?뚮옯???쒖? ?묒? ?뺤떇留?吏?먮맗?덈떎.')}
+            {warn('파싱 실패 시 파일 형식을 확인하세요. 배달 플랫폼 표준 엑셀 형식만 지원됩니다.')}
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???쇱씠???곌껐</p>
+            <p className="text-white font-medium">③ 라이더 연결</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>?뚯씪???쇱씠???대쫫쨌?꾩씠?붿? ?깅줉???쇱씠?붾? ?먮룞 留ㅽ븨</li>
-              <li>誘몃ℓ???쇱씠?붾뒗 ?쒕∼?ㅼ슫?먯꽌 吏곸젒 ?좏깮?섍굅??<strong className="text-white">?곌껐 ?덊븿</strong> 泥섎━</li>
-              <li><strong className="text-white">?뺤궛 怨꾩궛?섍린</strong> 踰꾪듉 ?대┃</li>
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-white font-medium">???뺤궛 寃곌낵 ?뺤씤 諛??뺤젙</p>
-            <ul className="space-y-1 ml-2 text-xs">
-              <li>?쇱씠?붾퀎 諛곕떖嫄댁닔쨌湲곕낯?뺤궛湲덉븸쨌蹂댄뿕猷뙿룹??ы봽濡쒕え?샕룰?由щ퉬쨌?뚮뱷?맞룹턀醫낆젙?곌툑???뺤씤</li>
-              <li><strong className="text-white">?꾩떆???</strong> ?섏쨷???섏젙 媛?ν븳 ?곹깭濡????/li>
-              <li><strong className="text-white">?뺤궛 ?뺤젙:</strong> ?뺤젙 ?꾨즺 (?좎?湲됯툑 ?먮룞 怨듭젣 泥섎━)</li>
+              <li>파일의 라이더 이름·아이디와 등록된 라이더를 자동 매핑</li>
+              <li>미매핑 라이더는 드롭다운에서 직접 선택하거나 <strong className="text-white">연결 안함</strong> 처리</li>
+              <li><strong className="text-white">정산 계산하기</strong> 버튼 클릭</li>
             </ul>
           </div>
 
-          {/* ?뚮옯?쇰퀎 怨꾩궛??*/}
+          <div className="space-y-2">
+            <p className="text-white font-medium">④ 정산 결과 확인 및 확정</p>
+            <ul className="space-y-1 ml-2 text-xs">
+              <li>라이더별 배달건수·기본정산금액·보험료·지사프로모션·관리비·소득세·최종정산금액 확인</li>
+              <li><strong className="text-white">임시저장:</strong> 나중에 수정 가능한 상태로 저장</li>
+              <li><strong className="text-white">정산 확정:</strong> 확정 완료 (선지급금 자동 공제 처리)</li>
+            </ul>
+          </div>
+
+          {/* 플랫폼별 계산식 */}
           <div className={`border rounded-lg p-4 space-y-2 ${isBaemin ? 'bg-emerald-900/20 border-emerald-700/40' : 'bg-yellow-900/20 border-yellow-700/40'}`}>
-            <p className={`text-xs font-semibold ${platformColor}`}>?뱪 {platformLabel} ?뺤궛 怨꾩궛 怨듭떇</p>
+            <p className={`text-xs font-semibold ${platformColor}`}>📐 {platformLabel} 정산 계산 공식</p>
             {isBaemin ? (
               <div className="space-y-1 text-xs text-slate-300 font-mono">
-                <p>湲곕낯?뺤궛湲덉븸 = 諛곕떖猷?+ 異붽?吏湲?諛곕?異붽?吏湲?</p>
-                <p>?멸툑?좉퀬湲덉븸 = 湲곕낯?뺤궛湲덉븸 + 吏?ы봽濡쒕え??/p>
-                <p>?뚮뱷??= ?멸툑?좉퀬湲덉븸 횞 {taxRateLabel} <span className="text-amber-300">(?먮떒???덉긽)</span></p>
+                <p>기본정산금액 = 배달료 + 추가지급(배민추가지급)</p>
+                <p>세금신고금액 = 기본정산금액 + 지사프로모션</p>
+                <p>소득세 = 세금신고금액 × {taxRateLabel} <span className="text-amber-300">(원단위 절상)</span></p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
-                  理쒖쥌?뺤궛湲덉븸 = 湲곕낯?뺤궛湲덉븸<br />
-                  <span className="ml-14">???쒓컙?쒕낫?섎즺<br /></span>
-                  <span className="ml-14">??怨좎슜蹂댄뿕(洹쇰줈??<br /></span>
-                  <span className="ml-14">???곗옱蹂댄뿕(洹쇰줈??<br /></span>
-                  <span className="ml-14">+ 吏?ы봽濡쒕え??br /></span>
-                  <span className="ml-14">??肄쒓?由щ퉬<br /></span>
-                  <span className="ml-14">???뚮뱷??br /></span>
-                  <span className="ml-14">???좎?湲됯툑 怨듭젣<br /></span>
-                  <span className="ml-14">+ ?좎?湲됯툑 ?뚯닔</span>
+                  최종정산금액 = 기본정산금액<br />
+                  <span className="ml-14">− 시간제보험료<br /></span>
+                  <span className="ml-14">− 고용보험(근로자)<br /></span>
+                  <span className="ml-14">− 산재보험(근로자)<br /></span>
+                  <span className="ml-14">+ 지사프로모션<br /></span>
+                  <span className="ml-14">− 콜관리비<br /></span>
+                  <span className="ml-14">− 소득세<br /></span>
+                  <span className="ml-14">− 선지급금 공제<br /></span>
+                  <span className="ml-14">+ 선지급금 회수</span>
                 </p>
               </div>
             ) : (
               <div className="space-y-1 text-xs text-slate-300 font-mono">
-                <p>湲곕낯?뺤궛湲덉븸 = 諛곕떖猷?+ 異붽?吏湲?/p>
-                <p>?멸툑?좉퀬湲덉븸 = 湲곕낯?뺤궛湲덉븸</p>
-                <p>?뚮뱷??= ?멸툑?좉퀬湲덉븸 횞 {taxRateLabel}</p>
+                <p>기본정산금액 = 배달료 + 추가지급</p>
+                <p>세금신고금액 = 기본정산금액</p>
+                <p>소득세 = 세금신고금액 × {taxRateLabel}</p>
                 <p className="border-t border-slate-700 pt-1 mt-1">
-                  理쒖쥌?뺤궛湲덉븸 = 湲곕낯?뺤궛湲덉븸<br />
-                  <span className="ml-14">??怨좎슜蹂댄뿕(洹쇰줈??<br /></span>
-                  <span className="ml-14">???곗옱蹂댄뿕(洹쇰줈??<br /></span>
-                  <span className="ml-14">+ 吏?ы봽濡쒕え??br /></span>
-                  <span className="ml-14">??肄쒓?由щ퉬<br /></span>
-                  <span className="ml-14">???뚮뱷??br /></span>
-                  <span className="ml-14">???좎?湲됯툑 怨듭젣<br /></span>
-                  <span className="ml-14">+ ?좎?湲됯툑 ?뚯닔</span>
+                  최종정산금액 = 기본정산금액<br />
+                  <span className="ml-14">− 고용보험(근로자)<br /></span>
+                  <span className="ml-14">− 산재보험(근로자)<br /></span>
+                  <span className="ml-14">+ 지사프로모션<br /></span>
+                  <span className="ml-14">− 콜관리비<br /></span>
+                  <span className="ml-14">− 소득세<br /></span>
+                  <span className="ml-14">− 선지급금 공제<br /></span>
+                  <span className="ml-14">+ 선지급금 회수</span>
                 </p>
               </div>
             )}
@@ -524,153 +524,153 @@ export default function ManualPage() {
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       9. ?뺤궛寃곌낵蹂닿린
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       9. 정산결과보기
+    ══════════════════════════════════════════ */
     {
-      id: 'result', title: '?뺤궛寃곌낵蹂닿린', icon: FileText,
-      badge: '?듭떖 湲곕뒫', badgeColor: 'bg-emerald-700',
+      id: 'result', title: '정산결과보기', icon: FileText,
+      badge: '핵심 기능', badgeColor: 'bg-emerald-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?뺤젙 ?먮뒗 ?꾩떆??λ맂 ?뺤궛 寃곌낵瑜?議고쉶?섍퀬 愿由ы빀?덈떎.</p>
+          <p>확정 또는 임시저장된 정산 결과를 조회하고 관리합니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?뺤궛 紐⑸줉 & ?곸꽭</p>
+            <p className="text-white font-medium">정산 목록 & 상세</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>醫뚯륫 紐⑸줉?먯꽌 二쇨컙 ?좏깮 ???곗륫???쇱씠?붾퀎 ?곸꽭 ?쒖떆</li>
-              <li className="flex items-center gap-2"><Badge className="bg-emerald-700 text-white text-xs">?뺤젙</Badge> 理쒖쥌 ?뺤젙???뺤궛</li>
-              <li className="flex items-center gap-2"><Badge className="bg-amber-700 text-white text-xs">?꾩떆???/Badge> ?꾩쭅 ?뺤젙?섏? ?딆? ?뺤궛</li>
+              <li>좌측 목록에서 주간 선택 → 우측에 라이더별 상세 표시</li>
+              <li className="flex items-center gap-2"><Badge className="bg-emerald-700 text-white text-xs">확정</Badge> 최종 확정된 정산</li>
+              <li className="flex items-center gap-2"><Badge className="bg-amber-700 text-white text-xs">임시저장</Badge> 아직 확정되지 않은 정산</li>
             </ul>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?쇱씠?붾퀎 ?뺤궛??誘몃━蹂닿린</p>
-            <p className="text-xs ml-2">?쇱씠?????대┃ ???뺤궛???앹뾽 (諛곕떖嫄댁닔, 湲곕낯?뺤궛湲덉븸, 吏?ы봽濡쒕え?? 怨듭젣 ??ぉ, 理쒖쥌?뺤궛湲덉븸)</p>
+            <p className="text-white font-medium">라이더별 정산서 미리보기</p>
+            <p className="text-xs ml-2">라이더 행 클릭 → 정산서 팝업 (배달건수, 기본정산금액, 지사프로모션, 공제 항목, 최종정산금액)</p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?뺤궛 ??젣</p>
-            {warn('??젣 ???곸꽭 ?곗씠?곗? ?④퍡 ?꾩쟾 ??젣?⑸땲?? ?곌껐???좎?湲됯툑??怨듭젣 泥섎━???먮룞 珥덇린??誘멸났???⑸땲??')}
+            <p className="text-white font-medium">정산 삭제</p>
+            {warn('삭제 시 상세 데이터와 함께 완전 삭제됩니다. 연결된 선지급금의 공제 처리도 자동 초기화(미공제)됩니다.')}
           </div>
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       10. 怨듭??ы빆 ?앹꽦
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       10. 공지사항 생성
+    ══════════════════════════════════════════ */
     {
-      id: 'notice', title: '怨듭??ы빆 ?앹꽦', icon: Megaphone,
-      badge: '遺媛 湲곕뒫', badgeColor: 'bg-purple-700',
+      id: 'notice', title: '공지사항 생성', icon: Megaphone,
+      badge: '부가 기능', badgeColor: 'bg-purple-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?쒗뵆由우쓣 ?좏깮?섍퀬 ?댁슜???낅젰?섎㈃ 怨듭??ы빆 ?대?吏瑜??먮룞 ?앹꽦?⑸땲?? ?쇱씠?붿뿉寃?怨듭쑀??怨듭?臾몄쓣 ?먯돺寃?留뚮뱾 ???덉뒿?덈떎.</p>
+          <p>템플릿을 선택하고 내용을 입력하면 공지사항 이미지를 자동 생성합니다. 라이더에게 공유할 공지문을 손쉽게 만들 수 있습니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">??怨듭??ы빆 ?묒꽦</p>
+            <p className="text-white font-medium">① 공지사항 작성</p>
             <ol className="space-y-1.5 list-decimal list-inside ml-2 text-xs">
-              <li>4媛吏 諛곌꼍 ?쒗뵆由?以??좏깮</li>
-              <li>?뚯궗紐끒룸궇吏?湲곕낯 ?뺣낫) ?낅젰</li>
-              <li>誘몃━蹂닿린 ?대?吏??<strong className="text-white">?쒕ぉ ?곸뿭 ?먮뒗 ?댁슜 ?곸뿭??吏곸젒 ?대┃</strong>?섏뿬 ?띿뒪???낅젰</li>
-              <li>?섎떒 ?ㅽ????⑤꼸?먯꽌 湲???ш린쨌?됱긽쨌援듦린쨌?뺣젹쨌?꾩튂(?몃줈) 議곗젙</li>
+              <li>4가지 배경 템플릿 중 선택</li>
+              <li>회사명·날짜(기본 정보) 입력</li>
+              <li>미리보기 이미지의 <strong className="text-white">제목 영역 또는 내용 영역을 직접 클릭</strong>하여 텍스트 입력</li>
+              <li>하단 스타일 패널에서 글씨 크기·색상·굵기·정렬·위치(세로) 조정</li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">???ㅼ슫濡쒕뱶 & ???/p>
+            <p className="text-white font-medium">② 다운로드 & 저장</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li><strong className="text-white">?ㅼ슫濡쒕뱶 & ???/strong> 踰꾪듉 ?대┃ ???대?吏(.png) ?ㅼ슫濡쒕뱶 + 怨듭??ы빆 紐⑸줉???먮룞 ???/li>
-              <li>??λ맂 怨듭????섎떒 紐⑸줉?먯꽌 誘몃━蹂닿린쨌?섏젙쨌??젣 媛??/li>
+              <li><strong className="text-white">다운로드 & 저장</strong> 버튼 클릭 → 이미지(.png) 다운로드 + 공지사항 목록에 자동 저장</li>
+              <li>저장된 공지는 하단 목록에서 미리보기·수정·삭제 가능</li>
             </ul>
           </div>
 
-          {tip('誘몃━蹂닿린 ?대?吏?먯꽌 ?쒕ぉ쨌?댁슜 ?곸뿭???대┃?섎㈃ 吏곸젒 ??댄븨?????덉뒿?덈떎. 蹂꾨룄 ?낅젰移몄씠 ?놁뼱???⑸땲??')}
+          {tip('미리보기 이미지에서 제목·내용 영역을 클릭하면 직접 타이핑할 수 있습니다. 별도 입력칸이 없어도 됩니다.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       11. ?쇱씠?붿궗?댄듃
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       11. 라이더사이트
+    ══════════════════════════════════════════ */
     {
-      id: 'rider-site', title: '?쇱씠?붿궗?댄듃', icon: Globe,
-      badge: '?쇱씠??怨듭쑀', badgeColor: 'bg-teal-700',
+      id: 'rider-site', title: '라이더사이트', icon: Globe,
+      badge: '라이더 공유', badgeColor: 'bg-teal-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?쇱씠?붽? ?먯떊???뺤궛?쒕? ?뺤씤?????덈뒗 媛쒖씤 留곹겕瑜?愿由ы빀?덈떎. 媛?怨꾩젙???쇱씠???ъ씠??URL? <strong className="text-white">?낅┰??/strong>?쇰줈 ?댁쁺?⑸땲??</p>
+          <p>라이더가 자신의 정산서를 확인할 수 있는 개인 링크를 관리합니다. 각 계정의 라이더 사이트 URL은 <strong className="text-white">독립적</strong>으로 운영됩니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?뺤궛??留곹겕 諛쒗뻾</p>
+            <p className="text-white font-medium">정산서 링크 발행</p>
             <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li>?쇱씠??紐⑸줉?먯꽌 怨듭쑀???쇱씠???좏깮</li>
-              <li><strong className="text-white">留곹겕 ?앹꽦</strong> 踰꾪듉 ?대┃ ??媛쒖씤 怨좎쑀 URL ?앹꽦</li>
-              <li>?앹꽦??留곹겕瑜?蹂듭궗?섏뿬 ?쇱씠?붿뿉寃??꾨떖 (移댁뭅?ㅽ넚, 臾몄옄 ??</li>
+              <li>라이더 목록에서 공유할 라이더 선택</li>
+              <li><strong className="text-white">링크 생성</strong> 버튼 클릭 → 개인 고유 URL 생성</li>
+              <li>생성된 링크를 복사하여 라이더에게 전달 (카카오톡, 문자 등)</li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?쇱씠???뺤궛???붾㈃ 援ъ꽦</p>
+            <p className="text-white font-medium">라이더 정산서 화면 구성</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>理쒖떊 ?뺤궛??留??꾩뿉 ?쒖떆</li>
-              <li>湲곕낯?뺤궛湲덉븸(諛곕떖猷?+ {isBaemin ? '諛곕?異붽?吏湲? : '異붽?吏湲?}), 吏?ы봽濡쒕え??/li>
-              <li>?좎?湲됯툑 怨듭젣 ?댁뿭 (硫붾え ?ы븿) ???대떦?먯뿉寃뚮쭔 ?쒖떆</li>
-              <li>?뚯닔 ?깅줉 ?댁뿭 (硫붾え ?ы븿) ???대떦?먯뿉寃뚮쭔 ?쒖떆</li>
-              <li>理쒖쥌?뺤궛湲덉븸</li>
+              <li>최신 정산이 맨 위에 표시</li>
+              <li>기본정산금액(배달료 + {isBaemin ? '배민추가지급' : '추가지급'}), 지사프로모션</li>
+              <li>선지급금 공제 내역 (메모 포함) — 해당자에게만 표시</li>
+              <li>회수 등록 내역 (메모 포함) — 해당자에게만 표시</li>
+              <li>최종정산금액</li>
             </ul>
           </div>
 
-          {good('?쇱씠??留곹겕???좏겙 湲곕컲?쇰줈 ?덉쟾?섍쾶 蹂댄샇?섎ŉ, ?ㅻⅨ ?쇱씠?붿쓽 ?뺣낫??蹂????놁뒿?덈떎.')}
+          {good('라이더 링크는 토큰 기반으로 안전하게 보호되며, 다른 라이더의 정보는 볼 수 없습니다.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       12. 臾몄쓽?섍린
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       12. 문의하기
+    ══════════════════════════════════════════ */
     {
-      id: 'inquiry', title: '臾몄쓽?섍린', icon: MessageSquare,
-      badge: '怨좉컼 吏??, badgeColor: 'bg-blue-700',
+      id: 'inquiry', title: '문의하기', icon: MessageSquare,
+      badge: '고객 지원', badgeColor: 'bg-blue-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>?쒖뒪???댁슜 以?沅곴툑???ы빆?대굹 遺덊렪???먯쓣 ?꾩껜愿由ъ옄?먭쾶 臾몄쓽?????덉뒿?덈떎. ?듬?? ?ㅼ떆媛꾩쑝濡??섏떊?⑸땲??</p>
+          <p>시스템 이용 중 궁금한 사항이나 불편한 점을 전체관리자에게 문의할 수 있습니다. 답변은 실시간으로 수신됩니다.</p>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">臾몄쓽 ?묒꽦</p>
+            <p className="text-white font-medium">문의 작성</p>
             <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li>?곗륫 ?곷떒 <strong className="text-white">??臾몄쓽</strong> 踰꾪듉 ?대┃</li>
-              <li>?쒕ぉ怨??댁슜 ?낅젰 ??<strong className="text-white">?깅줉</strong> ?대┃</li>
-              <li>紐⑸줉??臾몄쓽媛 異붽??섎ŉ <Badge className="bg-amber-800 text-amber-300 text-xs">?듬??湲?/Badge> ?곹깭濡??쒖떆</li>
+              <li>우측 상단 <strong className="text-white">새 문의</strong> 버튼 클릭</li>
+              <li>제목과 내용 입력 후 <strong className="text-white">등록</strong> 클릭</li>
+              <li>목록에 문의가 추가되며 <Badge className="bg-amber-800 text-amber-300 text-xs">답변대기</Badge> 상태로 표시</li>
             </ol>
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">?듬? ?뺤씤 & ?щЦ??/p>
+            <p className="text-white font-medium">답변 확인 & 재문의</p>
             <ul className="space-y-1 ml-2 text-xs">
-              <li>?꾩껜愿由ъ옄媛 ?듬??섎㈃ ?곹깭媛 <Badge className="bg-emerald-800 text-emerald-300 text-xs">?듬??꾨즺</Badge>濡?蹂寃쎈릺硫?<strong className="text-white">?ㅼ떆媛??뚮┝</strong></li>
-              <li>臾몄쓽瑜??대┃?섎㈃ 梨꾪똿 ?뺥깭??????ㅻ젅???뺤씤 媛??/li>
-              <li>?섎떒 ?낅젰李쎌뿉 異붽? 吏덈Ц???낅젰?섎㈃ <strong className="text-white">?щЦ??/strong>濡??깅줉??/li>
-              <li>Enter ?ㅻ줈 ?꾩넚, Shift+Enter濡?以꾨컮轅?/li>
+              <li>전체관리자가 답변하면 상태가 <Badge className="bg-emerald-800 text-emerald-300 text-xs">답변완료</Badge>로 변경되며 <strong className="text-white">실시간 알림</strong></li>
+              <li>문의를 클릭하면 채팅 형태의 대화 스레드 확인 가능</li>
+              <li>하단 입력창에 추가 질문을 입력하면 <strong className="text-white">재문의</strong>로 등록됨</li>
+              <li>Enter 키로 전송, Shift+Enter로 줄바꿈</li>
             </ul>
           </div>
 
-          {tip('?듬? ?섏떊 ??蹂꾨룄 ?뚮┝? ?놁쑝誘濡? 二쇨린?곸쑝濡?臾몄쓽?섍린 ??쓣 ?뺤씤??二쇱꽭??')}
+          {tip('답변 수신 시 별도 알림은 없으므로, 주기적으로 문의하기 탭을 확인해 주세요.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       13. ?먮룞 濡쒓렇?꾩썐
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       13. 자동 로그아웃
+    ══════════════════════════════════════════ */
     {
-      id: 'security', title: '?먮룞 濡쒓렇?꾩썐 & 蹂댁븞', icon: LogOut,
-      badge: '蹂댁븞', badgeColor: 'bg-red-800',
+      id: 'security', title: '자동 로그아웃 & 보안', icon: LogOut,
+      badge: '보안', badgeColor: 'bg-red-800',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
           <div className="space-y-3">
             {[
-              ['釉뚮씪?곗?/???リ린', '李쎌쓣 ?ル뒗 利됱떆 ?쒕쾭 ?몄뀡??臾댄슚?붾맗?덈떎. ?ъ젒????濡쒓렇?몄씠 ?꾩슂?⑸땲??'],
-              ['1?쒓컙 臾댄솢??, '留덉슦?ㅒ룻궎蹂대뱶 ?낅젰??1?쒓컙 ?놁쑝硫??먮룞 濡쒓렇?꾩썐?⑸땲?? 5遺????붾㈃??寃쎄퀬 ?뚮┝???쒖떆?⑸땲??'],
-              ['?섎룞 濡쒓렇?꾩썐', '?ъ씠?쒕컮 ?섎떒 濡쒓렇?꾩썐 踰꾪듉???대┃?섎㈃ 利됱떆 濡쒓렇?꾩썐?⑸땲??'],
+              ['브라우저/탭 닫기', '창을 닫는 즉시 서버 세션이 무효화됩니다. 재접속 시 로그인이 필요합니다.'],
+              ['1시간 무활동', '마우스·키보드 입력이 1시간 없으면 자동 로그아웃됩니다. 5분 전 화면에 경고 알림이 표시됩니다.'],
+              ['수동 로그아웃', '사이드바 하단 로그아웃 버튼을 클릭하면 즉시 로그아웃됩니다.'],
             ].map(([t, d]) => (
               <div key={t as string} className="border border-slate-700 rounded-lg p-3 space-y-1">
                 <p className="text-white font-medium text-sm">{t as string}</p>
@@ -679,50 +679,50 @@ export default function ManualPage() {
             ))}
           </div>
 
-          {warn('以묒슂???묒뾽(?뺤궛 怨꾩궛, ?꾩떆????? ??諛섎뱶??????щ?瑜??뺤씤?섏꽭?? ?먮룞 濡쒓렇?꾩썐 ??誘몄????곗씠?곕뒗 ?좎떎?????덉뒿?덈떎.')}
+          {warn('중요한 작업(정산 계산, 임시저장 등) 후 반드시 저장 여부를 확인하세요. 자동 로그아웃 시 미저장 데이터는 유실될 수 있습니다.')}
         </div>
       ),
     },
 
-    /* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧
-       14. ?먯＜ 臾삳뒗 吏덈Ц
-    ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
+    /* ══════════════════════════════════════════
+       14. 자주 묻는 질문
+    ══════════════════════════════════════════ */
     {
-      id: 'faq', title: '?먯＜ 臾삳뒗 吏덈Ц', icon: AlertTriangle,
+      id: 'faq', title: '자주 묻는 질문', icon: AlertTriangle,
       content: (
         <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
           {[
             {
-              q: '?뚯씪 ?낅줈?????쇱씠??留ㅽ븨?????섏뼱 ?덉뼱??',
-              a: '?뚯씪???쇱씠???대쫫쨌?꾩씠?붽? ?깅줉???쇱씠???뺣낫? ?뺥솗???쇱튂?댁빞 ?먮룞 留ㅽ븨?⑸땲?? ?쇱씠??愿由???뿉???꾩씠?붾? ?깅줉?섎㈃ ?뺥솗?꾧? ?믪븘吏묐땲??',
+              q: '파일 업로드 후 라이더 매핑이 안 되어 있어요.',
+              a: '파일의 라이더 이름·아이디가 등록된 라이더 정보와 정확히 일치해야 자동 매핑됩니다. 라이더 관리 탭에서 아이디를 등록하면 정확도가 높아집니다.',
             },
             {
-              q: '?뺤궛 怨꾩궛 ??寃곌낵媛 蹂댁씠吏 ?딆븘??',
-              a: '?쇱씠???곌껐 ?④퀎?먯꽌 紐⑤뱺 ?쇱씠?붾? "?곌껐 ?덊븿"?쇰줈 ?ㅼ젙?섎㈃ 寃곌낵媛 ?놁뒿?덈떎. 理쒖냼 1紐??댁긽 ?곌껐?댁＜?몄슂.',
+              q: '정산 계산 후 결과가 보이지 않아요.',
+              a: '라이더 연결 단계에서 모든 라이더를 "연결 안함"으로 설정하면 결과가 없습니다. 최소 1명 이상 연결해주세요.',
             },
             {
-              q: '?좎?湲됯툑???먮룞?쇰줈 李④컧?섏? ?딆븘??',
-              a: '?뺤궛 ?뺤젙 ??"誘멸났?? ?곹깭???좎?湲됯툑留??먮룞 李④컧?⑸땲?? ?대? 怨듭젣 ?꾨즺????ぉ? ?ㅼ떆 李④컧?섏? ?딆뒿?덈떎.',
+              q: '선지급금이 자동으로 차감되지 않아요.',
+              a: '정산 확정 시 "미공제" 상태의 선지급금만 자동 차감됩니다. 이미 공제 완료된 항목은 다시 차감되지 않습니다.',
             },
             {
-              q: '媛숈? ?쇱씠?붽? ?щ윭 ?뚯씪???덉뼱??',
-              a: '?뚯씪???숈떆???낅줈?쒗븯硫??숈씪 ?쇱씠???곗씠?곕? ?먮룞 ?⑹궛?⑸땲?? ?⑹궛??諛곕떖嫄댁닔 湲곗??쇰줈 ?꾨줈紐⑥뀡???곸슜?⑸땲??',
+              q: '같은 라이더가 여러 파일에 있어요.',
+              a: '파일을 동시에 업로드하면 동일 라이더 데이터를 자동 합산합니다. 합산된 배달건수 기준으로 프로모션이 적용됩니다.',
             },
             {
-              q: '?쇱씠?붾? ??젣?덈뒗???뺤궛 ?곗씠?곕룄 ??젣?섎굹??',
-              a: '?꾩쟾 ??젣 ???뺤궛 ?곸꽭쨌?좎?湲됯툑쨌?꾨줈紐⑥뀡쨌愿由щ퉬 ?ㅼ젙??紐⑤몢 ??젣?⑸땲?? ?⑥닚 鍮꾪솢?깊솕???곗씠?곌? 蹂댁〈?⑸땲??',
+              q: '라이더를 삭제했는데 정산 데이터도 삭제되나요?',
+              a: '완전 삭제 시 정산 상세·선지급금·프로모션·관리비 설정이 모두 삭제됩니다. 단순 비활성화는 데이터가 보존됩니다.',
             },
             {
-              q: '?뺤궛 寃곌낵瑜???젣?덈뒗???좎?湲됯툑???',
-              a: '?뺤궛 寃곌낵 ??젣 ???대떦 ?뺤궛?먯꽌 怨듭젣???좎?湲됯툑??怨듭젣 ?곹깭媛 "誘멸났??濡??먮룞 珥덇린?붾맗?덈떎.',
+              q: '정산 결과를 삭제했는데 선지급금은요?',
+              a: '정산 결과 삭제 시 해당 정산에서 공제된 선지급금의 공제 상태가 "미공제"로 자동 초기화됩니다.',
             },
             ...(isBaemin ? [{
-              q: '?뚮뱷?멸? ?덉긽怨??ㅻⅤ寃?怨꾩궛?섏뼱??',
-              a: `諛곕떖??誘쇱” ?뺤궛?먯꽌 ?뚮뱷?몃뒗 ?멸툑?좉퀬湲덉븸(湲곕낯?뺤궛湲덉븸+吏?ы봽濡쒕え?? 횞 ${taxRateLabel}瑜??먮떒???덉긽(?щ┝)?섏뿬 怨꾩궛?⑸땲??`,
+              q: '소득세가 예상과 다르게 계산되어요.',
+              a: `배달의 민족 정산에서 소득세는 세금신고금액(기본정산금액+지사프로모션) × ${taxRateLabel}를 원단위 절상(올림)하여 계산합니다.`,
             }] : []),
             {
-              q: '釉뚮씪?곗?瑜??レ븯?ㅺ? ?ㅼ떆 ?대㈃ 濡쒓렇?몄씠 ?꾩슂?쒓???',
-              a: '?? 蹂댁븞???꾪빐 釉뚮씪?곗?쨌??쓣 ?レ쑝硫??먮룞 濡쒓렇?꾩썐?⑸땲?? ?ъ젒?????꾩씠?붋룸퉬諛踰덊샇瑜??ㅼ떆 ?낅젰?댁빞 ?⑸땲??',
+              q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',
+              a: '네. 보안을 위해 브라우저·탭을 닫으면 자동 로그아웃됩니다. 재접속 시 아이디·비밀번호를 다시 입력해야 합니다.',
             },
           ].map(({ q, a }, i) => (
             <div key={i} className="border border-slate-700 rounded-lg p-4 space-y-2">
@@ -750,30 +750,30 @@ export default function ManualPage() {
         }
       `}</style>
 
-      <div className="p-4 md:p-6 space-y-6 print-content" ref={printRef}>
-        {/* ?ㅻ뜑 */}
+      <div className="p-6 space-y-6 print-content" ref={printRef}>
+        {/* 헤더 */}
         <div className="flex items-start justify-between no-print">
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               <BookOpen className="h-6 w-6 text-blue-400" />
-              ?ъ슜??硫붾돱??
+              사용자 메뉴얼
             </h2>
             <p className="text-slate-400 text-sm mt-1">
-              {platformLabel} ?쇱씠???뺤궛 ?쒖뒪??쨌 愿由ъ옄 ?ъ슜 媛?대뱶
+              {platformLabel} 라이더 정산 시스템 · 관리자 사용 가이드
               <span className="ml-2 text-slate-600 text-xs">v2.0</span>
             </p>
           </div>
           <Button onClick={handleDownloadPDF} disabled={pdfLoading}
             className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
             {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {pdfLoading ? 'PDF ?앹꽦 以?..' : 'PDF ???}
+            {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
           </Button>
         </div>
 
-        {/* 紐⑹감 */}
+        {/* 목차 */}
         <Card className="border-slate-700 bg-slate-900/50 no-print">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-sm font-medium">紐⑹감</CardTitle>
+            <CardTitle className="text-white text-sm font-medium">목차</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
@@ -792,7 +792,7 @@ export default function ManualPage() {
           </CardContent>
         </Card>
 
-        {/* ?뱀뀡蹂??댁슜 */}
+        {/* 섹션별 내용 */}
         <div className="space-y-4">
           {sections.map((s, i) => {
             const Icon = s.icon
@@ -816,12 +816,12 @@ export default function ManualPage() {
           })}
         </div>
 
-        {/* ?섎떒 PDF 踰꾪듉 */}
+        {/* 하단 PDF 버튼 */}
         <div className="flex justify-center pt-2 no-print">
           <Button onClick={handleDownloadPDF} disabled={pdfLoading} size="lg"
             className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
             {pdfLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-            {pdfLoading ? 'PDF ?앹꽦 以?..' : 'PDF濡???ν븯湲?}
+            {pdfLoading ? 'PDF 생성 중...' : 'PDF로 저장하기'}
           </Button>
         </div>
       </div>

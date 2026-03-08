@@ -17,7 +17,7 @@ export default function RiderSitePage() {
     setOrigin(window.location.origin)
   }, [])
 
-  // profiles ?뚯씠釉붿쓽 username 議고쉶
+  // profiles 테이블의 username 조회
   const [username, setUsername] = useState<string | null>(null)
   useEffect(() => {
     if (!user) return
@@ -40,34 +40,34 @@ export default function RiderSitePage() {
     navigator.clipboard.writeText(url)
     setCopiedPersonal(true)
     setTimeout(() => setCopiedPersonal(false), 2000)
-    toast.success('?쇱씠???ъ씠??二쇱냼媛 蹂듭궗?섏뿀?듬땲??')
+    toast.success('라이더 사이트 주소가 복사되었습니다.')
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+    <div className="p-6 space-y-6 max-w-2xl">
       <div>
-        <h2 className="text-2xl font-bold text-white">?쇱씠???ъ씠??/h2>
-        <p className="text-slate-400 text-sm mt-1">?쇱씠?붽? ?뺤궛 ?댁뿭??吏곸젒 議고쉶?섎뒗 ?꾩슜 ?섏씠吏</p>
+        <h2 className="text-2xl font-bold text-white">라이더 사이트</h2>
+        <p className="text-slate-400 text-sm mt-1">라이더가 정산 내역을 직접 조회하는 전용 페이지</p>
       </div>
 
-      {/* 媛쒖씤 ?꾩슜 URL (異붿쿇) */}
+      {/* 개인 전용 URL (추천) */}
       <Card className="border-blue-600/60 bg-blue-900/15">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-blue-300 text-base flex items-center gap-2">
               <Link2 className="h-5 w-5" />
-              ???꾩슜 ?쇱씠???ъ씠??二쇱냼
+              내 전용 라이더 사이트 주소
             </CardTitle>
-            <Badge className="bg-blue-700/60 text-blue-200 text-xs">沅뚯옣</Badge>
+            <Badge className="bg-blue-700/60 text-blue-200 text-xs">권장</Badge>
           </div>
           <p className="text-slate-400 text-xs mt-1">
-            ??二쇱냼濡??묒냽???쇱씠?붾뒗 <span className="text-blue-300 font-medium">??怨꾩젙???깅줉???쇱씠?붾쭔</span> 議고쉶?????덉뒿?덈떎.
+            이 주소로 접속한 라이더는 <span className="text-blue-300 font-medium">내 계정에 등록된 라이더만</span> 조회할 수 있습니다.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
           {userLoading || !username ? (
             <div className="bg-slate-800 rounded-lg p-4 text-slate-500 text-sm text-center">
-              {userLoading ? '遺덈윭?ㅻ뒗 以?..' : '濡쒓렇???뺣낫瑜??뺤씤?????놁뒿?덈떎.'}
+              {userLoading ? '불러오는 중...' : '로그인 정보를 확인할 수 없습니다.'}
             </div>
           ) : (
             <div className="bg-slate-800 rounded-lg p-4 flex items-center justify-between gap-3">
@@ -76,13 +76,13 @@ export default function RiderSitePage() {
                 <Button size="sm" onClick={() => handleCopy(personalUrl)}
                   className={`h-8 text-xs transition-colors ${copiedPersonal ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                   {copiedPersonal
-                    ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />蹂듭궗??/>
-                    : <><Copy className="h-3.5 w-3.5 mr-1" />蹂듭궗</>}
+                    ? <><CheckCircle className="h-3.5 w-3.5 mr-1" />복사됨</>
+                    : <><Copy className="h-3.5 w-3.5 mr-1" />복사</>}
                 </Button>
                 <Button size="sm" variant="outline"
                   onClick={() => window.open(personalUrl, '_blank')}
                   className="h-8 text-xs border-slate-600 text-slate-300 hover:bg-slate-700">
-                  <ExternalLink className="h-3.5 w-3.5 mr-1" />?닿린
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />열기
                 </Button>
               </div>
             </div>
@@ -90,32 +90,32 @@ export default function RiderSitePage() {
         </CardContent>
       </Card>
 
-      {/* ?댁슜 ?덈궡 */}
+      {/* 이용 안내 */}
       <Card className="border-slate-700 bg-slate-900">
         <CardHeader className="pb-3">
           <CardTitle className="text-white text-base flex items-center gap-2">
             <Info className="h-4 w-4 text-slate-400" />
-            ?댁슜 ?덈궡
+            이용 안내
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {[
             {
               step: '1',
-              title: '?꾩슜 二쇱냼 怨듭쑀',
-              desc: '?????꾩슜 ?쇱씠???ъ씠??二쇱냼瑜?移댁뭅?ㅽ넚, 臾몄옄 ?깆쑝濡??쇱씠?붿뿉寃??꾨떖?섏꽭??',
+              title: '전용 주소 공유',
+              desc: '위 내 전용 라이더 사이트 주소를 카카오톡, 문자 등으로 라이더에게 전달하세요.',
               color: 'bg-blue-600',
             },
             {
               step: '2',
-              title: '二쇰??깅줉踰덊샇 ?낅젰',
-              desc: '?쇱씠?붽? ?ъ씠?몄뿉 ?묒냽 ??蹂몄씤??二쇰??깅줉踰덊샇瑜??낅젰?⑸땲??',
+              title: '주민등록번호 입력',
+              desc: '라이더가 사이트에 접속 후 본인의 주민등록번호를 입력합니다.',
               color: 'bg-violet-600',
             },
             {
               step: '3',
-              title: '?뺤궛 ?댁뿭 ?뺤씤',
-              desc: '??怨꾩젙???깅줉???쇱씠?붿쓽 二쇰??깅줉踰덊샇? ?쇱튂?섎㈃ ?대떦 ?쇱씠?붿쓽 ?뺤궛 ?댁뿭???쒖떆?⑸땲??',
+              title: '정산 내역 확인',
+              desc: '내 계정에 등록된 라이더의 주민등록번호와 일치하면 해당 라이더의 정산 내역이 표시됩니다.',
               color: 'bg-emerald-600',
             },
           ].map(item => (
@@ -134,8 +134,8 @@ export default function RiderSitePage() {
             <p className="text-blue-300 text-xs flex items-start gap-1.5">
               <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>
-                <span className="font-bold">?꾩슜 二쇱냼</span>瑜??ъ슜?섎㈃ ?ㅻⅨ 愿由ъ옄 怨꾩젙???쇱씠?붿? ?쇰룞?섏? ?딆뒿?덈떎.
-                ?쇱씠??愿由???뿉???쇱씠?붿쓽 <span className="font-bold">二쇰??깅줉踰덊샇</span>媛 ?뺥솗???깅줉?섏뼱 ?덉뼱??議고쉶?⑸땲??
+                <span className="font-bold">전용 주소</span>를 사용하면 다른 관리자 계정의 라이더와 혼동되지 않습니다.
+                라이더 관리 탭에서 라이더의 <span className="font-bold">주민등록번호</span>가 정확히 등록되어 있어야 조회됩니다.
               </span>
             </p>
           </div>
@@ -144,8 +144,9 @@ export default function RiderSitePage() {
 
       <div className="flex items-center gap-2">
         <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">
-          <CheckCircle className="h-3 w-3 mr-1" />?쒕퉬???댁쁺 以?        </Badge>
-        <span className="text-slate-500 text-xs">?쇱씠???ъ씠?몃뒗 蹂꾨룄 濡쒓렇???놁씠 24?쒓컙 ?묒냽 媛?ν빀?덈떎.</span>
+          <CheckCircle className="h-3 w-3 mr-1" />서비스 운영 중
+        </Badge>
+        <span className="text-slate-500 text-xs">라이더 사이트는 별도 로그인 없이 24시간 접속 가능합니다.</span>
       </div>
     </div>
   )

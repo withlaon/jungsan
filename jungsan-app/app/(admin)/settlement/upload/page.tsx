@@ -34,7 +34,7 @@ interface UploadedFile {
   errorMsg?: string
 }
 
-// ?? 二쇨컙 ?듭뀡 (???? ??
+// ── 주간 옵션 (수~화) ──
 function getWeekOptions() {
   const options: { label: string; value: string; endValue: string }[] = []
   const today = new Date()
@@ -42,7 +42,7 @@ function getWeekOptions() {
   const daysBack = (today.getDay() - 3 + 7) % 7
   const baseWed = new Date(today)
   baseWed.setDate(today.getDate() - daysBack)
-  const dl = ['??, '??, '??, '??, '紐?, '湲?, '??]
+  const dl = ['일', '월', '화', '수', '목', '금', '토']
   const fmt = (d: Date) => {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -75,15 +75,15 @@ export default function SettlementUploadPage() {
   const [step, setStep] = useState<Step>('upload')
   const [dragging, setDragging] = useState(false)
 
-  // ?ъ뾽?먮벑濡앸쾲???レ옄留? - ?뷀샇???뚯씪 ?먮룞 鍮꾨?踰덊샇 (ref濡???긽 理쒖떊媛??좎?)
+  // 사업자등록번호(숫자만) - 암호화 파일 자동 비밀번호 (ref로 항상 최신값 유지)
   const autoPasswordRef = useRef<string>('')
 
-  // 湲곌컙 ?좏깮
+  // 기간 선택
   const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? '')
   const weekStart = selectedWeek
   const weekEnd = weekOptions.find(w => w.value === selectedWeek)?.endValue ?? ''
 
-  // ?뚯씪 紐⑸줉
+  // 파일 목록
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   // preview
@@ -104,10 +104,10 @@ export default function SettlementUploadPage() {
     }
   }, [userId, isAdmin])
 
-  // ?ъ뾽?먮벑濡앸쾲???먮낯 ref (?쒕쾭 API???꾨떖??
+  // 사업자등록번호 원본 ref (서버 API에 전달용)
   const rawBizNumRef = useRef<string>('')
 
-  // ?꾨줈?꾩뿉???ъ뾽?먮벑濡앸쾲??罹먯떆
+  // 프로필에서 사업자등록번호 캐시
   const fetchProfileNumbers = async () => {
     if (rawBizNumRef.current) return
     const { data: { user } } = await supabase.auth.getUser()
@@ -124,7 +124,7 @@ export default function SettlementUploadPage() {
   }
 
   const fetchSettings = async () => {
-    // ?좎?蹂??ㅼ젙 ?곗꽑 議고쉶, ?놁쑝硫?湲濡쒕쾶(user_id IS NULL) ?ㅼ젙 ?ъ슜
+    // 유저별 설정 우선 조회, 없으면 글로벌(user_id IS NULL) 설정 사용
     if (userId) {
       const { data: userSettings } = await supabase
         .from('fee_settings')
@@ -163,7 +163,7 @@ export default function SettlementUploadPage() {
     if (data) setPromotionsCache(data as Promotion[])
   }
 
-  // ?? ?꾨줈紐⑥뀡 誘몃━蹂닿린 怨꾩궛 ??
+  // ── 프로모션 미리보기 계산 ──
   const calcPreviewPromo = (riderId: string, deliveryCount: number): number => {
     const applicable = promotionsCache.filter(p => {
       if (p.date_mode === 'none') return true
@@ -190,7 +190,7 @@ export default function SettlementUploadPage() {
     )
   }
 
-  // ?? ?듭떖 ?뚯떛 濡쒖쭅 (?쒕쾭 API ?몄텧) ??
+  // ── 핵심 파싱 로직 (서버 API 호출) ──
   const parseFileCore = async (file: File): Promise<{
     success: boolean
     rows: ParsedRiderRow[]
@@ -206,7 +206,7 @@ export default function SettlementUploadPage() {
       const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
       const data = await res.json()
       if (data.success) {
-        // ?붾쾭洹? ?ㅼ젣 ?뚯씪 ?쒗듃/?ㅻ뜑 援ъ“ 肄섏넄 異쒕젰 (荑좏뙜?댁툩 ?뚯떛 臾몄젣 遺꾩꽍??
+        // 디버그: 실제 파일 시트/헤더 구조 콘솔 출력 (쿠팡이츠 파싱 문제 분석용)
         console.log('[parse-excel] detectedPlatform:', data.detectedPlatform)
         console.log('[parse-excel] rows:', data.rows?.length)
         console.log('[parse-excel] debugAllSheets:', JSON.stringify(data.debugAllSheets, null, 2))
@@ -219,19 +219,19 @@ export default function SettlementUploadPage() {
       return {
         success: false, rows: [],
         isPasswordRequired: !!data.isPasswordRequired,
-        errorMsg: data.error ?? '?뚯떛 ?ㅽ뙣',
+        errorMsg: data.error ?? '파싱 실패',
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      return { success: false, rows: [], isPasswordRequired: false, errorMsg: '?붿껌 ?ㅽ뙣: ' + msg }
+      return { success: false, rows: [], isPasswordRequired: false, errorMsg: '요청 실패: ' + msg }
     }
   }
 
-  // ?? ?⑥씪 ?뚯씪 ?뚯떛 (state ?낅뜲?댄듃) ??
-  // ?쒕쾭(API)?먯꽌 ?ъ뾽?먮벑濡앸쾲???щ윭 ?뺤떇?쇰줈 ?먮룞 ?쒕룄?섎?濡??대씪?댁뼵?몃뒗 1???몄텧留?
+  // ── 단일 파일 파싱 (state 업데이트) ──
+  // 서버(API)에서 사업자등록번호 여러 형식으로 자동 시도하므로 클라이언트는 1회 호출만
   const parseFile = async (id: string, file: File) => {
     setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'parsing', errorMsg: undefined } : f))
-    // bizNum???꾩쭅 紐?媛?몄솕?쇰㈃ 癒쇱? 議고쉶
+    // bizNum을 아직 못 가져왔으면 먼저 조회
     if (!rawBizNumRef.current) await fetchProfileNumbers()
     const result = await parseFileCore(file)
     if (result.success) {
@@ -245,7 +245,7 @@ export default function SettlementUploadPage() {
     }
   }
 
-  // ?? ?뚯씪 異붽? ??
+  // ── 파일 추가 ──
   const addFiles = useCallback((files: File[]) => {
     const newEntries: UploadedFile[] = files
       .filter(f => /\.(xlsx|xls|csv)$/i.test(f.name))
@@ -255,7 +255,7 @@ export default function SettlementUploadPage() {
         status: 'pending' as FileStatus,
         rows: [],
       }))
-    if (newEntries.length === 0) { toast.error('.xlsx, .xls, .csv ?뚯씪留??낅줈??媛?ν빀?덈떎.'); return }
+    if (newEntries.length === 0) { toast.error('.xlsx, .xls, .csv 파일만 업로드 가능합니다.'); return }
     setUploadedFiles(prev => [...prev, ...newEntries])
     for (const entry of newEntries) {
       parseFile(entry.id, entry.file)
@@ -275,13 +275,13 @@ export default function SettlementUploadPage() {
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id))
 
-  // ?? ?뚯씪 紐⑸줉?쇰줈 preview ?대룞 ??
+  // ── 파일 목록으로 preview 이동 ──
   const goToPreviewWithFiles = (files: UploadedFile[]) => {
     const successFiles = files.filter(f => f.status === 'success')
     if (successFiles.length === 0) return
 
-    // ?? 1?④퀎: ?대쫫 ??userId ??갑???몃뜳??援ъ텞 ??
-    // ?대뼡 ?뚯씪?대뱺 userId 媛 ?덈뒗 ?됱씠 ?덉쑝硫?洹?userId 瑜??뺢퇋 ?ㅻ줈 ?ъ슜
+    // ── 1단계: 이름 → userId 역방향 인덱스 구축 ──
+    // 어떤 파일이든 userId 가 있는 행이 있으면 그 userId 를 정규 키로 사용
     const nameToUserId = new Map<string, string>()
     for (const uf of successFiles) {
       for (const row of uf.rows) {
@@ -291,8 +291,8 @@ export default function SettlementUploadPage() {
       }
     }
 
-    // ?? 2?④퀎: ?쇱씠?붾퀎 ?⑹궛 (?щ윭 ?뚯씪 ?숈씪 ?쇱씠???곗씠??蹂묓빀) ??
-    // ?뺢퇋 ?? userId > ?대쫫?쇰줈 ??“?뚮맂 userId > ?뺢퇋?붾맂 ?대쫫
+    // ── 2단계: 라이더별 합산 (여러 파일 동일 라이더 데이터 병합) ──
+    // 정규 키: userId > 이름으로 역조회된 userId > 정규화된 이름
     const mergedMap = new Map<string, ParsedRiderRow>()
     for (const uf of successFiles) {
       for (const row of uf.rows) {
@@ -324,7 +324,7 @@ export default function SettlementUploadPage() {
     const merged = Array.from(mergedMap.values())
     setParsedRows(merged)
 
-    // 媛묒? summary ?⑹궛
+    // 갑지 summary 합산
     const totalSummary = successFiles.reduce(
       (acc, f) => ({
         settledAmount:                acc.settledAmount                + (f.summary?.settledAmount                ?? 0),
@@ -338,10 +338,10 @@ export default function SettlementUploadPage() {
     const hasData = Object.values(totalSummary).some(v => v > 0)
     setSummaryData(hasData ? totalSummary : null)
 
-    // ?쇱씠???먮룞 留ㅽ븨 ?곗꽑?쒖쐞:
-    // 1) ?뚯씪 userId(?쇱씠?좎뒪ID/諛곕?ID) ???ъ씠??rider_username
-    // 2) ?뚯씪 湲곗궗?대쫫 ???ъ씠???쇱씠?붾챸
-    // 3) ?뚯씪 湲곗궗?대쫫 ???ъ씠??rider_username (??갑??
+    // 라이더 자동 매핑 우선순위:
+    // 1) 파일 userId(라이선스ID/배민ID) ↔ 사이트 rider_username
+    // 2) 파일 기사이름 ↔ 사이트 라이더명
+    // 3) 파일 기사이름 ↔ 사이트 rider_username (역방향)
     const mapping: Record<string, string> = {}
     for (const row of merged) {
       const rowNameNorm = row.name.replace(/\s/g, '').toLowerCase()
@@ -351,11 +351,11 @@ export default function SettlementUploadPage() {
         const rNameNorm = r.name.replace(/\s/g, '').toLowerCase()
         const rUserNorm = (r.rider_username ?? '').replace(/\s/g, '').toLowerCase()
 
-        // 1) ?뚯씪 userId(?쇱씠?좎뒪ID) ???ъ씠??rider_username ?쇱튂 (荑좏뙜?댁툩 ?듭떖 留ㅽ븨)
+        // 1) 파일 userId(라이선스ID) ↔ 사이트 rider_username 일치 (쿠팡이츠 핵심 매핑)
         if (rowUidNorm && rUserNorm && rUserNorm === rowUidNorm) return true
-        // 2) ?뚯씪 湲곗궗?대쫫 ???ъ씠???쇱씠?붾챸 ?쇱튂
+        // 2) 파일 기사이름 ↔ 사이트 라이더명 일치
         if (rNameNorm === rowNameNorm) return true
-        // 3) ?뚯씪 湲곗궗?대쫫 ???ъ씠??rider_username ?쇱튂 (??갑??蹂댁“)
+        // 3) 파일 기사이름 ↔ 사이트 rider_username 일치 (역방향 보조)
         if (rUserNorm && rUserNorm === rowNameNorm) return true
         return false
       })
@@ -365,17 +365,17 @@ export default function SettlementUploadPage() {
     setStep('preview')
   }
 
-  // ?? ?ㅼ쓬 ?④퀎 踰꾪듉 ??
+  // ── 다음 단계 버튼 ──
   const handleGoToPreview = () => {
     if (uploadedFiles.filter(f => f.status === 'success').length === 0) {
-      toast.error('?뚯떛 ?꾨즺???뚯씪???놁뒿?덈떎.'); return
+      toast.error('파싱 완료된 파일이 없습니다.'); return
     }
     goToPreviewWithFiles(uploadedFiles)
   }
 
-  // ?? ?뺤궛 怨꾩궛 ??
+  // ── 정산 계산 ──
   const handlePreviewConfirm = async () => {
-    // settings媛 ?놁쑝硫?湲곕낯 ?몄쑉濡?fallback (3.3% ?먯쿇??
+    // settings가 없으면 기본 세율로 fallback (3.3% 원천세)
     const effectiveSettings = settings ?? {
       id: 'default', user_id: null,
       insurance_rate: 0, income_tax_rate: 0.033,
@@ -383,7 +383,7 @@ export default function SettlementUploadPage() {
       effective_from: '', note: null, created_at: '',
     }
     if (!settings) {
-      toast('?ㅼ젙媛믪씠 ?놁뼱 湲곕낯 ?몄쑉(?먯쿇??3.3%)濡?怨꾩궛?⑸땲??', { icon: '?좑툘' })
+      toast('설정값이 없어 기본 세율(원천세 3.3%)로 계산합니다.', { icon: '⚠️' })
     }
 
     const [promoRes, advanceRes] = await Promise.all([
@@ -393,7 +393,7 @@ export default function SettlementUploadPage() {
     const promotions: Promotion[] = promoRes.data ?? []
     const advances: AdvancePayment[] = advanceRes.data ?? []
 
-    // ?쇱씠???곌껐???됰쭔 異붿텧
+    // 라이더 연결된 행만 추출
     const rawInputs = parsedRows
       .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
       .map(r => {
@@ -415,14 +415,14 @@ export default function SettlementUploadPage() {
     if (rawInputs.length === 0) {
       const unmapped = parsedRows.length
       if (unmapped === 0) {
-        toast.error('?뚯떛???쇱씠???곗씠?곌? ?놁뒿?덈떎. ?뚯씪???ㅼ떆 ?낅줈?쒗빐二쇱꽭??')
+        toast.error('파싱된 라이더 데이터가 없습니다. 파일을 다시 업로드해주세요.')
       } else {
-        toast.error(`${unmapped}紐낆쓽 ?쇱씠?붽? 紐⑤몢 誘몄뿰寃??곹깭?낅땲?? ?곗륫 "?쇱씠???곌껐" ?쒕∼?ㅼ슫?먯꽌 ?곌껐?댁＜?몄슂.`)
+        toast.error(`${unmapped}명의 라이더가 모두 미연결 상태입니다. 우측 "라이더 연결" 드롭다운에서 연결해주세요.`)
       }
       return
     }
 
-    // 媛숈? riderId媛 ?щ윭 ?됱씤 寃쎌슦 ?⑹궛
+    // 같은 riderId가 여러 행인 경우 합산
     const mergedMap = new Map<string, typeof rawInputs[0]>()
     for (const input of rawInputs) {
       const existing = mergedMap.get(input.riderId)
@@ -443,7 +443,7 @@ export default function SettlementUploadPage() {
     }
     const inputs = Array.from(mergedMap.values())
 
-    // ?낅줈?쒕맂 ?뚯씪 以?荑좏뙜?댁툩濡?媛먯????뚯씪???덉쑝硫?platform??'coupang'?쇰줈 override
+    // 업로드된 파일 중 쿠팡이츠로 감지된 파일이 있으면 platform을 'coupang'으로 override
     const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
     const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
 
@@ -452,9 +452,9 @@ export default function SettlementUploadPage() {
     setStep('confirm')
   }
 
-  // ?? ?뺤궛 ?????
+  // ── 정산 저장 ──
   const handleSave = async (status: 'draft' | 'confirmed') => {
-    if (results.length === 0) { toast.error('??ν븷 ?뺤궛 ?곗씠?곌? ?놁뒿?덈떎.'); return }
+    if (results.length === 0) { toast.error('저장할 정산 데이터가 없습니다.'); return }
     setSaving(true)
     const fileNames = uploadedFiles.filter(f => f.status === 'success').map(f => f.file.name).join(', ')
 
@@ -473,7 +473,7 @@ export default function SettlementUploadPage() {
       .select().single()
 
     if (settlementError || !settlement) {
-      toast.error('?뺤궛 ?앹꽦 ?ㅽ뙣: ' + settlementError?.message)
+      toast.error('정산 생성 실패: ' + settlementError?.message)
       setSaving(false); return
     }
 
@@ -502,7 +502,7 @@ export default function SettlementUploadPage() {
 
     const { error: detailError } = await supabase.from('settlement_details').insert(details)
     if (detailError) {
-      toast.error('?곸꽭 ?곗씠??????ㅽ뙣: ' + detailError.message)
+      toast.error('상세 데이터 저장 실패: ' + detailError.message)
       await supabase.from('weekly_settlements').delete().eq('id', settlement.id)
       setSaving(false); return
     }
@@ -518,7 +518,7 @@ export default function SettlementUploadPage() {
       }
     }
 
-    toast.success('?뺤궛????λ릺?덉뒿?덈떎.')
+    toast.success('정산이 저장되었습니다.')
     setSaving(false)
     router.push('/settlement/result')
   }
@@ -534,35 +534,35 @@ export default function SettlementUploadPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-6 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">?뺤궛?뚯씪 ?깅줉</h2>
-        <p className="text-slate-400 text-sm mt-1">?뺤궛 湲곌컙???좏깮?섍퀬 ?묒? ?뚯씪???낅줈?쒗븯?몄슂</p>
+        <h2 className="text-2xl font-bold text-white">정산파일 등록</h2>
+        <p className="text-slate-400 text-sm mt-1">정산 기간을 선택하고 엑셀 파일을 업로드하세요</p>
       </div>
 
-      {/* 吏꾪뻾 ?④퀎 */}
+      {/* 진행 단계 */}
       <div className="flex items-center gap-2">
         {(['upload', 'preview', 'confirm'] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
               ${step === s ? 'bg-blue-600 text-white' : (step === 'confirm' || (step === 'preview' && s === 'upload')) ? 'bg-emerald-800 text-emerald-300' : 'bg-slate-800 text-slate-500'}`}>
-              {i + 1}. {s === 'upload' ? '?뚯씪 ?낅줈?? : s === 'preview' ? '?곗씠???뺤씤' : '?뺤궛 寃곌낵'}
+              {i + 1}. {s === 'upload' ? '파일 업로드' : s === 'preview' ? '데이터 확인' : '정산 결과'}
             </div>
             {i < 2 && <ChevronRight className="h-4 w-4 text-slate-600" />}
           </div>
         ))}
       </div>
 
-      {/* ?? STEP 1: ?낅줈???? */}
+      {/* ── STEP 1: 업로드 ── */}
       {step === 'upload' && (
         <div className="space-y-5">
-          {/* ?뺤궛 湲곌컙 ?좏깮 */}
+          {/* 정산 기간 선택 */}
           <Card className="border-blue-700/40 bg-blue-900/10">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-blue-400 shrink-0" />
                 <div className="flex-1">
-                  <Label className="text-blue-300 text-sm font-medium block mb-1.5">?뺤궛 湲곌컙 ?좏깮 <span className="text-red-400">*</span></Label>
+                  <Label className="text-blue-300 text-sm font-medium block mb-1.5">정산 기간 선택 <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <select value={selectedWeek} onChange={e => setSelectedWeek(e.target.value)}
                       className="w-full px-3 py-2.5 bg-slate-800 border border-blue-700/50 rounded-md text-sm text-white appearance-none cursor-pointer hover:border-blue-600 pr-8 focus:outline-none focus:border-blue-500">
@@ -577,10 +577,10 @@ export default function SettlementUploadPage() {
             </CardContent>
           </Card>
 
-          {/* ?뚯씪 ?낅줈???곸뿭 */}
+          {/* 파일 업로드 영역 */}
           <Card className="border-slate-700 bg-slate-900">
-            <CardContent className="p-4 md:p-6 space-y-4">
-              {/* ?쒕옒洹??쒕∼ 議?*/}
+            <CardContent className="p-6 space-y-4">
+              {/* 드래그&드롭 존 */}
               <div
                 onDrop={handleDrop}
                 onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -593,12 +593,12 @@ export default function SettlementUploadPage() {
                   multiple onChange={handleFileInput} />
                 <FileSpreadsheet className="h-10 w-10 text-slate-500 mx-auto mb-3" />
                 <p className="text-white text-sm font-medium mb-1">
-                  ?뚯씪???쒕옒洹명븯嫄곕굹 ?대┃?섏뿬 ?낅줈??
+                  파일을 드래그하거나 클릭하여 업로드
                 </p>
-                <p className="text-slate-500 text-xs">?щ윭 ?뚯씪 ?숈떆 ?낅줈??媛??쨌 .xlsx, .xls, .csv</p>
+                <p className="text-slate-500 text-xs">여러 파일 동시 업로드 가능 · .xlsx, .xls, .csv</p>
               </div>
 
-              {/* ?낅줈?쒕맂 ?뚯씪 紐⑸줉 */}
+              {/* 업로드된 파일 목록 */}
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2">
                   {uploadedFiles.map(uf => (
@@ -606,21 +606,21 @@ export default function SettlementUploadPage() {
                       ${uf.status === 'success' ? 'border-emerald-700/50 bg-emerald-900/10'
                         : uf.status === 'error' ? 'border-rose-700/50 bg-rose-900/10'
                         : 'border-slate-700 bg-slate-800/50'}`}>
-                      {/* ?뚯씪 ?뺣낫 ??*/}
+                      {/* 파일 정보 행 */}
                       <div className="flex items-center gap-2">
                         {statusIcon(uf.status)}
                         <FileSpreadsheet className="h-4 w-4 text-slate-400 shrink-0" />
                         <span className="text-white text-sm flex-1 truncate">{uf.file.name}</span>
                         <span className="text-slate-500 text-xs shrink-0">{(uf.file.size / 1024).toFixed(0)}KB</span>
                         {uf.status === 'success' && (
-                          <span className="text-emerald-400 text-xs shrink-0">{uf.rows.length}??/span>
+                          <span className="text-emerald-400 text-xs shrink-0">{uf.rows.length}행</span>
                         )}
                         <button onClick={() => removeFile(uf.id)} className="text-slate-500 hover:text-rose-400 transition-colors p-0.5 shrink-0">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
 
-                      {/* ?먮윭 硫붿떆吏 */}
+                      {/* 에러 메시지 */}
                       {uf.errorMsg && (
                         <p className="text-rose-400 text-xs pl-6 flex items-center gap-1">
                           <Lock className="h-3 w-3 shrink-0" />{uf.errorMsg}
@@ -631,41 +631,41 @@ export default function SettlementUploadPage() {
                 </div>
               )}
 
-              {/* 異붽? ?낅줈??踰꾪듉 (?뚯씪 ?덉쓣 ?? */}
+              {/* 추가 업로드 버튼 (파일 있을 때) */}
               {uploadedFiles.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}
                   className="border-slate-600 text-slate-300 hover:bg-slate-800 h-8 text-xs">
-                  <Plus className="h-3.5 w-3.5 mr-1" />?뚯씪 異붽?
+                  <Plus className="h-3.5 w-3.5 mr-1" />파일 추가
                 </Button>
               )}
             </CardContent>
           </Card>
 
-          {/* ?ㅼ쓬 ?④퀎 踰꾪듉 */}
+          {/* 다음 단계 버튼 */}
           {uploadedFiles.length > 0 && (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm">
-                {successCount > 0 && <span className="text-emerald-400 font-medium">?뚯떛 ?꾨즺 {successCount}媛?/span>}
-                {pendingCount > 0 && <span className="text-blue-400">泥섎━ 以?{pendingCount}媛?/span>}
+                {successCount > 0 && <span className="text-emerald-400 font-medium">파싱 완료 {successCount}개</span>}
+                {pendingCount > 0 && <span className="text-blue-400">처리 중 {pendingCount}개</span>}
               </div>
               <Button onClick={handleGoToPreview} disabled={successCount === 0 || pendingCount > 0}
                 className="bg-blue-600 hover:bg-blue-700 ml-auto">
-                {pendingCount > 0 ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />?뚯떛 以?..</> : '?곗씠???뺤씤 ??}
+                {pendingCount > 0 ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />파싱 중...</> : '데이터 확인 →'}
               </Button>
             </div>
           )}
         </div>
       )}
 
-      {/* ?? STEP 2: ?곗씠???뺤씤 ?? */}
+      {/* ── STEP 2: 데이터 확인 ── */}
       {step === 'preview' && (
         <div className="space-y-4">
-          {/* 湲곌컙 + ?뚯씪紐?*/}
+          {/* 기간 + 파일명 */}
           <Card className="border-blue-700/40 bg-blue-900/10">
             <CardContent className="p-4 flex items-center gap-3 flex-wrap">
               <CalendarDays className="h-5 w-5 text-blue-400 shrink-0" />
               <div>
-                <p className="text-blue-300 text-xs mb-0.5">?뺤궛 湲곌컙</p>
+                <p className="text-blue-300 text-xs mb-0.5">정산 기간</p>
                 <p className="text-white font-bold">{weekStart} ~ {weekEnd}</p>
               </div>
               <div className="ml-auto flex items-center gap-2 text-xs text-slate-400 flex-wrap">
@@ -678,15 +678,15 @@ export default function SettlementUploadPage() {
             </CardContent>
           </Card>
 
-          {/* 媛묒? ?붿빟 */}
+          {/* 갑지 요약 */}
           {summaryData && (
             <div className="grid grid-cols-5 gap-2">
               {[
-                { label: '?뺤궛?덉젙湲덉븸 (P25)', value: summaryData.settledAmount,               color: 'violet' },
-                { label: '吏?ш?由щ퉬 (F25)',   value: summaryData.branchFee,                   color: 'blue' },
-                { label: '遺媛??(C31)',        value: summaryData.vatAmount,                   color: 'amber' },
-                { label: '怨좎슜蹂댄뿕?ъ뾽二?(I25)',value: summaryData.employerEmploymentInsurance, color: 'cyan' },
-                { label: '?곗옱蹂댄뿕?ъ뾽二?(K25)',value: summaryData.employerAccidentInsurance,   color: 'purple' },
+                { label: '정산예정금액 (P25)', value: summaryData.settledAmount,               color: 'violet' },
+                { label: '지사관리비 (F25)',   value: summaryData.branchFee,                   color: 'blue' },
+                { label: '부가세 (C31)',        value: summaryData.vatAmount,                   color: 'amber' },
+                { label: '고용보험사업주 (I25)',value: summaryData.employerEmploymentInsurance, color: 'cyan' },
+                { label: '산재보험사업주 (K25)',value: summaryData.employerAccidentInsurance,   color: 'purple' },
               ].map(item => (
                 <Card key={item.label} className={`border-${item.color}-700/40 bg-${item.color}-900/10`}>
                   <CardContent className="p-3">
@@ -698,7 +698,7 @@ export default function SettlementUploadPage() {
             </div>
           )}
 
-          {/* ?쇱씠???뺤궛 ?곗씠???뚯씠釉?*/}
+          {/* 라이더 정산 데이터 테이블 */}
           {(() => {
             const mappedRows   = parsedRows.filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
             const unmappedRows = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none')
@@ -707,7 +707,7 @@ export default function SettlementUploadPage() {
               const mappedRider = riderMapping[row.name]
                 ? riders.find(r => r.id === riderMapping[row.name])
                 : null
-              // User ID: ?ъ씠?몄뿉 ?깅줉??rider_username ?곗꽑, ?놁쑝硫??뚯씪??userId
+              // User ID: 사이트에 등록된 rider_username 우선, 없으면 파일의 userId
               const displayUserId = mappedRider?.rider_username || row.userId || '-'
               return (
                 <TableRow key={i} className="border-slate-700 hover:bg-slate-800/50">
@@ -732,7 +732,7 @@ export default function SettlementUploadPage() {
                   <TableCell className="text-violet-400 text-right whitespace-nowrap">
                     {(() => {
                       const rid = riderMapping[row.name]
-                      if (!rid || rid === 'none') return <span className="text-slate-600 text-xs">誘몄뿰寃?/span>
+                      if (!rid || rid === 'none') return <span className="text-slate-600 text-xs">미연결</span>
                       const amt = calcPreviewPromo(rid, row.deliveryCount)
                       return amt > 0 ? <span className="font-medium">+{formatKRW(amt)}</span> : '-'
                     })()}
@@ -745,10 +745,10 @@ export default function SettlementUploadPage() {
                   <TableCell className="whitespace-nowrap">
                     <Select value={riderMapping[row.name] ?? ''} onValueChange={v => setRiderMapping(prev => ({ ...prev, [row.name]: v }))}>
                       <SelectTrigger className={`w-40 h-8 text-sm ${riderMapping[row.name] && riderMapping[row.name] !== 'none' ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800 border-slate-600'} text-white`}>
-                        <SelectValue placeholder="?쇱씠???좏깮" />
+                        <SelectValue placeholder="라이더 선택" />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-600">
-                        <SelectItem value="none" className="text-slate-400">?곌껐 ?덊븿</SelectItem>
+                        <SelectItem value="none" className="text-slate-400">연결 안함</SelectItem>
                         {riders.map(r => <SelectItem key={r.id} value={r.id} className="text-white">{r.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -760,36 +760,36 @@ export default function SettlementUploadPage() {
             const TableColumns = () => (
               <TableRow className="border-slate-700 hover:bg-transparent">
                 <TableHead className="text-slate-400 whitespace-nowrap">User ID</TableHead>
-                <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠?붾챸</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖嫄댁닔</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖猷?/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">異붽?吏湲?/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">珥앸같?щ즺</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쒓컙?쒕낫?섎즺</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">吏?ы봽濡쒕え??/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">怨좎슜蹂댄뿕</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?곗옱蹂댄뿕</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쇱씠?붾퀎?뺤궛湲덉븸</TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?먯쿇吏뺤닔??/TableHead>
-                <TableHead className="text-slate-400 text-right whitespace-nowrap">?쇱씠?붾퀎吏湲됯툑??/TableHead>
-                <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠???곌껐 *</TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">라이더명</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">배달료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">추가지급</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">총배달료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별정산금액</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">원천징수액</TableHead>
+                <TableHead className="text-slate-400 text-right whitespace-nowrap">라이더별지급금액</TableHead>
+                <TableHead className="text-slate-400 whitespace-nowrap">라이더 연결 *</TableHead>
               </TableRow>
             )
 
             return (
               <>
-                {/* 留ㅽ븨???쇱씠???뚯씠釉?*/}
+                {/* 매핑된 라이더 테이블 */}
                 <Card className="border-slate-700 bg-slate-900">
                   <CardHeader>
                     <CardTitle className="text-white text-base flex items-center justify-between">
-                      <span>?쇱씠???뺤궛 ?곗씠??({mappedRows.length}紐?</span>
+                      <span>라이더 정산 데이터 ({mappedRows.length}명)</span>
                       <div className="flex items-center gap-2 text-sm font-normal">
                         <span className="text-emerald-400 flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4" />{mappedRows.length}紐?留ㅽ븨 ?꾨즺
+                          <CheckCircle className="h-4 w-4" />{mappedRows.length}명 매핑 완료
                         </span>
                         {unmappedRows.length > 0 && (
                           <span className="text-amber-400 flex items-center gap-1">
-                            <AlertTriangle className="h-4 w-4" />{unmappedRows.length}紐?誘몃ℓ??
+                            <AlertTriangle className="h-4 w-4" />{unmappedRows.length}명 미매핑
                           </span>
                         )}
                       </div>
@@ -798,7 +798,7 @@ export default function SettlementUploadPage() {
                   <CardContent className="p-0">
                     {mappedRows.length === 0 ? (
                       <div className="p-6 text-center text-slate-500 text-sm">
-                        留ㅽ븨???쇱씠?붽? ?놁뒿?덈떎. ?꾨옒 誘몃ℓ???쇱씠?붾? ?곌껐?댁＜?몄슂.
+                        매핑된 라이더가 없습니다. 아래 미매핑 라이더를 연결해주세요.
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -813,13 +813,13 @@ export default function SettlementUploadPage() {
                   </CardContent>
                 </Card>
 
-                {/* 誘몃ℓ???쇱씠?????묒쓣 ???덈뒗 ?뱀뀡 */}
+                {/* 미매핑 라이더 — 접을 수 있는 섹션 */}
                 {unmappedRows.length > 0 && (
                   <Card className="border-amber-700/30 bg-amber-900/5">
                     <CardHeader className="py-3">
                       <CardTitle className="text-amber-400 text-sm flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                        誘몃ℓ???쇱씠??({unmappedRows.length}紐? ???ъ씠?몄뿉 ?깅줉?섏? ?딆븯嫄곕굹 ?먮룞 ?곌껐???ㅽ뙣?덉뒿?덈떎. 吏곸젒 ?곌껐?섍굅??臾댁떆?섏꽭??
+                        미매핑 라이더 ({unmappedRows.length}명) — 사이트에 등록되지 않았거나 자동 연결에 실패했습니다. 직접 연결하거나 무시하세요.
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -839,16 +839,16 @@ export default function SettlementUploadPage() {
           })()}
 
           <div className="flex gap-3 flex-wrap items-center">
-            <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">???뚯씪 ?낅줈??/Button>
+            <Button variant="ghost" onClick={() => setStep('upload')} className="text-slate-400 hover:text-white">← 파일 업로드</Button>
 
-            {/* 誘몄뿰寃??쇱씠????寃쎄퀬 */}
+            {/* 미연결 라이더 수 경고 */}
             {parsedRows.length > 0 && (() => {
               const unmapped = parsedRows.filter(r => !riderMapping[r.name] || riderMapping[r.name] === 'none').length
               if (unmapped === 0) return null
               return (
                 <span className="text-amber-400 text-sm flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4" />
-                  {unmapped}紐?誘몄뿰寃????곌껐 ??怨꾩궛?댁＜?몄슂
+                  {unmapped}명 미연결 — 연결 후 계산해주세요
                 </span>
               )
             })()}
@@ -858,26 +858,26 @@ export default function SettlementUploadPage() {
               disabled={parsedRows.length === 0}
               className="bg-blue-600 hover:bg-blue-700 ml-auto disabled:opacity-50"
             >
-              ?뺤궛 怨꾩궛?섍린 ??
+              정산 계산하기 →
             </Button>
           </div>
         </div>
       )}
 
-      {/* ?? STEP 3: ?뺤궛 寃곌낵 ?? */}
+      {/* ── STEP 3: 정산 결과 ── */}
       {step === 'confirm' && (
         <div className="space-y-4">
           {results.length === 0 ? (
             <Card className="border-amber-700/40 bg-amber-900/10">
               <CardContent className="p-6 text-center">
                 <AlertTriangle className="h-10 w-10 text-amber-400 mx-auto mb-3" />
-                <p className="text-white font-semibold mb-1">?뺤궛 怨꾩궛???쇱씠?붽? ?놁뒿?덈떎</p>
+                <p className="text-white font-semibold mb-1">정산 계산할 라이더가 없습니다</p>
                 <p className="text-slate-400 text-sm mb-4">
-                  ?곗씠???뺤씤 ?④퀎?먯꽌 ?곗륫 <strong className="text-white">?쇱씠???곌껐</strong> ?쒕∼?ㅼ슫???듯빐<br />
-                  ?뚯씪??湲곗궗? ?ъ씠???깅줉 ?쇱씠?붾? ?곌껐?????ㅼ떆 怨꾩궛?댁＜?몄슂.
+                  데이터 확인 단계에서 우측 <strong className="text-white">라이더 연결</strong> 드롭다운을 통해<br />
+                  파일의 기사와 사이트 등록 라이더를 연결한 후 다시 계산해주세요.
                 </p>
                 <Button onClick={() => setStep('preview')} variant="outline" className="border-slate-600 text-slate-300">
-                  ???곗씠???뺤씤?쇰줈 ?뚯븘媛湲?
+                  ← 데이터 확인으로 돌아가기
                 </Button>
               </CardContent>
             </Card>
@@ -887,25 +887,25 @@ export default function SettlementUploadPage() {
                 <CardHeader>
                   <CardTitle className="text-white text-base flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-400" />
-                    ?뺤궛 怨꾩궛 ?꾨즺 ({weekStart} ~ {weekEnd})
+                    정산 계산 완료 ({weekStart} ~ {weekEnd})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-4 gap-3 mb-4">
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">珥??쇱씠??/p>
-                      <p className="text-white font-bold text-xl">{results.length}紐?/p>
+                      <p className="text-slate-400 text-xs">총 라이더</p>
+                      <p className="text-white font-bold text-xl">{results.length}명</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">珥??멸툑?좉퀬湲덉븸</p>
+                      <p className="text-slate-400 text-xs">총 세금신고금액</p>
                       <p className="text-emerald-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.taxBaseAmount, 0))}</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">珥??먯쿇??/p>
+                      <p className="text-slate-400 text-xs">총 원천세</p>
                       <p className="text-rose-400 font-bold">-{formatKRW(results.reduce((s, r) => s + r.incomeTaxDeduction, 0))}</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                      <p className="text-slate-400 text-xs">珥?理쒖쥌?뺤궛湲덉븸</p>
+                      <p className="text-slate-400 text-xs">총 최종정산금액</p>
                       <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
                     </div>
                   </div>
@@ -918,21 +918,21 @@ export default function SettlementUploadPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-slate-700 hover:bg-transparent">
-                          <TableHead className="text-slate-400 whitespace-nowrap">?쇱씠??/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">諛곕떖嫄댁닔</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">湲곕낯?뺤궛湲덉븸</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?대같?щ즺</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">?댁텛媛吏湲?/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?쒓컙?쒕낫?섎즺</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">怨좎슜蹂댄뿕</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?곗옱蹂댄뿕</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">吏?ы봽濡쒕え??/TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">肄쒓?由щ퉬</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?멸툑?좉퀬湲덉븸</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?먯쿇??3.3%)</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?좎?湲됯툑</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">?좎?湲됯툑?뚯닔</TableHead>
-                          <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">理쒖쥌?뺤궛湲덉븸</TableHead>
+                          <TableHead className="text-slate-400 whitespace-nowrap">라이더</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">배달건수</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">기본정산금액</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ배달료</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap text-xs opacity-70">ㄴ추가지급</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">선지급금회수</TableHead>
+                          <TableHead className="text-slate-400 text-right font-bold whitespace-nowrap">최종정산금액</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -962,12 +962,12 @@ export default function SettlementUploadPage() {
               </Card>
 
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">???댁쟾?쇰줈</Button>
+                <Button variant="ghost" onClick={() => setStep('preview')} className="text-slate-400 hover:text-white">← 이전으로</Button>
                 <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}?꾩떆???
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}임시저장
                 </Button>
                 <Button onClick={() => handleSave('confirmed')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}?뺤궛 ?뺤젙 ???
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}정산 확정 저장
                 </Button>
               </div>
             </>

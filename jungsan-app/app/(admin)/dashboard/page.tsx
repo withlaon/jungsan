@@ -61,7 +61,7 @@ export default function DashboardPage() {
     if (data) setDetails(data as SettlementDetail[])
   }
 
-  // 李⑦듃 ?곗씠?? 理쒓렐 12二쇱튂 ?쒖씠??(?ㅻ옒?쒋넂理쒖떊 ??
+  // 차트 데이터: 최근 12주치 순이익 (오래된→최신 순)
   const chartData = useMemo(() => {
     const recent = [...settlements].reverse().slice(-12)
     return recent.map(s => {
@@ -74,7 +74,7 @@ export default function DashboardPage() {
         - (s.employer_employment_insurance ?? 0)
         - (s.employer_accident_insurance ?? 0)
         - promoTotal + callTotal + insAddTotal
-      // 二쇱감 ?쇰꺼: "25/02/05~02/11" ?뺥깭濡??뺤텞
+      // 주차 라벨: "25/02/05~02/11" 형태로 압축
       const [, mm1, dd1] = (s.week_start ?? '').split('-')
       const [, mm2, dd2] = (s.week_end   ?? '').split('-')
       const label = `${mm1}/${dd1}~${mm2}/${dd2}`
@@ -84,14 +84,14 @@ export default function DashboardPage() {
 
   const currentSettlement = settlements.find(s => s.id === selectedId)
 
-  // 媛묒? ?붿빟 (weekly_settlements ??κ컪)
+  // 갑지 요약 (weekly_settlements 저장값)
   const settledAmount   = currentSettlement?.settled_amount                ?? 0
   const branchFee       = currentSettlement?.branch_fee                   ?? 0
   const vatAmount       = currentSettlement?.vat_amount                   ?? 0
   const empInsurance    = currentSettlement?.employer_employment_insurance ?? 0
   const accInsurance    = currentSettlement?.employer_accident_insurance   ?? 0
 
-  // settlement_details 吏묎퀎
+  // settlement_details 집계
   const promotionTotal  = details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0)
   const callFeeTotal    = details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0)
   const riderPayTotal   = details.reduce((s, d) => s + (d.final_amount ?? 0), 0)
@@ -99,12 +99,12 @@ export default function DashboardPage() {
   const insAdditionTotal = details.reduce((s, d) => s + (d.employment_insurance_addition ?? 0) + (d.accident_insurance_addition ?? 0), 0)
   const riderCount      = details.length
 
-  // 吏?ъ닚?댁씡 = 吏?ш?由щ퉬 - 怨좎슜蹂댄뿕?ъ뾽二?- ?곗옱蹂댄뿕?ъ뾽二?- ?꾨줈紐⑥뀡鍮?+ 肄쒓?由щ퉬 + 怨좎슜?곗옱愿由щ퉬
+  // 지사순이익 = 지사관리비 - 고용보험사업주 - 산재보험사업주 - 프로모션비 + 콜관리비 + 고용산재관리비
   const branchProfit    = branchFee - empInsurance - accInsurance - promotionTotal + callFeeTotal + insAdditionTotal
 
   const items = [
     {
-      label: '?뺤궛?덉젙湲덉븸',
+      label: '정산예정금액',
       value: settledAmount,
       icon: TrendingUp,
       color: 'text-violet-400',
@@ -112,7 +112,7 @@ export default function DashboardPage() {
       sign: '',
     },
     {
-      label: '吏?ш?由щ퉬',
+      label: '지사관리비',
       value: branchFee,
       icon: Building2,
       color: 'text-blue-400',
@@ -120,7 +120,7 @@ export default function DashboardPage() {
       sign: '+',
     },
     {
-      label: '遺媛??,
+      label: '부가세',
       value: vatAmount,
       icon: Percent,
       color: 'text-amber-400',
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       sign: '-',
     },
     {
-      label: '怨좎슜蹂댄뿕?ъ뾽二?,
+      label: '고용보험사업주',
       value: empInsurance,
       icon: ShieldCheck,
       color: 'text-cyan-400',
@@ -136,7 +136,7 @@ export default function DashboardPage() {
       sign: '-',
     },
     {
-      label: '?곗옱蹂댄뿕?ъ뾽二?,
+      label: '산재보험사업주',
       value: accInsurance,
       icon: ShieldCheck,
       color: 'text-purple-400',
@@ -144,7 +144,7 @@ export default function DashboardPage() {
       sign: '-',
     },
     {
-      label: '?꾨줈紐⑥뀡鍮?,
+      label: '프로모션비',
       value: promotionTotal,
       icon: Gift,
       color: 'text-rose-400',
@@ -152,7 +152,7 @@ export default function DashboardPage() {
       sign: '-',
     },
     {
-      label: '肄쒓?由щ퉬',
+      label: '콜관리비',
       value: callFeeTotal,
       icon: Phone,
       color: 'text-orange-400',
@@ -160,7 +160,7 @@ export default function DashboardPage() {
       sign: '+',
     },
     {
-      label: '?먯쿇??,
+      label: '원천세',
       value: incomeTaxTotal,
       icon: Receipt,
       color: 'text-red-400',
@@ -168,7 +168,7 @@ export default function DashboardPage() {
       sign: '-',
     },
     {
-      label: '怨좎슜?곗옱愿由щ퉬',
+      label: '고용산재관리비',
       value: insAdditionTotal,
       icon: ShieldCheck,
       color: 'text-teal-400',
@@ -176,7 +176,7 @@ export default function DashboardPage() {
       sign: '+',
     },
     {
-      label: '?쇱씠??理쒖쥌?뺤궛湲덉븸',
+      label: '라이더 최종정산금액',
       value: riderPayTotal,
       icon: Wallet,
       color: 'text-slate-300',
@@ -188,30 +188,30 @@ export default function DashboardPage() {
   if (userLoading || loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-screen text-slate-400">
-        <div className="animate-pulse text-lg">?곗씠??濡쒕뵫 以?..</div>
+        <div className="animate-pulse text-lg">데이터 로딩 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* ?ㅻ뜑 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="p-6 space-y-6">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">二쇨컙 ?뺤궛 ?꾪솴</h2>
-          <p className="text-slate-400 text-sm mt-1">二쇱감蹂?吏???쒖씠????쒕낫??/p>
+          <h2 className="text-2xl font-bold text-white">주간 정산 현황</h2>
+          <p className="text-slate-400 text-sm mt-1">주차별 지사 순이익 대시보드</p>
         </div>
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-slate-400 shrink-0" />
+        <div className="flex items-center gap-3">
+          <CalendarDays className="h-5 w-5 text-slate-400" />
           <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="w-full sm:w-64 bg-slate-800 border-slate-600 text-white">
-              <SelectValue placeholder="二쇱감 ?좏깮" />
+            <SelectTrigger className="w-64 bg-slate-800 border-slate-600 text-white">
+              <SelectValue placeholder="주차 선택" />
             </SelectTrigger>
             <SelectContent className="bg-slate-800 border-slate-600">
               {settlements.map(s => (
                 <SelectItem key={s.id} value={s.id} className="text-white hover:bg-slate-700">
                   {s.week_start} ~ {s.week_end}
-                  {s.status === 'confirmed' && ' ??}
+                  {s.status === 'confirmed' && ' ✓'}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -222,37 +222,37 @@ export default function DashboardPage() {
       {settlements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-500">
           <CalendarDays className="h-16 w-16 mb-4 opacity-30" />
-          <p className="text-lg">?깅줉???뺤궛 ?곗씠?곌? ?놁뒿?덈떎.</p>
-          <p className="text-sm mt-1">?뺤궛?뚯씪 ?깅줉 ??뿉???묒? ?뚯씪???낅줈?쒗빐 二쇱꽭??</p>
+          <p className="text-lg">등록된 정산 데이터가 없습니다.</p>
+          <p className="text-sm mt-1">정산파일 등록 탭에서 엑셀 파일을 업로드해 주세요.</p>
         </div>
       ) : (
         <>
-          {/* 二쇱감 諛곗? */}
+          {/* 주차 배지 */}
           {currentSettlement && (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-slate-600 text-slate-300">
                 {currentSettlement.week_start} ~ {currentSettlement.week_end}
               </Badge>
               <Badge className={currentSettlement.status === 'confirmed' ? 'bg-emerald-700' : 'bg-amber-700'}>
-                {currentSettlement.status === 'confirmed' ? '?뺤젙' : '?꾩떆???}
+                {currentSettlement.status === 'confirmed' ? '확정' : '임시저장'}
               </Badge>
               <span className="text-slate-500 text-sm flex items-center gap-1">
-                <Users className="h-4 w-4" />{riderCount}紐?
+                <Users className="h-4 w-4" />{riderCount}명
               </span>
             </div>
           )}
 
-          {/* 吏???쒖씠??硫붿씤 移대뱶 */}
+          {/* 지사 순이익 메인 카드 */}
           <Card className={`border-2 ${branchProfit >= 0 ? 'border-emerald-600/60 bg-emerald-900/15' : 'border-rose-600/60 bg-rose-900/15'}`}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm font-medium mb-1">二쇨컙 吏???쒖씠??/p>
+                  <p className="text-slate-400 text-sm font-medium mb-1">주간 지사 순이익</p>
                   <p className={`text-4xl font-bold ${branchProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {branchProfit >= 0 ? '+' : ''}{formatKRW(branchProfit)}
                   </p>
                   <p className="text-slate-500 text-xs mt-2">
-                    吏?ш?由щ퉬 - 怨좎슜蹂댄뿕?ъ뾽二?- ?곗옱蹂댄뿕?ъ뾽二?- ?꾨줈紐⑥뀡鍮?+ 肄쒓?由щ퉬 + 怨좎슜?곗옱愿由щ퉬
+                    지사관리비 - 고용보험사업주 - 산재보험사업주 - 프로모션비 + 콜관리비 + 고용산재관리비
                   </p>
                 </div>
                 <div className={`rounded-2xl p-4 ${branchProfit >= 0 ? 'bg-emerald-900/30' : 'bg-rose-900/30'}`}>
@@ -262,13 +262,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* ??ぉ蹂?移대뱶 */}
+          {/* 항목별 카드 */}
           <Card className="border-slate-700 bg-slate-900">
             <CardHeader>
-              <CardTitle className="text-white text-base">吏???쒖씠??援ъ꽦 ??ぉ</CardTitle>
+              <CardTitle className="text-white text-base">지사 순이익 구성 항목</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {items.map(item => {
                   const Icon = item.icon
                   return (
@@ -285,27 +285,27 @@ export default function DashboardPage() {
                 })}
               </div>
 
-              {/* ?쒖씠??怨꾩궛???붿빟 */}
+              {/* 순이익 계산식 요약 */}
               <div className="mt-4 rounded-xl bg-slate-800/50 border border-slate-700 p-4">
-                <p className="text-slate-500 text-xs mb-3 font-medium">?쒖씠??怨꾩궛??/p>
+                <p className="text-slate-500 text-xs mb-3 font-medium">순이익 계산식</p>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-blue-400 font-medium">{formatKRW(branchFee)}</span>
-                  <span className="text-slate-500">(吏?ш?由щ퉬)</span>
+                  <span className="text-slate-500">(지사관리비)</span>
                   <span className="text-slate-600">-</span>
                   <span className="text-cyan-400">{formatKRW(empInsurance)}</span>
-                  <span className="text-slate-500">(怨좎슜蹂댄뿕)</span>
+                  <span className="text-slate-500">(고용보험)</span>
                   <span className="text-slate-600">-</span>
                   <span className="text-purple-400">{formatKRW(accInsurance)}</span>
-                  <span className="text-slate-500">(?곗옱蹂댄뿕)</span>
+                  <span className="text-slate-500">(산재보험)</span>
                   <span className="text-slate-600">-</span>
                   <span className="text-rose-400">{formatKRW(promotionTotal)}</span>
-                  <span className="text-slate-500">(?꾨줈紐⑥뀡)</span>
+                  <span className="text-slate-500">(프로모션)</span>
                   <span className="text-slate-600">+</span>
                   <span className="text-orange-400">{formatKRW(callFeeTotal)}</span>
-                  <span className="text-slate-500">(肄쒓?由щ퉬)</span>
+                  <span className="text-slate-500">(콜관리비)</span>
                   <span className="text-slate-600">+</span>
                   <span className="text-teal-400">{formatKRW(insAdditionTotal)}</span>
-                  <span className="text-slate-500">(怨좎슜?곗옱愿由щ퉬)</span>
+                  <span className="text-slate-500">(고용산재관리비)</span>
                   <span className="text-slate-600">=</span>
                   <span className={`font-bold text-base ${branchProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {branchProfit >= 0 ? '+' : ''}{formatKRW(branchProfit)}
@@ -315,14 +315,14 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 二쇰퀎 吏???쒖씠??留됰?洹몃옒??*/}
+          {/* 주별 지사 순이익 막대그래프 */}
           {chartData.length > 1 && (
             <Card className="border-slate-700 bg-slate-900">
               <CardHeader>
                 <CardTitle className="text-white text-base flex items-center gap-2">
                   <BarChart2 className="h-4 w-4 text-emerald-400" />
-                  二쇰퀎 吏???쒖씠??異붿씠
-                  <span className="text-slate-500 text-xs font-normal ml-1">(理쒓렐 {chartData.length}二?</span>
+                  주별 지사 순이익 추이
+                  <span className="text-slate-500 text-xs font-normal ml-1">(최근 {chartData.length}주)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -338,8 +338,8 @@ export default function DashboardPage() {
                     <YAxis
                       tickFormatter={v => {
                         const abs = Math.abs(v)
-                        if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}諛깅쭔`
-                        if (abs >= 10_000)   return `${(v / 10_000).toFixed(0)}留?
+                        if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}백만`
+                        if (abs >= 10_000)   return `${(v / 10_000).toFixed(0)}만`
                         return String(v)
                       }}
                       tick={{ fill: '#94a3b8', fontSize: 11 }}
@@ -353,7 +353,7 @@ export default function DashboardPage() {
                       labelStyle={{ color: '#cbd5e1', fontSize: 12, marginBottom: 4 }}
                       formatter={(value: number | undefined) => [
                         `${(value ?? 0) >= 0 ? '+' : ''}${formatKRW(value ?? 0)}`,
-                        '吏???쒖씠??,
+                        '지사 순이익',
                       ]}
                     />
                     <ReferenceLine y={0} stroke="#475569" strokeWidth={1.5} />
@@ -370,7 +370,7 @@ export default function DashboardPage() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <p className="text-slate-600 text-xs text-center mt-1">?꾩옱 ?좏깮 二쇱감??諛앷쾶 ?쒖떆?⑸땲??/p>
+                <p className="text-slate-600 text-xs text-center mt-1">현재 선택 주차는 밝게 표시됩니다</p>
               </CardContent>
             </Card>
           )}

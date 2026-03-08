@@ -13,9 +13,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-// ??????????????????????????????????????????????
-// ?곸닔 / ???
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// 상수 / 타입
+// ──────────────────────────────────────────────
 const SIZE = 1080
 const FONT = "'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', sans-serif"
 type TemplateId = 1 | 2 | 3 | 4
@@ -41,15 +41,15 @@ const TEMPLATE_DEFAULTS: Record<TemplateId, StyleOptions> = {
 }
 
 const TEMPLATES = [
-  { id: 1 as TemplateId, name: '?ㅽ겕 鍮꾩쫰?덉뒪', colors: ['#0c1228', '#0f2044'], accent: '#38bdf8' },
-  { id: 2 as TemplateId, name: '?대┛ ?붿씠??,   colors: ['#1e40af', '#3b82f6'], accent: '#3b82f6' },
-  { id: 3 as TemplateId, name: '?먮찓?꾨뱶 洹몃┛', colors: ['#022c22', '#064e3b'], accent: '#34d399' },
-  { id: 4 as TemplateId, name: '???ㅻ젋吏',     colors: ['#ea580c', '#f97316'], accent: '#f97316' },
+  { id: 1 as TemplateId, name: '다크 비즈니스', colors: ['#0c1228', '#0f2044'], accent: '#38bdf8' },
+  { id: 2 as TemplateId, name: '클린 화이트',   colors: ['#1e40af', '#3b82f6'], accent: '#3b82f6' },
+  { id: 3 as TemplateId, name: '에메랄드 그린', colors: ['#022c22', '#064e3b'], accent: '#34d399' },
+  { id: 4 as TemplateId, name: '웜 오렌지',     colors: ['#ea580c', '#f97316'], accent: '#f97316' },
 ]
 
-// ??????????????????????????????????????????????
-// 怨듭??ы빆 ?덉퐫?????
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// 공지사항 레코드 타입
+// ──────────────────────────────────────────────
 interface Notice {
   id: string
   title: string
@@ -62,9 +62,9 @@ interface Notice {
   created_at: string
 }
 
-const THUMB = 320  // ?몃꽕??罹붾쾭???ш린
+const THUMB = 320  // 썸네일 캔버스 크기
 
-// ?몃꽕??320px) ?앹꽦 ??base64 PNG 諛섑솚
+// 썸네일(320px) 생성 → base64 PNG 반환
 function generateThumbnail(
   title: string, content: string, date: string, company: string,
   templateId: TemplateId, styles: StyleOptions,
@@ -72,8 +72,8 @@ function generateThumbnail(
   const off = document.createElement('canvas')
   off.width = THUMB; off.height = THUMB
   const ctx = off.getContext('2d')!
-  // SIZE?뭈HUMB ?ㅼ??쇰줈 ?숈씪??draw ?⑥닔 ?몄텧?섎릺,
-  // ctx.scale濡?異뺤냼 ?곸슜
+  // SIZE→THUMB 스케일로 동일한 draw 함수 호출하되,
+  // ctx.scale로 축소 적용
   ctx.scale(THUMB / SIZE, THUMB / SIZE)
   const nb: Bounds = { title: null, content: null }
   const args = [ctx, title, content, date, company, styles, nb, null, null] as const
@@ -84,7 +84,7 @@ function generateThumbnail(
   return off.toDataURL('image/jpeg', 0.7)
 }
 
-// overlay 湲곗?: left pad, right pad (canvas 醫뚰몴)
+// overlay 기준: left pad, right pad (canvas 좌표)
 const TPL_REGION: Record<TemplateId, { left: number; right: number }> = {
   1: { left: 90,  right: 90  },
   2: { left: 132, right: 60  },
@@ -92,9 +92,9 @@ const TPL_REGION: Record<TemplateId, { left: number; right: number }> = {
   4: { left: 110, right: 60  },
 }
 
-// ??????????????????????????????????????????????
-// 罹붾쾭???ы띁
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// 캔버스 헬퍼
+// ──────────────────────────────────────────────
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return ['']
   const lines: string[] = []
@@ -117,7 +117,7 @@ function xByAlign(align: Align, pad: number, rightPad = pad): number {
   return pad
 }
 
-// ?띿뒪??議?怨듯넻 ?쒕줈??(editingZone 吏??
+// 텍스트 존 공통 드로잉 (editingZone 지원)
 function drawZone(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -156,7 +156,7 @@ function drawZone(
   return { y1: startY, y2: curY }
 }
 
-// ?좏깮 ?섏씠?쇱씠??
+// 선택 하이라이트
 function drawSelectionOverlay(
   ctx: CanvasRenderingContext2D,
   selection: 'title' | 'content' | null,
@@ -176,9 +176,9 @@ function drawSelectionOverlay(
   ctx.setLineDash([]); ctx.restore()
 }
 
-// ??????????????????????????????????????????????
-// Template 1: ?ㅽ겕 鍮꾩쫰?덉뒪
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// Template 1: 다크 비즈니스
+// ──────────────────────────────────────────────
 function drawT1(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE)
@@ -194,25 +194,25 @@ function drawT1(ctx: CanvasRenderingContext2D, title: string, content: string, d
   if (company) { ctx.font = `500 30px ${FONT}`; ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'; ctx.fillText(company, PAD, 90) }
   if (date)    { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#475569'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - PAD, 90) }
   ctx.strokeStyle = 'rgba(51,65,85,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, 118); ctx.lineTo(SIZE - PAD, 118); ctx.stroke()
-  ctx.font = `700 28px ${FONT}`; ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'left'; ctx.fillText('?뱼  怨듭??ы빆', PAD, 170)
+  ctx.font = `700 28px ${FONT}`; ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'left'; ctx.fillText('📢  공지사항', PAD, 170)
 
   let curY = 230 + s.verticalOffset
-  const tr = drawZone(ctx, title, '?? ?쒕ぉ ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '✏  제목 영역 — 클릭하여 입력', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 12; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') {
     const ag = ctx.createLinearGradient(PAD, 0, PAD + 200, 0); ag.addColorStop(0, '#06b6d4'); ag.addColorStop(1, 'transparent')
     ctx.strokeStyle = ag; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(PAD, curY); ctx.lineTo(PAD + 200, curY); ctx.stroke()
   }
   curY += 36
-  const cr = drawZone(ctx, content, '?? ?댁슜 ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '✏  내용 영역 — 클릭하여 입력', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   ctx.fillStyle = topBar; ctx.fillRect(0, SIZE - 12, SIZE, 12)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// ??????????????????????????????????????????????
-// Template 2: ?대┛ ?붿씠??
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// Template 2: 클린 화이트
+// ──────────────────────────────────────────────
 function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, SIZE, SIZE)
@@ -221,7 +221,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   ctx.fillStyle = hg; ctx.fillRect(0, 0, SIZE, headerH)
   ctx.beginPath(); ctx.arc(SIZE - 80, headerH / 2, 220, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill()
   ctx.beginPath(); ctx.arc(SIZE - 80, headerH / 2, 140, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill()
-  ctx.font = `800 52px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('怨듭??ы빆', 80, 120)
+  ctx.font = `800 52px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('공지사항', 80, 120)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(company, 80, 170) }
   if (date)    { ctx.font = `400 26px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - 80, 170) }
   const cardX = 60, cardY = 290, cardW = SIZE - 120, cardH = SIZE - 360
@@ -238,7 +238,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   // Title
   {
     const isEditing = editingZone === 'title', isEmpty = !title.trim()
-    const display = isEmpty ? '?? ?쒕ぉ ?곸뿭 ???대┃?섏뿬 ?낅젰' : title
+    const display = isEmpty ? '✏  제목 영역 — 클릭하여 입력' : title
     const weight  = s.titleBold ? '800' : '500'
     const lineH   = Math.round(s.titleSize * 1.25)
     const effAlign: Align = isEmpty ? 'left' : s.textAlign
@@ -255,7 +255,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   // Content
   {
     const isEditing = editingZone === 'content', isEmpty = !content.trim()
-    const display = isEmpty ? '?? ?댁슜 ?곸뿭 ???대┃?섏뿬 ?낅젰' : content
+    const display = isEmpty ? '✏  내용 영역 — 클릭하여 입력' : content
     const lineH = Math.round(s.contentSize * 1.5)
     const effAlign: Align = isEmpty ? 'left' : s.textAlign
     const y1 = curY
@@ -268,9 +268,9 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// ??????????????????????????????????????????????
-// Template 3: ?먮찓?꾨뱶 洹몃┛
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// Template 3: 에메랄드 그린
+// ──────────────────────────────────────────────
 function drawT3(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE); bg.addColorStop(0, '#022c22'); bg.addColorStop(1, '#064e3b')
@@ -280,26 +280,26 @@ function drawT3(ctx: CanvasRenderingContext2D, title: string, content: string, d
   const vBar = ctx.createLinearGradient(0, 0, 0, SIZE); vBar.addColorStop(0, '#34d399'); vBar.addColorStop(1, '#059669')
   ctx.fillStyle = vBar; ctx.fillRect(0, 0, 10, SIZE)
   const PAD = 80
-  ctx.font = `700 30px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'left'; ctx.fillText('?뱼  N O T I C E', PAD, 95)
+  ctx.font = `700 30px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'left'; ctx.fillText('📢  N O T I C E', PAD, 95)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'right'; ctx.fillText(company, SIZE - PAD, 95) }
   const gg = ctx.createLinearGradient(PAD, 0, SIZE - PAD, 0); gg.addColorStop(0, 'transparent'); gg.addColorStop(0.15, '#fbbf24'); gg.addColorStop(0.85, '#fbbf24'); gg.addColorStop(1, 'transparent')
   ctx.strokeStyle = gg; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(PAD, 124); ctx.lineTo(SIZE - PAD, 124); ctx.stroke()
 
   let curY = 220 + s.verticalOffset
-  const tr = drawZone(ctx, title, '?? ?쒕ぉ ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '✏  제목 영역 — 클릭하여 입력', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 10; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') { ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(PAD, curY); ctx.lineTo(PAD + 120, curY); ctx.stroke() }
   curY += 46
-  const cr = drawZone(ctx, content, '?? ?댁슜 ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '✏  내용 영역 — 클릭하여 입력', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   if (date) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - PAD, SIZE - 56) }
   ctx.fillStyle = '#fbbf24'; ctx.fillRect(0, SIZE - 8, SIZE, 8)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// ??????????????????????????????????????????????
-// Template 4: ???ㅻ젋吏
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// Template 4: 웜 오렌지
+// ──────────────────────────────────────────────
 function drawT4(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   ctx.fillStyle = '#fef3c7'; ctx.fillRect(0, 0, SIZE, SIZE)
@@ -308,26 +308,26 @@ function drawT4(ctx: CanvasRenderingContext2D, title: string, content: string, d
   const og = ctx.createLinearGradient(0, 0, SIZE, 0); og.addColorStop(0, '#ea580c'); og.addColorStop(1, '#f97316')
   ctx.fillStyle = og; ctx.fillRect(40, 40, SIZE - 80, headerH)
   ctx.beginPath(); ctx.arc(SIZE - 100, 40 + headerH / 2, 160, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fill()
-  ctx.font = `800 48px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('怨듭??ы빆', 110, 40 + 96)
+  ctx.font = `800 48px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('공지사항', 110, 40 + 96)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillText(company, 110, 40 + 152) }
   if (date)    { ctx.font = `400 26px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - 110, 40 + 152) }
   ctx.fillStyle = og; ctx.fillRect(40, 40 + headerH, 8, SIZE - 80 - headerH)
   const PAD = 110
 
   let curY = 40 + headerH + 90 + s.verticalOffset
-  const tr = drawZone(ctx, title, '?? ?쒕ぉ ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, 60, curY, SIZE - PAD - 60, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '✏  제목 영역 — 클릭하여 입력', PAD, 60, curY, SIZE - PAD - 60, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 8; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') { ctx.fillStyle = '#f97316'; ctx.fillRect(PAD, curY, 80, 6) }
   curY += 44
-  const cr = drawZone(ctx, content, '?? ?댁슜 ?곸뿭 ???대┃?섏뿬 ?낅젰', PAD, 60, curY, SIZE - PAD - 60, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '✏  내용 영역 — 클릭하여 입력', PAD, 60, curY, SIZE - PAD - 60, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   ctx.fillStyle = og; ctx.fillRect(40, SIZE - 48, SIZE - 80, 8)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// ??????????????????????????????????????????????
-// 而댄뙥??而⑦듃濡?
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// 컴팩트 컨트롤
+// ──────────────────────────────────────────────
 function SizeRow({ label, value, min, max, step = 2, onChange }: {
   label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void
 }) {
@@ -354,9 +354,9 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   )
 }
 
-// ??????????????????????????????????????????????
-// 硫붿씤
-// ??????????????????????????????????????????????
+// ──────────────────────────────────────────────
+// 메인
+// ──────────────────────────────────────────────
 export default function NoticePage() {
   const supabase     = createClient()
   const canvasRef    = useRef<HTMLCanvasElement>(null)
@@ -386,7 +386,7 @@ export default function NoticePage() {
   const setStyle = <K extends keyof StyleOptions>(key: K, val: StyleOptions[K]) =>
     setStyles(prev => ({ ...prev, [key]: val }))
 
-  // ?붿뒪?뚮젅???ㅼ???異붿쟻
+  // 디스플레이 스케일 추적
   useEffect(() => {
     const update = () => {
       if (wrapperRef.current) setDisplayScale(wrapperRef.current.offsetWidth / SIZE)
@@ -396,13 +396,13 @@ export default function NoticePage() {
     return () => window.removeEventListener('resize', update)
   }, [])
 
-  // ?쒗뵆由??꾪솚
+  // 템플릿 전환
   const handleSelectTpl = (id: TemplateId) => {
     setSelectedTpl(id); setStyles(TEMPLATE_DEFAULTS[id])
     setCanvasSelection(null); setEditingZone(null); setOverlayBounds(null)
   }
 
-  // ?뚯궗紐??먮룞 濡쒕뱶
+  // 회사명 자동 로드
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
@@ -411,7 +411,7 @@ export default function NoticePage() {
     })
   }, [])
 
-  // 怨듭??ы빆 紐⑸줉 濡쒕뱶
+  // 공지사항 목록 로드
   const fetchNotices = useCallback(async () => {
     setNoticesLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -427,41 +427,41 @@ export default function NoticePage() {
 
   useEffect(() => { fetchNotices() }, [fetchNotices])
 
-  // 怨듭??ы빆 ???(DB)
+  // 공지사항 저장 (DB)
   const saveNotice = async (thumbnail: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     if (editingNoticeId) {
-      // 湲곗〈 ??ぉ ?섏젙
+      // 기존 항목 수정
       await supabase.from('notices').update({
         title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
       }).eq('id', editingNoticeId).eq('user_id', user.id)
-      toast.success('怨듭??ы빆???낅뜲?댄듃?섏뿀?듬땲??')
+      toast.success('공지사항이 업데이트되었습니다.')
     } else {
-      // ?좉퇋 ?깅줉
+      // 신규 등록
       await supabase.from('notices').insert({
         user_id: user.id, title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
       })
-      toast.success('怨듭??ы빆????λ릺?덉뒿?덈떎.')
+      toast.success('공지사항이 저장되었습니다.')
     }
     setEditingNoticeId(null)
     fetchNotices()
   }
 
-  // 怨듭??ы빆 ??젣
+  // 공지사항 삭제
   const handleDeleteNotice = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase.from('notices').delete().eq('id', id).eq('user_id', user.id)
     setDeleteConfirmId(null)
     if (editingNoticeId === id) { setEditingNoticeId(null) }
-    toast.success('怨듭??ы빆????젣?섏뿀?듬땲??')
+    toast.success('공지사항이 삭제되었습니다.')
     fetchNotices()
   }
 
-  // 怨듭??ы빆 ?섏젙 (?먮뵒?곗뿉 濡쒕뱶)
+  // 공지사항 수정 (에디터에 로드)
   const handleEditNotice = (notice: Notice) => {
     setTitle(notice.title)
     setContent(notice.content)
@@ -474,7 +474,7 @@ export default function NoticePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // 罹붾쾭???뚮뜑
+  // 캔버스 렌더
   const render = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return
     const ctx    = canvas.getContext('2d'); if (!ctx) return
@@ -492,7 +492,7 @@ export default function NoticePage() {
 
   useEffect(() => { render() }, [render])
 
-  // ?ㅻ쾭?덉씠 textarea ?먮룞 ?ъ빱??
+  // 오버레이 textarea 자동 포커스
   useEffect(() => {
     if (editingZone && overlayRef.current) {
       overlayRef.current.focus()
@@ -501,7 +501,7 @@ export default function NoticePage() {
     }
   }, [editingZone])
 
-  // 罹붾쾭??醫뚰몴 蹂??
+  // 캔버스 좌표 변환
   const getCanvasY = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current; if (!canvas) return -1
     return (e.clientY - canvas.getBoundingClientRect().top) * (SIZE / canvas.getBoundingClientRect().height)
@@ -527,20 +527,20 @@ export default function NoticePage() {
     }
   }
 
-  // ?ㅻ쾭?덉씠 ?リ린
+  // 오버레이 닫기
   const closeOverlay = () => {
     setEditingZone(null); setOverlayBounds(null)
   }
 
-  // ?ㅽ???????罹붾쾭???좏깮 ?숆린??
+  // 스타일 탭 ↔ 캔버스 선택 동기화
   const handleTabChange = (tab: StyleTab) => {
     setStyleTab(tab); setCanvasSelection(tab === 'layout' ? null : tab)
     if (tab !== 'layout') setEditingZone(null)
   }
 
-  // ?ㅼ슫濡쒕뱶 + DB ???
+  // 다운로드 + DB 저장
   const handleDownload = async () => {
-    // 1) ?꾩껜 ?댁긽??罹붾쾭?????ㅼ슫濡쒕뱶
+    // 1) 전체 해상도 캔버스 → 다운로드
     const off = document.createElement('canvas'); off.width = SIZE; off.height = SIZE
     const ctx = off.getContext('2d')!
     const nb: Bounds = { title: null, content: null }
@@ -550,9 +550,9 @@ export default function NoticePage() {
       case 3: drawT3(...args); break; case 4: drawT4(...args); break
     }
     const a = document.createElement('a'); a.href = off.toDataURL('image/png')
-    a.download = `怨듭??ы빆_${title || '?대?吏'}.png`
+    a.download = `공지사항_${title || '이미지'}.png`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    // 2) ?몃꽕???앹꽦 ??DB ???
+    // 2) 썸네일 생성 → DB 저장
     const thumb = generateThumbnail(title, content, date, companyName, selectedTpl, styles)
     await saveNotice(thumb)
   }
@@ -564,7 +564,7 @@ export default function NoticePage() {
     setEditingZone(null); setOverlayBounds(null); setEditingNoticeId(null)
   }
 
-  // ?ㅻ쾭?덉씠 ?꾩튂 怨꾩궛
+  // 오버레이 위치 계산
   const reg   = TPL_REGION[selectedTpl]
   const oLeft = reg.left  * displayScale
   const oW    = (SIZE - reg.left - reg.right) * displayScale
@@ -583,23 +583,23 @@ export default function NoticePage() {
     }`
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl">
+    <div className="p-6 space-y-6 max-w-7xl">
       <div>
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Megaphone className="h-6 w-6 text-blue-400" />怨듭??ы빆 ?앹꽦
+          <Megaphone className="h-6 w-6 text-blue-400" />공지사항 생성
         </h2>
-        <p className="text-slate-400 text-sm mt-1">?쇱씠?붿뿉寃?臾몄옄쨌移댁뭅?ㅽ넚?쇰줈 諛쒖넚??怨듭? ?대?吏瑜??앹꽦?섏꽭??/p>
+        <p className="text-slate-400 text-sm mt-1">라이더에게 문자·카카오톡으로 발송할 공지 이미지를 생성하세요</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-        {/* ?? ?쇱そ ?? */}
+        {/* ── 왼쪽 ── */}
         <div className="space-y-4">
 
-          {/* ?쒗뵆由?*/}
+          {/* 템플릿 */}
           <Card className="border-slate-700 bg-slate-900">
             <CardHeader className="pb-3">
-              <CardTitle className="text-white text-sm">??諛곌꼍 ?쒗뵆由??좏깮</CardTitle>
+              <CardTitle className="text-white text-sm">① 배경 템플릿 선택</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
@@ -625,78 +625,78 @@ export default function NoticePage() {
             </CardContent>
           </Card>
 
-          {/* 湲곕낯 ?뺣낫 */}
+          {/* 기본 정보 */}
           <Card className="border-slate-700 bg-slate-900">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white text-sm">??湲곕낯 ?뺣낫</CardTitle>
+              <CardTitle className="text-white text-sm">② 기본 정보</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs">?뚯궗紐?/Label>
+                  <Label className="text-slate-400 text-xs">회사명</Label>
                   <Input value={companyName} onChange={e => setCompanyName(e.target.value)}
-                    placeholder="?뚯궗紐? className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
+                    placeholder="회사명" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs">?좎쭨</Label>
+                  <Label className="text-slate-400 text-xs">날짜</Label>
                   <Input value={date} onChange={e => setDate(e.target.value)}
-                    placeholder="?좎쭨" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
+                    placeholder="날짜" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* ?덈궡 */}
+          {/* 안내 */}
           <Card className="border-blue-900/50 bg-blue-950/30">
             <CardContent className="pt-4 pb-3 space-y-2">
               <p className="text-blue-300 text-xs font-medium flex items-center gap-1.5">
-                <Edit3 className="h-3.5 w-3.5" />?ㅻⅨ履?誘몃━蹂닿린?먯꽌 吏곸젒 ?몄쭛
+                <Edit3 className="h-3.5 w-3.5" />오른쪽 미리보기에서 직접 편집
               </p>
               <ul className="text-slate-400 text-xs space-y-1 pl-5 list-disc">
-                <li><span className="text-white">?쒕ぉ/?댁슜 ?곸뿭 ?대┃</span> ???띿뒪??吏곸젒 ?낅젰</li>
-                <li>?낅젰 ??<kbd className="bg-slate-700 px-1 py-0.5 rounded text-xs">Esc</kbd> ?먮뒗 ?곸뿭 諛??대┃?쇰줈 ?꾨즺</li>
-                <li>?대┃ ?좏깮 ???꾨옒 ?ㅽ????⑤꼸?먯꽌 ?쒖떇 ?몄쭛</li>
+                <li><span className="text-white">제목/내용 영역 클릭</span> → 텍스트 직접 입력</li>
+                <li>입력 후 <kbd className="bg-slate-700 px-1 py-0.5 rounded text-xs">Esc</kbd> 또는 영역 밖 클릭으로 완료</li>
+                <li>클릭 선택 후 아래 스타일 패널에서 서식 편집</li>
               </ul>
             </CardContent>
           </Card>
 
-          {/* ?몄쭛 以??뚮┝ */}
+          {/* 편집 중 알림 */}
           {editingNoticeId && (
             <div className="flex items-center gap-2 bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2">
               <Pencil className="h-4 w-4 text-amber-400 shrink-0" />
-              <span className="text-amber-300 text-xs flex-1">??λ맂 怨듭??ы빆 ?섏젙 以?/span>
+              <span className="text-amber-300 text-xs flex-1">저장된 공지사항 수정 중</span>
               <button onClick={() => setEditingNoticeId(null)}
                 className="text-amber-500 hover:text-amber-300"><X className="h-4 w-4" /></button>
             </div>
           )}
 
-          {/* ?≪뀡 */}
+          {/* 액션 */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleReset}
               className="border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-white gap-2">
-              <RefreshCw className="h-4 w-4" />珥덇린??
+              <RefreshCw className="h-4 w-4" />초기화
             </Button>
             <Button onClick={handleDownload} className="flex-1 gap-2"
               style={{ background: editingNoticeId ? '#d97706' : tplConfig.accent }}
               disabled={!title && !content}>
               {editingNoticeId
-                ? <><SaveAll className="h-4 w-4" />?낅뜲?댄듃 & ?ㅼ슫濡쒕뱶</>
-                : <><Download className="h-4 w-4" />?ㅼ슫濡쒕뱶 & ???/>}
+                ? <><SaveAll className="h-4 w-4" />업데이트 & 다운로드</>
+                : <><Download className="h-4 w-4" />다운로드 & 저장</>}
             </Button>
           </div>
         </div>
 
-        {/* ?? ?ㅻⅨ履? 誘몃━蹂닿린 + ?ㅽ????⑤꼸 ?? */}
+        {/* ── 오른쪽: 미리보기 + 스타일 패널 ── */}
         <div className="space-y-3">
 
-          {/* 罹붾쾭??*/}
+          {/* 캔버스 */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-sm font-medium">???ㅼ떆媛?誘몃━蹂닿린 (?대┃?섏뿬 吏곸젒 ?몄쭛)</p>
-              <span className="text-slate-600 text-xs">1080횞1080px</span>
+              <p className="text-slate-400 text-sm font-medium">③ 실시간 미리보기 (클릭하여 직접 편집)</p>
+              <span className="text-slate-600 text-xs">1080×1080px</span>
             </div>
 
-            {/* 罹붾쾭??+ ?ㅻ쾭?덉씠 ?섑띁 */}
+            {/* 캔버스 + 오버레이 래퍼 */}
             <div ref={wrapperRef} className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
               <canvas
                 ref={canvasRef}
@@ -708,7 +708,7 @@ export default function NoticePage() {
                 onMouseLeave={() => setCanvasCursor('default')}
               />
 
-              {/* ?띿뒪???낅젰 ?ㅻ쾭?덉씠 */}
+              {/* 텍스트 입력 오버레이 */}
               {editingZone && overlayBounds && (
                 <textarea
                   ref={overlayRef}
@@ -719,7 +719,7 @@ export default function NoticePage() {
                   }}
                   onBlur={closeOverlay}
                   onKeyDown={e => { if (e.key === 'Escape') e.currentTarget.blur() }}
-                  placeholder={editingZone === 'title' ? '?쒕ぉ???낅젰?섏꽭??..' : '?댁슜???낅젰?섏꽭??..'}
+                  placeholder={editingZone === 'title' ? '제목을 입력하세요...' : '내용을 입력하세요...'}
                   maxLength={editingZone === 'title' ? 40 : 400}
                   style={{
                     position: 'absolute',
@@ -744,33 +744,33 @@ export default function NoticePage() {
                 />
               )}
 
-              {/* ?몄쭛 以??덉씠釉?*/}
+              {/* 편집 중 레이블 */}
               {editingZone && (
                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-30 pointer-events-none">
                   <Edit3 className="h-3 w-3" />
-                  {editingZone === 'title' ? '?쒕ぉ ?몄쭛 以? : '?댁슜 ?몄쭛 以?}
+                  {editingZone === 'title' ? '제목 편집 중' : '내용 편집 중'}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ?ㅽ????⑤꼸 */}
+          {/* 스타일 패널 */}
           <Card className="border-slate-700 bg-slate-900">
             <CardContent className="p-3 space-y-3">
               <div className="flex gap-1 bg-slate-800 rounded-lg p-1">
                 {(['title', 'content', 'layout'] as StyleTab[]).map(tab => (
                   <button key={tab} onClick={() => handleTabChange(tab)} className={tabCls(tab)}>
-                    {tab === 'title' ? '?쒕ぉ ?ㅽ??? : tab === 'content' ? '?댁슜 ?ㅽ??? : '諛곗튂'}
+                    {tab === 'title' ? '제목 스타일' : tab === 'content' ? '내용 스타일' : '배치'}
                   </button>
                 ))}
               </div>
 
               {styleTab === 'title' && (
                 <div className="space-y-2">
-                  <SizeRow label="湲???ш린" value={styles.titleSize}   min={40}   max={120}  onChange={v => setStyle('titleSize',   v)} />
-                  <ColorRow label="湲???됱긽" value={styles.titleColor}  onChange={v => setStyle('titleColor',  v)} />
+                  <SizeRow label="글씨 크기" value={styles.titleSize}   min={40}   max={120}  onChange={v => setStyle('titleSize',   v)} />
+                  <ColorRow label="글씨 색상" value={styles.titleColor}  onChange={v => setStyle('titleColor',  v)} />
                   <div className="flex items-center gap-2 h-7">
-                    <span className="text-slate-400 text-xs w-14 shrink-0">援듦쾶</span>
+                    <span className="text-slate-400 text-xs w-14 shrink-0">굵게</span>
                     <button onClick={() => setStyle('titleBold', !styles.titleBold)}
                       className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${styles.titleBold ? 'bg-blue-600' : 'bg-slate-700'}`}>
                       <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${styles.titleBold ? 'right-0.5' : 'left-0.5'}`} />
@@ -782,15 +782,15 @@ export default function NoticePage() {
 
               {styleTab === 'content' && (
                 <div className="space-y-2">
-                  <SizeRow  label="湲???ш린" value={styles.contentSize}  min={24}   max={72}   onChange={v => setStyle('contentSize',  v)} />
-                  <ColorRow label="湲???됱긽" value={styles.contentColor} onChange={v => setStyle('contentColor', v)} />
+                  <SizeRow  label="글씨 크기" value={styles.contentSize}  min={24}   max={72}   onChange={v => setStyle('contentSize',  v)} />
+                  <ColorRow label="글씨 색상" value={styles.contentColor} onChange={v => setStyle('contentColor', v)} />
                 </div>
               )}
 
               {styleTab === 'layout' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 h-7">
-                    <span className="text-slate-400 text-xs w-14 shrink-0">?뺣젹</span>
+                    <span className="text-slate-400 text-xs w-14 shrink-0">정렬</span>
                     <div className="flex gap-1">
                       {([{ v: 'left' as Align, Icon: AlignLeft }, { v: 'center' as Align, Icon: AlignCenter }, { v: 'right' as Align, Icon: AlignRight }]).map(({ v, Icon }) => (
                         <button key={v} onClick={() => setStyle('textAlign', v)}
@@ -800,11 +800,11 @@ export default function NoticePage() {
                       ))}
                     </div>
                   </div>
-                  <SizeRow label="?섏쭅 ?꾩튂" value={styles.verticalOffset} min={-200} max={200} step={10} onChange={v => setStyle('verticalOffset', v)} />
-                  <p className="text-slate-600 text-xs pl-16">?뚯닔 = ?꾨줈, ?묒닔 = ?꾨옒濡?/p>
+                  <SizeRow label="수직 위치" value={styles.verticalOffset} min={-200} max={200} step={10} onChange={v => setStyle('verticalOffset', v)} />
+                  <p className="text-slate-600 text-xs pl-16">음수 = 위로, 양수 = 아래로</p>
                   <button onClick={() => setStyles(TEMPLATE_DEFAULTS[selectedTpl])}
                     className="text-slate-500 hover:text-slate-300 text-xs underline underline-offset-2 pl-16">
-                    湲곕낯媛?珥덇린??
+                    기본값 초기화
                   </button>
                 </div>
               )}
@@ -814,26 +814,26 @@ export default function NoticePage() {
         </div>
       </div>
 
-      {/* ?? ??λ맂 怨듭??ы빆 紐⑸줉 ?? */}
+      {/* ── 저장된 공지사항 목록 ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <Clock className="h-5 w-5 text-slate-400" />
-            ??λ맂 怨듭??ы빆
+            저장된 공지사항
             <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">{notices.length}</span>
           </h3>
           <button onClick={fetchNotices} className="text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />?덈줈怨좎묠
+            <RefreshCw className="h-3 w-3" />새로고침
           </button>
         </div>
 
         {noticesLoading ? (
-          <div className="text-slate-500 text-sm text-center py-8">遺덈윭?ㅻ뒗 以?..</div>
+          <div className="text-slate-500 text-sm text-center py-8">불러오는 중...</div>
         ) : notices.length === 0 ? (
           <div className="border border-dashed border-slate-700 rounded-xl py-12 text-center">
             <Megaphone className="h-10 w-10 text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">?꾩쭅 ??λ맂 怨듭??ы빆???놁뒿?덈떎</p>
-            <p className="text-slate-600 text-xs mt-1">?대?吏瑜??ㅼ슫濡쒕뱶?섎㈃ ?먮룞?쇰줈 ?ш린????λ맗?덈떎</p>
+            <p className="text-slate-500 text-sm">아직 저장된 공지사항이 없습니다</p>
+            <p className="text-slate-600 text-xs mt-1">이미지를 다운로드하면 자동으로 여기에 저장됩니다</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -848,7 +848,7 @@ export default function NoticePage() {
                       ? 'border-amber-500 ring-2 ring-amber-500/30'
                       : 'border-slate-700 hover:border-slate-500'
                   }`}>
-                  {/* ?몃꽕??*/}
+                  {/* 썸네일 */}
                   <div className="relative aspect-square overflow-hidden bg-slate-900">
                     {notice.thumbnail
                       ? <img src={notice.thumbnail} alt={notice.title} className="w-full h-full object-cover" />
@@ -859,28 +859,28 @@ export default function NoticePage() {
                     }
                     {isEditing && (
                       <div className="absolute inset-0 bg-amber-900/30 flex items-center justify-center">
-                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">?섏젙 以?/span>
+                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">수정 중</span>
                       </div>
                     )}
                   </div>
 
-                  {/* ?뺣낫 */}
+                  {/* 정보 */}
                   <div className="bg-slate-900 p-2.5 space-y-1.5">
-                    <p className="text-white text-xs font-medium truncate">{notice.title || '(?쒕ぉ ?놁쓬)'}</p>
+                    <p className="text-white text-xs font-medium truncate">{notice.title || '(제목 없음)'}</p>
                     <p className="text-slate-500 text-xs truncate">{notice.date}</p>
 
-                    {/* ??젣 ?뺤씤 */}
+                    {/* 삭제 확인 */}
                     {isConfirmDelete ? (
                       <div className="space-y-1.5 pt-0.5">
-                        <p className="text-red-400 text-xs text-center">??젣?섏떆寃좎뒿?덇퉴?</p>
+                        <p className="text-red-400 text-xs text-center">삭제하시겠습니까?</p>
                         <div className="flex gap-1">
                           <button onClick={() => handleDeleteNotice(notice.id)}
                             className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 rounded transition-colors">
-                            ??젣
+                            삭제
                           </button>
                           <button onClick={() => setDeleteConfirmId(null)}
                             className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1 rounded transition-colors">
-                            痍⑥냼
+                            취소
                           </button>
                         </div>
                       </div>
@@ -889,12 +889,12 @@ export default function NoticePage() {
                         <button
                           onClick={() => handleEditNotice(notice)}
                           className="flex-1 bg-slate-700 hover:bg-blue-700 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
-                          <Pencil className="h-3 w-3" />?섏젙
+                          <Pencil className="h-3 w-3" />수정
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(notice.id)}
                           className="flex-1 bg-slate-700 hover:bg-red-800 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
-                          <Trash2 className="h-3 w-3" />??젣
+                          <Trash2 className="h-3 w-3" />삭제
                         </button>
                       </div>
                     )}
