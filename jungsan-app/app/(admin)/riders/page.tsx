@@ -424,7 +424,18 @@ export default function RidersPage() {
       fetch('/api/admin/rider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: r.id, ...r, status: 'inactive' }),
+        body: JSON.stringify({
+          id: r.id,
+          join_date: r.join_date ?? null,
+          name: r.name,
+          rider_username: r.rider_username ?? null,
+          id_number: r.id_number ?? null,
+          phone: r.phone ?? null,
+          bank_name: r.bank_name ?? null,
+          bank_account: r.bank_account ?? null,
+          account_holder: r.account_holder ?? null,
+          status: 'inactive',
+        }),
       })
     ))
     toast.success(`${targets.length}명을 비활성화했습니다.`)
