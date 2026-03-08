@@ -19,13 +19,13 @@ import { toast } from 'sonner'
 
 type PaymentWithRider = AdvancePayment & { riders: Rider }
 
-// 수요일~화요일 기준 주간 목록 생성 (최근 24주)
+// ?�요???�요??기�? 주간 목록 ?�성 (최근 24�?
 function getWeekOptions() {
   const options: { label: string; value: string }[] = []
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // 가장 최근 수요일 찾기 (0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토)
+  // 가??최근 ?�요??찾기 (0=?? 1=?? 2=?? 3=?? 4=�? 5=�? 6=??
   const daysBack = (today.getDay() - 3 + 7) % 7
   const baseWed = new Date(today)
   baseWed.setDate(today.getDate() - daysBack)
@@ -42,7 +42,7 @@ function getWeekOptions() {
     const day = String(d.getDate()).padStart(2, '0')
     return `${y}-${m}-${day}`
   }
-  const dayLabel = ['일', '월', '화', '수', '목', '금', '토']
+  const dayLabel = ['??, '??, '??, '??, '�?, '�?, '??]
 
   for (let i = 0; i < 24; i++) {
     const wed = new Date(baseWed)
@@ -61,7 +61,7 @@ const weekOptions = getWeekOptions()
 
 const emptyForm = { rider_id: '', amount: '', week: weekOptions[0]?.value ?? '', memo: '' }
 
-// 라이더 검색 Select 컴포넌트
+// ?�이??검??Select 컴포?�트
 function RiderSearchSelect({
   riders,
   value,
@@ -95,7 +95,7 @@ function RiderSearchSelect({
         className="w-full flex items-center justify-between px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white hover:border-slate-500 transition-colors"
       >
         <span className={selected ? 'text-white' : 'text-slate-500'}>
-          {selected ? `${selected.name}${selected.rider_username ? ` (${selected.rider_username})` : ''}` : '라이더 검색 후 선택'}
+          {selected ? `${selected.name}${selected.rider_username ? ` (${selected.rider_username})` : ''}` : '?�이??검?????�택'}
         </span>
         <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
       </button>
@@ -109,14 +109,14 @@ function RiderSearchSelect({
                 autoFocus
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="이름·아이디·연락처 검색"
+                placeholder="?�름·?�이?�·연?�처 검??
                 className="pl-7 h-8 text-sm bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
           </div>
           <div className="max-h-48 overflow-y-auto">
             {filtered.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-3">검색 결과 없음</p>
+              <p className="text-slate-500 text-sm text-center py-3">검??결과 ?�음</p>
             ) : (
               filtered.map(r => (
                 <button
@@ -170,12 +170,12 @@ export default function AdvancePaymentsPage() {
   const handleSave = async (type: 'advance' | 'recovery') => {
     const form = type === 'advance' ? advanceForm : recoveryForm
     if (!form.rider_id || !form.amount || !form.week) {
-      toast.error('라이더, 금액, 주간을 모두 입력해주세요.')
+      toast.error('?�이?? 금액, 주간??모두 ?�력?�주?�요.')
       return
     }
     const amount = parseInt(form.amount.replace(/,/g, ''))
     if (isNaN(amount) || amount <= 0) {
-      toast.error('올바른 금액을 입력해주세요.')
+      toast.error('?�바�?금액???�력?�주?�요.')
       return
     }
 
@@ -190,9 +190,9 @@ export default function AdvancePaymentsPage() {
     if (userId) insertRow.user_id = userId
     const { error } = await supabase.from('advance_payments').insert(insertRow)
 
-    if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
+    if (error) { toast.error('?�록 ?�패: ' + error.message); setSaving(false); return }
 
-    toast.success(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
+    toast.success(type === 'advance' ? '?��?급금???�록?�었?�니??' : '?�수 ?�역???�록?�었?�니??')
     setSaving(false)
     if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
     else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
@@ -201,14 +201,14 @@ export default function AdvancePaymentsPage() {
 
   const handleDelete = async (id: string, riderName: string, type: 'advance' | 'recovery') => {
     const target = payments.find(p => p.id === id)
-    const label = type === 'advance' ? '선지급금' : '회수 내역'
+    const label = type === 'advance' ? '?��?급금' : '?�수 ?�역'
     const extraWarning = target?.deducted_settlement_id
-      ? '\n※ 이미 정산에 공제된 항목입니다. 삭제해도 기존 정산 결과는 변경되지 않습니다.'
+      ? '\n???��? ?�산??공제????��?�니?? ??��?�도 기존 ?�산 결과??변경되지 ?�습?�다.'
       : ''
-    if (!confirm(`${riderName}의 ${label}을 삭제하시겠습니까?${extraWarning}`)) return
+    if (!confirm(`${riderName}??${label}????��?�시겠습?�까?${extraWarning}`)) return
     const { error } = await supabase.from('advance_payments').delete().eq('id', id)
-    if (error) { toast.error('삭제 실패'); return }
-    toast.success('삭제되었습니다.')
+    if (error) { toast.error('??�� ?�패'); return }
+    toast.success('??��?�었?�니??')
     fetchData()
   }
 
@@ -223,10 +223,10 @@ export default function AdvancePaymentsPage() {
     return { rider: r, total }
   }).filter(x => x.total > 0)
 
-  // 주간 라벨 찾기
+  // 주간 ?�벨 찾기
   const weekLabel = (dateStr: string) => weekOptions.find(w => w.value === dateStr)?.label ?? dateStr
 
-  // 공통 다이얼로그 폼 렌더링
+  // 공통 ?�이?�로�????�더�?
   const renderForm = (
     type: 'advance' | 'recovery',
     form: typeof emptyForm,
@@ -234,7 +234,7 @@ export default function AdvancePaymentsPage() {
   ) => (
     <div className="space-y-4 py-2">
       <div className="space-y-1.5">
-        <Label className="text-slate-300">라이더 *</Label>
+        <Label className="text-slate-300">?�이??*</Label>
         <RiderSearchSelect riders={riders} value={form.rider_id} onChange={id => setForm(f => ({ ...f, rider_id: id }))} />
       </div>
       <div className="space-y-1.5">
@@ -248,7 +248,7 @@ export default function AdvancePaymentsPage() {
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-slate-300">{type === 'advance' ? '지급 주간' : '회수 주간'} *</Label>
+        <Label className="text-slate-300">{type === 'advance' ? '지�?주간' : '?�수 주간'} *</Label>
         <div className="relative">
           <select
             value={form.week}
@@ -267,7 +267,7 @@ export default function AdvancePaymentsPage() {
         <Textarea
           value={form.memo}
           onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
-          placeholder={type === 'advance' ? '선지급 사유...' : '회수 사유...'}
+          placeholder={type === 'advance' ? '?��?�??�유...' : '?�수 ?�유...'}
           className="bg-slate-800 border-slate-600 text-white resize-none"
           rows={2}
         />
@@ -276,33 +276,33 @@ export default function AdvancePaymentsPage() {
   )
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">선지급금 관리</h2>
-          <p className="text-slate-400 text-sm mt-1">라이더별 선지급금 등록 및 공제 현황</p>
+          <h2 className="text-2xl font-bold text-white">?��?급금 관�?/h2>
+          <p className="text-slate-400 text-sm mt-1">?�이?�별 ?��?급금 ?�록 �?공제 ?�황</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => { setRecoveryForm(emptyForm); setRecoveryOpen(true) }}
             variant="outline" className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/20">
             <RotateCcw className="h-4 w-4 mr-2" />
-            회수 등록
+            ?�수 ?�록
           </Button>
           <Button onClick={() => { setAdvanceForm(emptyForm); setAdvanceOpen(true) }}
             className="bg-blue-600 hover:bg-blue-700 text-white">
             <Plus className="h-4 w-4 mr-2" />
-            선지급금 등록
+            ?��?급금 ?�록
           </Button>
         </div>
       </div>
 
-      {/* 요약 카드 */}
+      {/* ?�약 카드 */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-slate-700 bg-orange-900/20">
           <CardContent className="p-4 flex items-center gap-3">
             <AlertCircle className="h-8 w-8 text-orange-400" />
             <div>
-              <p className="text-slate-400 text-xs">미공제 선지급금 합계</p>
+              <p className="text-slate-400 text-xs">미공???��?급금 ?�계</p>
               <p className="text-orange-400 text-2xl font-bold">{formatKRW(totalAdvance)}</p>
             </div>
           </CardContent>
@@ -311,8 +311,8 @@ export default function AdvancePaymentsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Wallet className="h-8 w-8 text-blue-400" />
             <div>
-              <p className="text-slate-400 text-xs">미공제 대상 라이더</p>
-              <p className="text-blue-400 text-2xl font-bold">{undeductedByRider.length}명</p>
+              <p className="text-slate-400 text-xs">미공???�???�이??/p>
+              <p className="text-blue-400 text-2xl font-bold">{undeductedByRider.length}�?/p>
             </div>
           </CardContent>
         </Card>
@@ -320,20 +320,20 @@ export default function AdvancePaymentsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <RotateCcw className="h-8 w-8 text-emerald-400" />
             <div>
-              <p className="text-slate-400 text-xs">회수 합계</p>
+              <p className="text-slate-400 text-xs">?�수 ?�계</p>
               <p className="text-emerald-400 text-2xl font-bold">{formatKRW(totalRecovery)}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 미공제 뱃지 */}
+      {/* 미공??뱃�? */}
       {undeductedByRider.length > 0 && (
         <Card className="border-orange-700/50 bg-orange-900/10">
           <CardHeader>
             <CardTitle className="text-orange-400 text-sm flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              미공제 선지급금 현황
+              미공???��?급금 ?�황
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -348,28 +348,28 @@ export default function AdvancePaymentsPage() {
         </Card>
       )}
 
-      {/* 선지급금 내역 테이블 */}
+      {/* ?��?급금 ?�역 ?�이�?*/}
       <Card className="border-slate-700 bg-slate-900">
         <CardHeader>
-          <CardTitle className="text-white text-base">선지급금 내역 ({advances.length}건)</CardTitle>
+          <CardTitle className="text-white text-base">?��?급금 ?�역 ({advances.length}�?</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow className="border-slate-700 hover:bg-transparent">
-                <TableHead className="text-slate-400">라이더</TableHead>
+                <TableHead className="text-slate-400">?�이??/TableHead>
                 <TableHead className="text-slate-400">금액</TableHead>
-                <TableHead className="text-slate-400">지급 주간</TableHead>
+                <TableHead className="text-slate-400">지�?주간</TableHead>
                 <TableHead className="text-slate-400">메모</TableHead>
-                <TableHead className="text-slate-400">공제 여부</TableHead>
-                <TableHead className="text-slate-400 text-right">관리</TableHead>
+                <TableHead className="text-slate-400">공제 ?��?</TableHead>
+                <TableHead className="text-slate-400 text-right">관�?/TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">로딩 중...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">로딩 �?..</TableCell></TableRow>
               ) : advances.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">등록된 선지급금이 없습니다.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-slate-500 py-8">?�록???��?급금???�습?�다.</TableCell></TableRow>
               ) : (
                 advances.map(p => (
                   <TableRow key={p.id} className="border-slate-700 hover:bg-slate-800/50">
@@ -379,14 +379,14 @@ export default function AdvancePaymentsPage() {
                     <TableCell className="text-slate-400 text-sm">{p.memo ?? '-'}</TableCell>
                     <TableCell>
                       <Badge className={p.deducted_settlement_id ? 'bg-emerald-800 text-emerald-300' : 'bg-orange-800 text-orange-300'}>
-                        {p.deducted_settlement_id ? '공제 완료' : '미공제'}
+                        {p.deducted_settlement_id ? '공제 ?�료' : '미공??}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost"
                         onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
                         className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />??��
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -397,30 +397,30 @@ export default function AdvancePaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* 회수 내역 테이블 */}
+      {/* ?�수 ?�역 ?�이�?*/}
       <Card className="border-emerald-700/40 bg-slate-900">
         <CardHeader>
           <CardTitle className="text-emerald-400 text-base flex items-center gap-2">
             <RotateCcw className="h-4 w-4" />
-            회수 내역 ({recoveries.length}건)
+            ?�수 ?�역 ({recoveries.length}�?
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow className="border-slate-700 hover:bg-transparent">
-                <TableHead className="text-slate-400">라이더</TableHead>
+                <TableHead className="text-slate-400">?�이??/TableHead>
                 <TableHead className="text-slate-400">금액</TableHead>
-                <TableHead className="text-slate-400">회수 주간</TableHead>
+                <TableHead className="text-slate-400">?�수 주간</TableHead>
                 <TableHead className="text-slate-400">메모</TableHead>
-                <TableHead className="text-slate-400 text-right">관리</TableHead>
+                <TableHead className="text-slate-400 text-right">관�?/TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">로딩 중...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">로딩 �?..</TableCell></TableRow>
               ) : recoveries.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">회수 내역이 없습니다.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-8">?�수 ?�역???�습?�다.</TableCell></TableRow>
               ) : (
                 recoveries.map(p => (
                   <TableRow key={p.id} className="border-slate-700 hover:bg-slate-800/50">
@@ -432,7 +432,7 @@ export default function AdvancePaymentsPage() {
                       <Button size="sm" variant="ghost"
                         onClick={() => handleDelete(p.id, p.riders?.name, 'recovery')}
                         className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />??��
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -443,37 +443,37 @@ export default function AdvancePaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* 선지급금 등록 다이얼로그 */}
+      {/* ?��?급금 ?�록 ?�이?�로�?*/}
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              <Plus className="h-5 w-5 text-blue-400" />선지급금 등록
+              <Plus className="h-5 w-5 text-blue-400" />?��?급금 ?�록
             </DialogTitle>
           </DialogHeader>
           {renderForm('advance', advanceForm, setAdvanceForm)}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAdvanceOpen(false)} className="text-slate-400 hover:text-white">취소</Button>
             <Button onClick={() => handleSave('advance')} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
-              {saving ? '저장 중...' : '등록'}
+              {saving ? '?�??�?..' : '?�록'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 회수 등록 다이얼로그 */}
+      {/* ?�수 ?�록 ?�이?�로�?*/}
       <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              <RotateCcw className="h-5 w-5 text-emerald-400" />회수 등록
+              <RotateCcw className="h-5 w-5 text-emerald-400" />?�수 ?�록
             </DialogTitle>
           </DialogHeader>
           {renderForm('recovery', recoveryForm, setRecoveryForm)}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRecoveryOpen(false)} className="text-slate-400 hover:text-white">취소</Button>
             <Button onClick={() => handleSave('recovery')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-              {saving ? '저장 중...' : '등록'}
+              {saving ? '?�??�?..' : '?�록'}
             </Button>
           </DialogFooter>
         </DialogContent>

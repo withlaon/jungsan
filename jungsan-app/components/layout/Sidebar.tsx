@@ -29,6 +29,8 @@ import {
   Trash2,
   Megaphone,
   MessageSquare,
+  Menu,
+  X,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser, clearUserCache } from '@/hooks/useUser'
@@ -95,6 +97,7 @@ export function Sidebar() {
   const config = PLATFORM_CONFIG[platform ?? 'baemin']
   const PlatformIcon = config.icon
 
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [profile, setProfile] = useState<Profile>({ username: '', company_name: '', business_number: '', manager_name: '', phone: '', email: '', logo_url: '' })
   const [newPassword, setNewPassword] = useState('')
@@ -271,8 +274,10 @@ export function Sidebar() {
     router.push('/')
   }
 
-  return (
-    <>
+  // 모바일에서 경로 변경 시 드로어 닫기
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  const SidebarInner = () => (
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
       <div className="p-5 flex items-center gap-3 border-b border-slate-700">
         <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden`}
@@ -296,6 +301,13 @@ export function Sidebar() {
           <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
           <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
         </div>
+        {/* 모바일 닫기 버튼 */}
+        <button
+          className="md:hidden text-slate-400 hover:text-white p-1"
+          onClick={() => setMobileOpen(false)}
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto flex flex-col">
@@ -320,7 +332,6 @@ export function Sidebar() {
           })}
         </div>
 
-        {/* 구분선 + 사용자 메뉴얼 */}
         <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-1">
           {bottomNavItems.map((item) => {
             const Icon = item.icon
@@ -371,6 +382,46 @@ export function Sidebar() {
         </Button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* 모바일 상단 헤더 바 (md 이상에서 숨김) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-slate-900 border-b border-slate-700 flex items-center px-4 gap-3">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="text-slate-400 hover:text-white p-1"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className={`${config.accent} rounded-lg shrink-0 w-7 h-7 flex items-center justify-center`}>
+          <PlatformIcon className="h-4 w-4 text-white" />
+        </div>
+        <h1 className="text-white font-semibold text-sm truncate">{config.label}</h1>
+      </div>
+
+      {/* 데스크탑 사이드바 (md 미만 숨김) */}
+      <div className="hidden md:block">
+        <SidebarInner />
+      </div>
+
+      {/* 모바일 드로어 오버레이 */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 flex"
+          onClick={() => setMobileOpen(false)}
+        >
+          {/* 배경 딤 */}
+          <div className="absolute inset-0 bg-black/60" />
+          {/* 드로어 패널 */}
+          <div
+            className="relative z-10"
+            onClick={e => e.stopPropagation()}
+          >
+            <SidebarInner />
+          </div>
+        </div>
+      )}
 
     {/* 정보수정 다이얼로그 */}
     <Dialog open={profileOpen} onOpenChange={setProfileOpen}>

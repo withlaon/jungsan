@@ -13,9 +13,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ìƒìˆ˜ / íƒ€ì…
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ?ìˆ˜ / ?€??
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 const SIZE = 1080
 const FONT = "'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', sans-serif"
 type TemplateId = 1 | 2 | 3 | 4
@@ -41,15 +41,15 @@ const TEMPLATE_DEFAULTS: Record<TemplateId, StyleOptions> = {
 }
 
 const TEMPLATES = [
-  { id: 1 as TemplateId, name: 'ë‹¤í¬ ë¹„ì¦ˆë‹ˆìŠ¤', colors: ['#0c1228', '#0f2044'], accent: '#38bdf8' },
-  { id: 2 as TemplateId, name: 'í´ë¦° í™”ì´íŠ¸',   colors: ['#1e40af', '#3b82f6'], accent: '#3b82f6' },
-  { id: 3 as TemplateId, name: 'ì—ë©”ë„ë“œ ê·¸ë¦°', colors: ['#022c22', '#064e3b'], accent: '#34d399' },
-  { id: 4 as TemplateId, name: 'ì›œ ì˜¤ë Œì§€',     colors: ['#ea580c', '#f97316'], accent: '#f97316' },
+  { id: 1 as TemplateId, name: '?¤í¬ ë¹„ì¦ˆ?ˆìŠ¤', colors: ['#0c1228', '#0f2044'], accent: '#38bdf8' },
+  { id: 2 as TemplateId, name: '?´ë¦° ?”ì´??,   colors: ['#1e40af', '#3b82f6'], accent: '#3b82f6' },
+  { id: 3 as TemplateId, name: '?ë©”?„ë“œ ê·¸ë¦°', colors: ['#022c22', '#064e3b'], accent: '#34d399' },
+  { id: 4 as TemplateId, name: '???¤ë Œì§€',     colors: ['#ea580c', '#f97316'], accent: '#f97316' },
 ]
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ê³µì§€ì‚¬í•­ ë ˆì½”ë“œ íƒ€ì…
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ê³µì??¬í•­ ?ˆì½”???€??
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 interface Notice {
   id: string
   title: string
@@ -62,9 +62,9 @@ interface Notice {
   created_at: string
 }
 
-const THUMB = 320  // ì¸ë„¤ì¼ ìº”ë²„ìŠ¤ í¬ê¸°
+const THUMB = 320  // ?¸ë„¤??ìº”ë²„???¬ê¸°
 
-// ì¸ë„¤ì¼(320px) ìƒì„± â†’ base64 PNG ë°˜í™˜
+// ?¸ë„¤??320px) ?ì„± ??base64 PNG ë°˜í™˜
 function generateThumbnail(
   title: string, content: string, date: string, company: string,
   templateId: TemplateId, styles: StyleOptions,
@@ -72,8 +72,8 @@ function generateThumbnail(
   const off = document.createElement('canvas')
   off.width = THUMB; off.height = THUMB
   const ctx = off.getContext('2d')!
-  // SIZEâ†’THUMB ìŠ¤ì¼€ì¼ë¡œ ë™ì¼í•œ draw í•¨ìˆ˜ í˜¸ì¶œí•˜ë˜,
-  // ctx.scaleë¡œ ì¶•ì†Œ ì ìš©
+  // SIZE?’THUMB ?¤ì??¼ë¡œ ?™ì¼??draw ?¨ìˆ˜ ?¸ì¶œ?˜ë˜,
+  // ctx.scaleë¡?ì¶•ì†Œ ?ìš©
   ctx.scale(THUMB / SIZE, THUMB / SIZE)
   const nb: Bounds = { title: null, content: null }
   const args = [ctx, title, content, date, company, styles, nb, null, null] as const
@@ -84,7 +84,7 @@ function generateThumbnail(
   return off.toDataURL('image/jpeg', 0.7)
 }
 
-// overlay ê¸°ì¤€: left pad, right pad (canvas ì¢Œí‘œ)
+// overlay ê¸°ì?: left pad, right pad (canvas ì¢Œí‘œ)
 const TPL_REGION: Record<TemplateId, { left: number; right: number }> = {
   1: { left: 90,  right: 90  },
   2: { left: 132, right: 60  },
@@ -92,9 +92,9 @@ const TPL_REGION: Record<TemplateId, { left: number; right: number }> = {
   4: { left: 110, right: 60  },
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ìº”ë²„ìŠ¤ í—¬í¼
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ìº”ë²„???¬í¼
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return ['']
   const lines: string[] = []
@@ -117,7 +117,7 @@ function xByAlign(align: Align, pad: number, rightPad = pad): number {
   return pad
 }
 
-// í…ìŠ¤íŠ¸ ì¡´ ê³µí†µ ë“œë¡œì‰ (editingZone ì§€ì›)
+// ?ìŠ¤??ì¡?ê³µí†µ ?œë¡œ??(editingZone ì§€??
 function drawZone(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -156,7 +156,7 @@ function drawZone(
   return { y1: startY, y2: curY }
 }
 
-// ì„ íƒ í•˜ì´ë¼ì´íŠ¸
+// ? íƒ ?˜ì´?¼ì´??
 function drawSelectionOverlay(
   ctx: CanvasRenderingContext2D,
   selection: 'title' | 'content' | null,
@@ -176,9 +176,9 @@ function drawSelectionOverlay(
   ctx.setLineDash([]); ctx.restore()
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Template 1: ë‹¤í¬ ë¹„ì¦ˆë‹ˆìŠ¤
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// Template 1: ?¤í¬ ë¹„ì¦ˆ?ˆìŠ¤
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function drawT1(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE)
@@ -194,25 +194,25 @@ function drawT1(ctx: CanvasRenderingContext2D, title: string, content: string, d
   if (company) { ctx.font = `500 30px ${FONT}`; ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'; ctx.fillText(company, PAD, 90) }
   if (date)    { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#475569'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - PAD, 90) }
   ctx.strokeStyle = 'rgba(51,65,85,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, 118); ctx.lineTo(SIZE - PAD, 118); ctx.stroke()
-  ctx.font = `700 28px ${FONT}`; ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'left'; ctx.fillText('ğŸ“¢  ê³µì§€ì‚¬í•­', PAD, 170)
+  ctx.font = `700 28px ${FONT}`; ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'left'; ctx.fillText('?“¢  ê³µì??¬í•­', PAD, 170)
 
   let curY = 230 + s.verticalOffset
-  const tr = drawZone(ctx, title, 'âœ  ì œëª© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '?? ?œëª© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 12; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') {
     const ag = ctx.createLinearGradient(PAD, 0, PAD + 200, 0); ag.addColorStop(0, '#06b6d4'); ag.addColorStop(1, 'transparent')
     ctx.strokeStyle = ag; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(PAD, curY); ctx.lineTo(PAD + 200, curY); ctx.stroke()
   }
   curY += 36
-  const cr = drawZone(ctx, content, 'âœ  ë‚´ìš© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '?? ?´ìš© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   ctx.fillStyle = topBar; ctx.fillRect(0, SIZE - 12, SIZE, 12)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Template 2: í´ë¦° í™”ì´íŠ¸
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// Template 2: ?´ë¦° ?”ì´??
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, SIZE, SIZE)
@@ -221,7 +221,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   ctx.fillStyle = hg; ctx.fillRect(0, 0, SIZE, headerH)
   ctx.beginPath(); ctx.arc(SIZE - 80, headerH / 2, 220, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill()
   ctx.beginPath(); ctx.arc(SIZE - 80, headerH / 2, 140, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill()
-  ctx.font = `800 52px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('ê³µì§€ì‚¬í•­', 80, 120)
+  ctx.font = `800 52px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('ê³µì??¬í•­', 80, 120)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(company, 80, 170) }
   if (date)    { ctx.font = `400 26px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - 80, 170) }
   const cardX = 60, cardY = 290, cardW = SIZE - 120, cardH = SIZE - 360
@@ -238,7 +238,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   // Title
   {
     const isEditing = editingZone === 'title', isEmpty = !title.trim()
-    const display = isEmpty ? 'âœ  ì œëª© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥' : title
+    const display = isEmpty ? '?? ?œëª© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥' : title
     const weight  = s.titleBold ? '800' : '500'
     const lineH   = Math.round(s.titleSize * 1.25)
     const effAlign: Align = isEmpty ? 'left' : s.textAlign
@@ -255,7 +255,7 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   // Content
   {
     const isEditing = editingZone === 'content', isEmpty = !content.trim()
-    const display = isEmpty ? 'âœ  ë‚´ìš© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥' : content
+    const display = isEmpty ? '?? ?´ìš© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥' : content
     const lineH = Math.round(s.contentSize * 1.5)
     const effAlign: Align = isEmpty ? 'left' : s.textAlign
     const y1 = curY
@@ -268,9 +268,9 @@ function drawT2(ctx: CanvasRenderingContext2D, title: string, content: string, d
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Template 3: ì—ë©”ë„ë“œ ê·¸ë¦°
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// Template 3: ?ë©”?„ë“œ ê·¸ë¦°
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function drawT3(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE); bg.addColorStop(0, '#022c22'); bg.addColorStop(1, '#064e3b')
@@ -280,26 +280,26 @@ function drawT3(ctx: CanvasRenderingContext2D, title: string, content: string, d
   const vBar = ctx.createLinearGradient(0, 0, 0, SIZE); vBar.addColorStop(0, '#34d399'); vBar.addColorStop(1, '#059669')
   ctx.fillStyle = vBar; ctx.fillRect(0, 0, 10, SIZE)
   const PAD = 80
-  ctx.font = `700 30px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'left'; ctx.fillText('ğŸ“¢  N O T I C E', PAD, 95)
+  ctx.font = `700 30px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'left'; ctx.fillText('?“¢  N O T I C E', PAD, 95)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'right'; ctx.fillText(company, SIZE - PAD, 95) }
   const gg = ctx.createLinearGradient(PAD, 0, SIZE - PAD, 0); gg.addColorStop(0, 'transparent'); gg.addColorStop(0.15, '#fbbf24'); gg.addColorStop(0.85, '#fbbf24'); gg.addColorStop(1, 'transparent')
   ctx.strokeStyle = gg; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(PAD, 124); ctx.lineTo(SIZE - PAD, 124); ctx.stroke()
 
   let curY = 220 + s.verticalOffset
-  const tr = drawZone(ctx, title, 'âœ  ì œëª© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '?? ?œëª© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 10; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') { ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(PAD, curY); ctx.lineTo(PAD + 120, curY); ctx.stroke() }
   curY += 46
-  const cr = drawZone(ctx, content, 'âœ  ë‚´ìš© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '?? ?´ìš© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, PAD, curY, SIZE - PAD * 2, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   if (date) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = '#6ee7b7'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - PAD, SIZE - 56) }
   ctx.fillStyle = '#fbbf24'; ctx.fillRect(0, SIZE - 8, SIZE, 8)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Template 4: ì›œ ì˜¤ë Œì§€
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// Template 4: ???¤ë Œì§€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function drawT4(ctx: CanvasRenderingContext2D, title: string, content: string, date: string, company: string, s: StyleOptions, bounds: Bounds, editingZone: EditZone, selection: 'title' | 'content' | null) {
   bounds.title = null; bounds.content = null
   ctx.fillStyle = '#fef3c7'; ctx.fillRect(0, 0, SIZE, SIZE)
@@ -308,26 +308,26 @@ function drawT4(ctx: CanvasRenderingContext2D, title: string, content: string, d
   const og = ctx.createLinearGradient(0, 0, SIZE, 0); og.addColorStop(0, '#ea580c'); og.addColorStop(1, '#f97316')
   ctx.fillStyle = og; ctx.fillRect(40, 40, SIZE - 80, headerH)
   ctx.beginPath(); ctx.arc(SIZE - 100, 40 + headerH / 2, 160, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fill()
-  ctx.font = `800 48px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('ê³µì§€ì‚¬í•­', 110, 40 + 96)
+  ctx.font = `800 48px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.fillText('ê³µì??¬í•­', 110, 40 + 96)
   if (company) { ctx.font = `400 28px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillText(company, 110, 40 + 152) }
   if (date)    { ctx.font = `400 26px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.textAlign = 'right'; ctx.fillText(date, SIZE - 110, 40 + 152) }
   ctx.fillStyle = og; ctx.fillRect(40, 40 + headerH, 8, SIZE - 80 - headerH)
   const PAD = 110
 
   let curY = 40 + headerH + 90 + s.verticalOffset
-  const tr = drawZone(ctx, title, 'âœ  ì œëª© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, 60, curY, SIZE - PAD - 60, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
+  const tr = drawZone(ctx, title, '?? ?œëª© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, 60, curY, SIZE - PAD - 60, s.titleSize, s.titleBold ? '800' : '500', s.titleColor, s.textAlign, 1.25, editingZone, 'title')
   curY = tr.y2 + 8; bounds.title = { y1: tr.y1, y2: curY }
   if (title.trim() && editingZone !== 'title') { ctx.fillStyle = '#f97316'; ctx.fillRect(PAD, curY, 80, 6) }
   curY += 44
-  const cr = drawZone(ctx, content, 'âœ  ë‚´ìš© ì˜ì—­ â€” í´ë¦­í•˜ì—¬ ì…ë ¥', PAD, 60, curY, SIZE - PAD - 60, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
+  const cr = drawZone(ctx, content, '?? ?´ìš© ?ì—­ ???´ë¦­?˜ì—¬ ?…ë ¥', PAD, 60, curY, SIZE - PAD - 60, s.contentSize, '400', s.contentColor, s.textAlign, 1.5, editingZone, 'content')
   bounds.content = { y1: cr.y1, y2: cr.y2 }
   ctx.fillStyle = og; ctx.fillRect(40, SIZE - 48, SIZE - 80, 8)
   drawSelectionOverlay(ctx, selection, bounds)
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ì»´íŒ©íŠ¸ ì»¨íŠ¸ë¡¤
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ì»´íŒ©??ì»¨íŠ¸ë¡?
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 function SizeRow({ label, value, min, max, step = 2, onChange }: {
   label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void
 }) {
@@ -354,9 +354,9 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   )
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 // ë©”ì¸
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 export default function NoticePage() {
   const supabase     = createClient()
   const canvasRef    = useRef<HTMLCanvasElement>(null)
@@ -386,7 +386,7 @@ export default function NoticePage() {
   const setStyle = <K extends keyof StyleOptions>(key: K, val: StyleOptions[K]) =>
     setStyles(prev => ({ ...prev, [key]: val }))
 
-  // ë””ìŠ¤í”Œë ˆì´ ìŠ¤ì¼€ì¼ ì¶”ì 
+  // ?”ìŠ¤?Œë ˆ???¤ì???ì¶”ì 
   useEffect(() => {
     const update = () => {
       if (wrapperRef.current) setDisplayScale(wrapperRef.current.offsetWidth / SIZE)
@@ -396,13 +396,13 @@ export default function NoticePage() {
     return () => window.removeEventListener('resize', update)
   }, [])
 
-  // í…œí”Œë¦¿ ì „í™˜
+  // ?œí”Œë¦??„í™˜
   const handleSelectTpl = (id: TemplateId) => {
     setSelectedTpl(id); setStyles(TEMPLATE_DEFAULTS[id])
     setCanvasSelection(null); setEditingZone(null); setOverlayBounds(null)
   }
 
-  // íšŒì‚¬ëª… ìë™ ë¡œë“œ
+  // ?Œì‚¬ëª??ë™ ë¡œë“œ
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
@@ -411,7 +411,7 @@ export default function NoticePage() {
     })
   }, [])
 
-  // ê³µì§€ì‚¬í•­ ëª©ë¡ ë¡œë“œ
+  // ê³µì??¬í•­ ëª©ë¡ ë¡œë“œ
   const fetchNotices = useCallback(async () => {
     setNoticesLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -427,41 +427,41 @@ export default function NoticePage() {
 
   useEffect(() => { fetchNotices() }, [fetchNotices])
 
-  // ê³µì§€ì‚¬í•­ ì €ì¥ (DB)
+  // ê³µì??¬í•­ ?€??(DB)
   const saveNotice = async (thumbnail: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     if (editingNoticeId) {
-      // ê¸°ì¡´ í•­ëª© ìˆ˜ì •
+      // ê¸°ì¡´ ??ª© ?˜ì •
       await supabase.from('notices').update({
         title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
       }).eq('id', editingNoticeId).eq('user_id', user.id)
-      toast.success('ê³µì§€ì‚¬í•­ì´ ì—…ë°ì´íŠ¸ë˜ì—ˆìŠµë‹ˆë‹¤.')
+      toast.success('ê³µì??¬í•­???…ë°?´íŠ¸?˜ì—ˆ?µë‹ˆ??')
     } else {
-      // ì‹ ê·œ ë“±ë¡
+      // ? ê·œ ?±ë¡
       await supabase.from('notices').insert({
         user_id: user.id, title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
       })
-      toast.success('ê³µì§€ì‚¬í•­ì´ ì €ì¥ë˜ì—ˆìŠµë‹ˆë‹¤.')
+      toast.success('ê³µì??¬í•­???€?¥ë˜?ˆìŠµ?ˆë‹¤.')
     }
     setEditingNoticeId(null)
     fetchNotices()
   }
 
-  // ê³µì§€ì‚¬í•­ ì‚­ì œ
+  // ê³µì??¬í•­ ?? œ
   const handleDeleteNotice = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     await supabase.from('notices').delete().eq('id', id).eq('user_id', user.id)
     setDeleteConfirmId(null)
     if (editingNoticeId === id) { setEditingNoticeId(null) }
-    toast.success('ê³µì§€ì‚¬í•­ì´ ì‚­ì œë˜ì—ˆìŠµë‹ˆë‹¤.')
+    toast.success('ê³µì??¬í•­???? œ?˜ì—ˆ?µë‹ˆ??')
     fetchNotices()
   }
 
-  // ê³µì§€ì‚¬í•­ ìˆ˜ì • (ì—ë””í„°ì— ë¡œë“œ)
+  // ê³µì??¬í•­ ?˜ì • (?ë””?°ì— ë¡œë“œ)
   const handleEditNotice = (notice: Notice) => {
     setTitle(notice.title)
     setContent(notice.content)
@@ -474,7 +474,7 @@ export default function NoticePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // ìº”ë²„ìŠ¤ ë Œë”
+  // ìº”ë²„???Œë”
   const render = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return
     const ctx    = canvas.getContext('2d'); if (!ctx) return
@@ -492,7 +492,7 @@ export default function NoticePage() {
 
   useEffect(() => { render() }, [render])
 
-  // ì˜¤ë²„ë ˆì´ textarea ìë™ í¬ì»¤ìŠ¤
+  // ?¤ë²„?ˆì´ textarea ?ë™ ?¬ì»¤??
   useEffect(() => {
     if (editingZone && overlayRef.current) {
       overlayRef.current.focus()
@@ -501,7 +501,7 @@ export default function NoticePage() {
     }
   }, [editingZone])
 
-  // ìº”ë²„ìŠ¤ ì¢Œí‘œ ë³€í™˜
+  // ìº”ë²„??ì¢Œí‘œ ë³€??
   const getCanvasY = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current; if (!canvas) return -1
     return (e.clientY - canvas.getBoundingClientRect().top) * (SIZE / canvas.getBoundingClientRect().height)
@@ -527,20 +527,20 @@ export default function NoticePage() {
     }
   }
 
-  // ì˜¤ë²„ë ˆì´ ë‹«ê¸°
+  // ?¤ë²„?ˆì´ ?«ê¸°
   const closeOverlay = () => {
     setEditingZone(null); setOverlayBounds(null)
   }
 
-  // ìŠ¤íƒ€ì¼ íƒ­ â†” ìº”ë²„ìŠ¤ ì„ íƒ ë™ê¸°í™”
+  // ?¤í???????ìº”ë²„??? íƒ ?™ê¸°??
   const handleTabChange = (tab: StyleTab) => {
     setStyleTab(tab); setCanvasSelection(tab === 'layout' ? null : tab)
     if (tab !== 'layout') setEditingZone(null)
   }
 
-  // ë‹¤ìš´ë¡œë“œ + DB ì €ì¥
+  // ?¤ìš´ë¡œë“œ + DB ?€??
   const handleDownload = async () => {
-    // 1) ì „ì²´ í•´ìƒë„ ìº”ë²„ìŠ¤ â†’ ë‹¤ìš´ë¡œë“œ
+    // 1) ?„ì²´ ?´ìƒ??ìº”ë²„?????¤ìš´ë¡œë“œ
     const off = document.createElement('canvas'); off.width = SIZE; off.height = SIZE
     const ctx = off.getContext('2d')!
     const nb: Bounds = { title: null, content: null }
@@ -550,9 +550,9 @@ export default function NoticePage() {
       case 3: drawT3(...args); break; case 4: drawT4(...args); break
     }
     const a = document.createElement('a'); a.href = off.toDataURL('image/png')
-    a.download = `ê³µì§€ì‚¬í•­_${title || 'ì´ë¯¸ì§€'}.png`
+    a.download = `ê³µì??¬í•­_${title || '?´ë?ì§€'}.png`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    // 2) ì¸ë„¤ì¼ ìƒì„± â†’ DB ì €ì¥
+    // 2) ?¸ë„¤???ì„± ??DB ?€??
     const thumb = generateThumbnail(title, content, date, companyName, selectedTpl, styles)
     await saveNotice(thumb)
   }
@@ -564,7 +564,7 @@ export default function NoticePage() {
     setEditingZone(null); setOverlayBounds(null); setEditingNoticeId(null)
   }
 
-  // ì˜¤ë²„ë ˆì´ ìœ„ì¹˜ ê³„ì‚°
+  // ?¤ë²„?ˆì´ ?„ì¹˜ ê³„ì‚°
   const reg   = TPL_REGION[selectedTpl]
   const oLeft = reg.left  * displayScale
   const oW    = (SIZE - reg.left - reg.right) * displayScale
@@ -583,23 +583,23 @@ export default function NoticePage() {
     }`
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl">
       <div>
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Megaphone className="h-6 w-6 text-blue-400" />ê³µì§€ì‚¬í•­ ìƒì„±
+          <Megaphone className="h-6 w-6 text-blue-400" />ê³µì??¬í•­ ?ì„±
         </h2>
-        <p className="text-slate-400 text-sm mt-1">ë¼ì´ë”ì—ê²Œ ë¬¸ìÂ·ì¹´ì¹´ì˜¤í†¡ìœ¼ë¡œ ë°œì†¡í•  ê³µì§€ ì´ë¯¸ì§€ë¥¼ ìƒì„±í•˜ì„¸ìš”</p>
+        <p className="text-slate-400 text-sm mt-1">?¼ì´?”ì—ê²?ë¬¸ìÂ·ì¹´ì¹´?¤í†¡?¼ë¡œ ë°œì†¡??ê³µì? ?´ë?ì§€ë¥??ì„±?˜ì„¸??/p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-        {/* â”€â”€ ì™¼ìª½ â”€â”€ */}
+        {/* ?€?€ ?¼ìª½ ?€?€ */}
         <div className="space-y-4">
 
-          {/* í…œí”Œë¦¿ */}
+          {/* ?œí”Œë¦?*/}
           <Card className="border-slate-700 bg-slate-900">
             <CardHeader className="pb-3">
-              <CardTitle className="text-white text-sm">â‘  ë°°ê²½ í…œí”Œë¦¿ ì„ íƒ</CardTitle>
+              <CardTitle className="text-white text-sm">??ë°°ê²½ ?œí”Œë¦?? íƒ</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
@@ -625,78 +625,78 @@ export default function NoticePage() {
             </CardContent>
           </Card>
 
-          {/* ê¸°ë³¸ ì •ë³´ */}
+          {/* ê¸°ë³¸ ?•ë³´ */}
           <Card className="border-slate-700 bg-slate-900">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white text-sm">â‘¡ ê¸°ë³¸ ì •ë³´</CardTitle>
+              <CardTitle className="text-white text-sm">??ê¸°ë³¸ ?•ë³´</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs">íšŒì‚¬ëª…</Label>
+                  <Label className="text-slate-400 text-xs">?Œì‚¬ëª?/Label>
                   <Input value={companyName} onChange={e => setCompanyName(e.target.value)}
-                    placeholder="íšŒì‚¬ëª…" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
+                    placeholder="?Œì‚¬ëª? className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs">ë‚ ì§œ</Label>
+                  <Label className="text-slate-400 text-xs">? ì§œ</Label>
                   <Input value={date} onChange={e => setDate(e.target.value)}
-                    placeholder="ë‚ ì§œ" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
+                    placeholder="? ì§œ" className="bg-slate-800 border-slate-600 text-white h-8 text-sm" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* ì•ˆë‚´ */}
+          {/* ?ˆë‚´ */}
           <Card className="border-blue-900/50 bg-blue-950/30">
             <CardContent className="pt-4 pb-3 space-y-2">
               <p className="text-blue-300 text-xs font-medium flex items-center gap-1.5">
-                <Edit3 className="h-3.5 w-3.5" />ì˜¤ë¥¸ìª½ ë¯¸ë¦¬ë³´ê¸°ì—ì„œ ì§ì ‘ í¸ì§‘
+                <Edit3 className="h-3.5 w-3.5" />?¤ë¥¸ìª?ë¯¸ë¦¬ë³´ê¸°?ì„œ ì§ì ‘ ?¸ì§‘
               </p>
               <ul className="text-slate-400 text-xs space-y-1 pl-5 list-disc">
-                <li><span className="text-white">ì œëª©/ë‚´ìš© ì˜ì—­ í´ë¦­</span> â†’ í…ìŠ¤íŠ¸ ì§ì ‘ ì…ë ¥</li>
-                <li>ì…ë ¥ í›„ <kbd className="bg-slate-700 px-1 py-0.5 rounded text-xs">Esc</kbd> ë˜ëŠ” ì˜ì—­ ë°– í´ë¦­ìœ¼ë¡œ ì™„ë£Œ</li>
-                <li>í´ë¦­ ì„ íƒ í›„ ì•„ë˜ ìŠ¤íƒ€ì¼ íŒ¨ë„ì—ì„œ ì„œì‹ í¸ì§‘</li>
+                <li><span className="text-white">?œëª©/?´ìš© ?ì—­ ?´ë¦­</span> ???ìŠ¤??ì§ì ‘ ?…ë ¥</li>
+                <li>?…ë ¥ ??<kbd className="bg-slate-700 px-1 py-0.5 rounded text-xs">Esc</kbd> ?ëŠ” ?ì—­ ë°??´ë¦­?¼ë¡œ ?„ë£Œ</li>
+                <li>?´ë¦­ ? íƒ ???„ë˜ ?¤í????¨ë„?ì„œ ?œì‹ ?¸ì§‘</li>
               </ul>
             </CardContent>
           </Card>
 
-          {/* í¸ì§‘ ì¤‘ ì•Œë¦¼ */}
+          {/* ?¸ì§‘ ì¤??Œë¦¼ */}
           {editingNoticeId && (
             <div className="flex items-center gap-2 bg-amber-900/30 border border-amber-700/50 rounded-lg px-3 py-2">
               <Pencil className="h-4 w-4 text-amber-400 shrink-0" />
-              <span className="text-amber-300 text-xs flex-1">ì €ì¥ëœ ê³µì§€ì‚¬í•­ ìˆ˜ì • ì¤‘</span>
+              <span className="text-amber-300 text-xs flex-1">?€?¥ëœ ê³µì??¬í•­ ?˜ì • ì¤?/span>
               <button onClick={() => setEditingNoticeId(null)}
                 className="text-amber-500 hover:text-amber-300"><X className="h-4 w-4" /></button>
             </div>
           )}
 
-          {/* ì•¡ì…˜ */}
+          {/* ?¡ì…˜ */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleReset}
               className="border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-white gap-2">
-              <RefreshCw className="h-4 w-4" />ì´ˆê¸°í™”
+              <RefreshCw className="h-4 w-4" />ì´ˆê¸°??
             </Button>
             <Button onClick={handleDownload} className="flex-1 gap-2"
               style={{ background: editingNoticeId ? '#d97706' : tplConfig.accent }}
               disabled={!title && !content}>
               {editingNoticeId
-                ? <><SaveAll className="h-4 w-4" />ì—…ë°ì´íŠ¸ & ë‹¤ìš´ë¡œë“œ</>
-                : <><Download className="h-4 w-4" />ë‹¤ìš´ë¡œë“œ & ì €ì¥</>}
+                ? <><SaveAll className="h-4 w-4" />?…ë°?´íŠ¸ & ?¤ìš´ë¡œë“œ</>
+                : <><Download className="h-4 w-4" />?¤ìš´ë¡œë“œ & ?€??/>}
             </Button>
           </div>
         </div>
 
-        {/* â”€â”€ ì˜¤ë¥¸ìª½: ë¯¸ë¦¬ë³´ê¸° + ìŠ¤íƒ€ì¼ íŒ¨ë„ â”€â”€ */}
+        {/* ?€?€ ?¤ë¥¸ìª? ë¯¸ë¦¬ë³´ê¸° + ?¤í????¨ë„ ?€?€ */}
         <div className="space-y-3">
 
-          {/* ìº”ë²„ìŠ¤ */}
+          {/* ìº”ë²„??*/}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-sm font-medium">â‘¢ ì‹¤ì‹œê°„ ë¯¸ë¦¬ë³´ê¸° (í´ë¦­í•˜ì—¬ ì§ì ‘ í¸ì§‘)</p>
+              <p className="text-slate-400 text-sm font-medium">???¤ì‹œê°?ë¯¸ë¦¬ë³´ê¸° (?´ë¦­?˜ì—¬ ì§ì ‘ ?¸ì§‘)</p>
               <span className="text-slate-600 text-xs">1080Ã—1080px</span>
             </div>
 
-            {/* ìº”ë²„ìŠ¤ + ì˜¤ë²„ë ˆì´ ë˜í¼ */}
+            {/* ìº”ë²„??+ ?¤ë²„?ˆì´ ?˜í¼ */}
             <div ref={wrapperRef} className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
               <canvas
                 ref={canvasRef}
@@ -708,7 +708,7 @@ export default function NoticePage() {
                 onMouseLeave={() => setCanvasCursor('default')}
               />
 
-              {/* í…ìŠ¤íŠ¸ ì…ë ¥ ì˜¤ë²„ë ˆì´ */}
+              {/* ?ìŠ¤???…ë ¥ ?¤ë²„?ˆì´ */}
               {editingZone && overlayBounds && (
                 <textarea
                   ref={overlayRef}
@@ -719,7 +719,7 @@ export default function NoticePage() {
                   }}
                   onBlur={closeOverlay}
                   onKeyDown={e => { if (e.key === 'Escape') e.currentTarget.blur() }}
-                  placeholder={editingZone === 'title' ? 'ì œëª©ì„ ì…ë ¥í•˜ì„¸ìš”...' : 'ë‚´ìš©ì„ ì…ë ¥í•˜ì„¸ìš”...'}
+                  placeholder={editingZone === 'title' ? '?œëª©???…ë ¥?˜ì„¸??..' : '?´ìš©???…ë ¥?˜ì„¸??..'}
                   maxLength={editingZone === 'title' ? 40 : 400}
                   style={{
                     position: 'absolute',
@@ -744,31 +744,31 @@ export default function NoticePage() {
                 />
               )}
 
-              {/* í¸ì§‘ ì¤‘ ë ˆì´ë¸” */}
+              {/* ?¸ì§‘ ì¤??ˆì´ë¸?*/}
               {editingZone && (
                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-30 pointer-events-none">
                   <Edit3 className="h-3 w-3" />
-                  {editingZone === 'title' ? 'ì œëª© í¸ì§‘ ì¤‘' : 'ë‚´ìš© í¸ì§‘ ì¤‘'}
+                  {editingZone === 'title' ? '?œëª© ?¸ì§‘ ì¤? : '?´ìš© ?¸ì§‘ ì¤?}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ìŠ¤íƒ€ì¼ íŒ¨ë„ */}
+          {/* ?¤í????¨ë„ */}
           <Card className="border-slate-700 bg-slate-900">
             <CardContent className="p-3 space-y-3">
               <div className="flex gap-1 bg-slate-800 rounded-lg p-1">
                 {(['title', 'content', 'layout'] as StyleTab[]).map(tab => (
                   <button key={tab} onClick={() => handleTabChange(tab)} className={tabCls(tab)}>
-                    {tab === 'title' ? 'ì œëª© ìŠ¤íƒ€ì¼' : tab === 'content' ? 'ë‚´ìš© ìŠ¤íƒ€ì¼' : 'ë°°ì¹˜'}
+                    {tab === 'title' ? '?œëª© ?¤í??? : tab === 'content' ? '?´ìš© ?¤í??? : 'ë°°ì¹˜'}
                   </button>
                 ))}
               </div>
 
               {styleTab === 'title' && (
                 <div className="space-y-2">
-                  <SizeRow label="ê¸€ì”¨ í¬ê¸°" value={styles.titleSize}   min={40}   max={120}  onChange={v => setStyle('titleSize',   v)} />
-                  <ColorRow label="ê¸€ì”¨ ìƒ‰ìƒ" value={styles.titleColor}  onChange={v => setStyle('titleColor',  v)} />
+                  <SizeRow label="ê¸€???¬ê¸°" value={styles.titleSize}   min={40}   max={120}  onChange={v => setStyle('titleSize',   v)} />
+                  <ColorRow label="ê¸€???‰ìƒ" value={styles.titleColor}  onChange={v => setStyle('titleColor',  v)} />
                   <div className="flex items-center gap-2 h-7">
                     <span className="text-slate-400 text-xs w-14 shrink-0">êµµê²Œ</span>
                     <button onClick={() => setStyle('titleBold', !styles.titleBold)}
@@ -782,15 +782,15 @@ export default function NoticePage() {
 
               {styleTab === 'content' && (
                 <div className="space-y-2">
-                  <SizeRow  label="ê¸€ì”¨ í¬ê¸°" value={styles.contentSize}  min={24}   max={72}   onChange={v => setStyle('contentSize',  v)} />
-                  <ColorRow label="ê¸€ì”¨ ìƒ‰ìƒ" value={styles.contentColor} onChange={v => setStyle('contentColor', v)} />
+                  <SizeRow  label="ê¸€???¬ê¸°" value={styles.contentSize}  min={24}   max={72}   onChange={v => setStyle('contentSize',  v)} />
+                  <ColorRow label="ê¸€???‰ìƒ" value={styles.contentColor} onChange={v => setStyle('contentColor', v)} />
                 </div>
               )}
 
               {styleTab === 'layout' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 h-7">
-                    <span className="text-slate-400 text-xs w-14 shrink-0">ì •ë ¬</span>
+                    <span className="text-slate-400 text-xs w-14 shrink-0">?•ë ¬</span>
                     <div className="flex gap-1">
                       {([{ v: 'left' as Align, Icon: AlignLeft }, { v: 'center' as Align, Icon: AlignCenter }, { v: 'right' as Align, Icon: AlignRight }]).map(({ v, Icon }) => (
                         <button key={v} onClick={() => setStyle('textAlign', v)}
@@ -800,11 +800,11 @@ export default function NoticePage() {
                       ))}
                     </div>
                   </div>
-                  <SizeRow label="ìˆ˜ì§ ìœ„ì¹˜" value={styles.verticalOffset} min={-200} max={200} step={10} onChange={v => setStyle('verticalOffset', v)} />
-                  <p className="text-slate-600 text-xs pl-16">ìŒìˆ˜ = ìœ„ë¡œ, ì–‘ìˆ˜ = ì•„ë˜ë¡œ</p>
+                  <SizeRow label="?˜ì§ ?„ì¹˜" value={styles.verticalOffset} min={-200} max={200} step={10} onChange={v => setStyle('verticalOffset', v)} />
+                  <p className="text-slate-600 text-xs pl-16">?Œìˆ˜ = ?„ë¡œ, ?‘ìˆ˜ = ?„ë˜ë¡?/p>
                   <button onClick={() => setStyles(TEMPLATE_DEFAULTS[selectedTpl])}
                     className="text-slate-500 hover:text-slate-300 text-xs underline underline-offset-2 pl-16">
-                    ê¸°ë³¸ê°’ ì´ˆê¸°í™”
+                    ê¸°ë³¸ê°?ì´ˆê¸°??
                   </button>
                 </div>
               )}
@@ -814,26 +814,26 @@ export default function NoticePage() {
         </div>
       </div>
 
-      {/* â”€â”€ ì €ì¥ëœ ê³µì§€ì‚¬í•­ ëª©ë¡ â”€â”€ */}
+      {/* ?€?€ ?€?¥ëœ ê³µì??¬í•­ ëª©ë¡ ?€?€ */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <Clock className="h-5 w-5 text-slate-400" />
-            ì €ì¥ëœ ê³µì§€ì‚¬í•­
+            ?€?¥ëœ ê³µì??¬í•­
             <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">{notices.length}</span>
           </h3>
           <button onClick={fetchNotices} className="text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />ìƒˆë¡œê³ ì¹¨
+            <RefreshCw className="h-3 w-3" />?ˆë¡œê³ ì¹¨
           </button>
         </div>
 
         {noticesLoading ? (
-          <div className="text-slate-500 text-sm text-center py-8">ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘...</div>
+          <div className="text-slate-500 text-sm text-center py-8">ë¶ˆëŸ¬?¤ëŠ” ì¤?..</div>
         ) : notices.length === 0 ? (
           <div className="border border-dashed border-slate-700 rounded-xl py-12 text-center">
             <Megaphone className="h-10 w-10 text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">ì•„ì§ ì €ì¥ëœ ê³µì§€ì‚¬í•­ì´ ì—†ìŠµë‹ˆë‹¤</p>
-            <p className="text-slate-600 text-xs mt-1">ì´ë¯¸ì§€ë¥¼ ë‹¤ìš´ë¡œë“œí•˜ë©´ ìë™ìœ¼ë¡œ ì—¬ê¸°ì— ì €ì¥ë©ë‹ˆë‹¤</p>
+            <p className="text-slate-500 text-sm">?„ì§ ?€?¥ëœ ê³µì??¬í•­???†ìŠµ?ˆë‹¤</p>
+            <p className="text-slate-600 text-xs mt-1">?´ë?ì§€ë¥??¤ìš´ë¡œë“œ?˜ë©´ ?ë™?¼ë¡œ ?¬ê¸°???€?¥ë©?ˆë‹¤</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -848,7 +848,7 @@ export default function NoticePage() {
                       ? 'border-amber-500 ring-2 ring-amber-500/30'
                       : 'border-slate-700 hover:border-slate-500'
                   }`}>
-                  {/* ì¸ë„¤ì¼ */}
+                  {/* ?¸ë„¤??*/}
                   <div className="relative aspect-square overflow-hidden bg-slate-900">
                     {notice.thumbnail
                       ? <img src={notice.thumbnail} alt={notice.title} className="w-full h-full object-cover" />
@@ -859,24 +859,24 @@ export default function NoticePage() {
                     }
                     {isEditing && (
                       <div className="absolute inset-0 bg-amber-900/30 flex items-center justify-center">
-                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">ìˆ˜ì • ì¤‘</span>
+                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-medium">?˜ì • ì¤?/span>
                       </div>
                     )}
                   </div>
 
-                  {/* ì •ë³´ */}
+                  {/* ?•ë³´ */}
                   <div className="bg-slate-900 p-2.5 space-y-1.5">
-                    <p className="text-white text-xs font-medium truncate">{notice.title || '(ì œëª© ì—†ìŒ)'}</p>
+                    <p className="text-white text-xs font-medium truncate">{notice.title || '(?œëª© ?†ìŒ)'}</p>
                     <p className="text-slate-500 text-xs truncate">{notice.date}</p>
 
-                    {/* ì‚­ì œ í™•ì¸ */}
+                    {/* ?? œ ?•ì¸ */}
                     {isConfirmDelete ? (
                       <div className="space-y-1.5 pt-0.5">
-                        <p className="text-red-400 text-xs text-center">ì‚­ì œí•˜ì‹œê² ìŠµë‹ˆê¹Œ?</p>
+                        <p className="text-red-400 text-xs text-center">?? œ?˜ì‹œê² ìŠµ?ˆê¹Œ?</p>
                         <div className="flex gap-1">
                           <button onClick={() => handleDeleteNotice(notice.id)}
                             className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 rounded transition-colors">
-                            ì‚­ì œ
+                            ?? œ
                           </button>
                           <button onClick={() => setDeleteConfirmId(null)}
                             className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1 rounded transition-colors">
@@ -889,12 +889,12 @@ export default function NoticePage() {
                         <button
                           onClick={() => handleEditNotice(notice)}
                           className="flex-1 bg-slate-700 hover:bg-blue-700 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
-                          <Pencil className="h-3 w-3" />ìˆ˜ì •
+                          <Pencil className="h-3 w-3" />?˜ì •
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(notice.id)}
                           className="flex-1 bg-slate-700 hover:bg-red-800 text-slate-300 hover:text-white text-xs py-1.5 rounded flex items-center justify-center gap-1 transition-colors">
-                          <Trash2 className="h-3 w-3" />ì‚­ì œ
+                          <Trash2 className="h-3 w-3" />?? œ
                         </button>
                       </div>
                     )}

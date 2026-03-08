@@ -56,14 +56,14 @@ export default function InquiryPage() {
   const [page, setPage] = useState(1)
   const [listLoading, setListLoading] = useState(false)
 
-  // 새 문의 작성
+  // ??문의 ?�성
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
   const [newLoading, setNewLoading] = useState(false)
   const [newError, setNewError] = useState('')
 
-  // 문의 상세 / 스레드
+  // 문의 ?�세 / ?�레??
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailInquiry, setDetailInquiry] = useState<InquiryDetail | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -109,7 +109,7 @@ export default function InquiryPage() {
     }
   }
 
-  // 스레드 실시간 구독
+  // ?�레???�시�?구독
   useEffect(() => {
     if (!detailInquiry) return
     realtimeRef.current?.unsubscribe()
@@ -127,7 +127,7 @@ export default function InquiryPage() {
           if (prev.some(m => m.id === newMsg.id)) return prev
           return [...prev, newMsg]
         })
-        // 새 메시지가 admin 답변이면 inquiries 목록 상태도 업데이트
+        // ??메시지가 admin ?��??�면 inquiries 목록 ?�태???�데?�트
         if (newMsg.sender_type === 'admin') {
           setInquiries(prev => prev.map(i =>
             i.id === detailInquiry.id ? { ...i, status: 'answered' } : i
@@ -141,14 +141,14 @@ export default function InquiryPage() {
     return () => { channel.unsubscribe() }
   }, [detailInquiry?.id, supabase])
 
-  // 메시지 추가 시 자동 스크롤
+  // 메시지 추�? ???�동 ?�크�?
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const handleNew = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
-      setNewError('제목과 내용을 모두 입력해주세요.')
+      setNewError('?�목�??�용??모두 ?�력?�주?�요.')
       return
     }
     setNewLoading(true)
@@ -161,7 +161,7 @@ export default function InquiryPage() {
       })
       if (!res.ok) {
         const j = await res.json()
-        setNewError(j.error ?? '등록 실패')
+        setNewError(j.error ?? '?�록 ?�패')
         return
       }
       setNewOpen(false)
@@ -186,7 +186,7 @@ export default function InquiryPage() {
       })
       if (!res.ok) {
         const j = await res.json()
-        setReplyError(j.error ?? '전송 실패')
+        setReplyError(j.error ?? '?�송 ?�패')
         return
       }
       setReplyContent('')
@@ -198,22 +198,22 @@ export default function InquiryPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      {/* 헤더 */}
+    <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
+      {/* ?�더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 rounded-xl p-2.5">
             <MessageSquare className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">문의하기</h1>
-            <p className="text-slate-400 text-sm">전체관리자에게 문의를 남기세요</p>
+            <h1 className="text-2xl font-bold text-white">문의?�기</h1>
+            <p className="text-slate-400 text-sm">?�체관리자?�게 문의�??�기?�요</p>
           </div>
         </div>
         <Button onClick={() => { setNewTitle(''); setNewContent(''); setNewError(''); setNewOpen(true) }}
           className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
           <Plus className="h-4 w-4" />
-          새 문의
+          ??문의
         </Button>
       </div>
 
@@ -222,7 +222,7 @@ export default function InquiryPage() {
         <CardHeader className="pb-3 border-b border-slate-700">
           <CardTitle className="text-white text-base flex items-center justify-between">
             <span>문의 목록</span>
-            <span className="text-slate-400 text-sm font-normal">총 {totalCount}건</span>
+            <span className="text-slate-400 text-sm font-normal">�?{totalCount}�?/span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -233,7 +233,7 @@ export default function InquiryPage() {
           ) : inquiries.length === 0 ? (
             <div className="text-center text-slate-500 py-12">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">등록된 문의가 없습니다.</p>
+              <p className="text-sm">?�록??문의가 ?�습?�다.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-700">
@@ -258,7 +258,7 @@ export default function InquiryPage() {
                           ? 'border-green-600 text-green-400 bg-green-950/30 text-xs'
                           : 'border-amber-600 text-amber-400 bg-amber-950/30 text-xs'
                       }>
-                        {inq.status === 'answered' ? '답변완료' : '답변대기'}
+                        {inq.status === 'answered' ? '?��??�료' : '?��??��?}
                       </Badge>
                       <span className="text-slate-500 text-xs">{formatDate(inq.created_at)}</span>
                     </div>
@@ -270,7 +270,7 @@ export default function InquiryPage() {
         </CardContent>
       </Card>
 
-      {/* 페이지네이션 */}
+      {/* ?�이지?�이??*/}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -285,26 +285,26 @@ export default function InquiryPage() {
         </div>
       )}
 
-      {/* 새 문의 작성 다이얼로그 */}
+      {/* ??문의 ?�성 ?�이?�로�?*/}
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-blue-400" />
-              새 문의 작성
+              ??문의 ?�성
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-2">
-              <label className="text-sm text-slate-300 font-medium">제목</label>
+              <label className="text-sm text-slate-300 font-medium">?�목</label>
               <Input value={newTitle} onChange={e => setNewTitle(e.target.value)}
-                placeholder="문의 제목을 입력하세요" maxLength={100}
+                placeholder="문의 ?�목???�력?�세?? maxLength={100}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-slate-300 font-medium">내용</label>
+              <label className="text-sm text-slate-300 font-medium">?�용</label>
               <Textarea value={newContent} onChange={e => setNewContent(e.target.value)}
-                placeholder="문의 내용을 입력하세요" rows={6} maxLength={2000}
+                placeholder="문의 ?�용???�력?�세?? rows={6} maxLength={2000}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 resize-none" />
             </div>
             {newError && <p className="text-red-400 text-sm">{newError}</p>}
@@ -314,27 +314,27 @@ export default function InquiryPage() {
               <Button onClick={handleNew} disabled={newLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
                 {newLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                등록
+                ?�록
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 문의 상세 / 스레드 다이얼로그 */}
+      {/* 문의 ?�세 / ?�레???�이?�로�?*/}
       <Dialog open={detailOpen} onOpenChange={(o) => { setDetailOpen(o); if (!o) realtimeRef.current?.unsubscribe() }}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-white flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-blue-400" />
-              {detailInquiry?.title ?? '문의 상세'}
+              {detailInquiry?.title ?? '문의 ?�세'}
               {detailInquiry && (
                 <Badge variant="outline" className={
                   detailInquiry.status === 'answered'
                     ? 'border-green-600 text-green-400 bg-green-950/30 text-xs ml-2'
                     : 'border-amber-600 text-amber-400 bg-amber-950/30 text-xs ml-2'
                 }>
-                  {detailInquiry.status === 'answered' ? '답변완료' : '답변대기'}
+                  {detailInquiry.status === 'answered' ? '?��??�료' : '?��??��?}
                 </Badge>
               )}
             </DialogTitle>
@@ -346,7 +346,7 @@ export default function InquiryPage() {
             </div>
           ) : (
             <>
-              {/* 메시지 스레드 */}
+              {/* 메시지 ?�레??*/}
               <div className="flex-1 overflow-y-auto space-y-3 py-2 min-h-0">
                 {messages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.sender_type === 'member' ? 'justify-end' : 'justify-start'}`}>
@@ -357,7 +357,7 @@ export default function InquiryPage() {
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs font-medium ${msg.sender_type === 'member' ? 'text-blue-200' : 'text-green-400'}`}>
-                          {msg.sender_type === 'member' ? '나' : '전체관리자'}
+                          {msg.sender_type === 'member' ? '?? : '?�체관리자'}
                         </span>
                         <span className={`text-xs ${msg.sender_type === 'member' ? 'text-blue-200' : 'text-slate-500'}`}>
                           {formatDate(msg.created_at)}
@@ -370,11 +370,11 @@ export default function InquiryPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* 재문의 입력 */}
+              {/* ?�문???�력 */}
               <div className="shrink-0 border-t border-slate-700 pt-3 space-y-2">
                 <div className="flex items-start gap-2">
                   <Textarea value={replyContent} onChange={e => setReplyContent(e.target.value)}
-                    placeholder="추가 문의 내용을 입력하세요... (Shift+Enter로 줄바꿈)"
+                    placeholder="추�? 문의 ?�용???�력?�세??.. (Shift+Enter�?줄바�?"
                     rows={3} maxLength={2000}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply() }
@@ -383,7 +383,7 @@ export default function InquiryPage() {
                   <Button onClick={handleReply} disabled={replyLoading || !replyContent.trim()}
                     className="bg-blue-600 hover:bg-blue-700 text-white self-end gap-1.5 shrink-0">
                     {replyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    재문의
+                    ?�문??
                   </Button>
                 </div>
                 {replyError && <p className="text-red-400 text-xs">{replyError}</p>}

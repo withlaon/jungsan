@@ -32,7 +32,7 @@ interface BulkRiderRow {
 
 function downloadRiderList(riders: Rider[], label: string) {
   const wb = XLSX.utils.book_new()
-  const header = ['가입일', '라이더명', '아이디', '주민등록번호', '연락처', '은행명', '계좌번호', '예금주', '상태']
+  const header = ['가?�일', '?�이?�명', '?�이??, '주�??�록번호', '?�락�?, '?�?�명', '계좌번호', '?�금�?, '?�태']
   const rows = riders.map(r => [
     r.join_date ?? '',
     r.name,
@@ -42,32 +42,32 @@ function downloadRiderList(riders: Rider[], label: string) {
     r.bank_name ?? '',
     r.bank_account ?? '',
     r.account_holder ?? '',
-    r.status === 'active' ? '활성' : '비활성',
+    r.status === 'active' ? '?�성' : '비활??,
   ])
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
   ws['!cols'] = [
     { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
     { wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 8 },
   ]
-  XLSX.utils.book_append_sheet(wb, ws, '라이더목록')
+  XLSX.utils.book_append_sheet(wb, ws, '?�이?�목�?)
   const today = new Date().toISOString().slice(0, 10)
-  XLSX.writeFile(wb, `라이더목록_${label}_${today}.xlsx`)
+  XLSX.writeFile(wb, `?�이?�목�?${label}_${today}.xlsx`)
 }
 
 function downloadSampleExcel() {
   const wb = XLSX.utils.book_new()
   const data = [
-    ['가입일', '라이더명*', '아이디', '주민등록번호', '연락처', '은행명', '계좌번호', '예금주명'],
-    ['2026-01-01', '홍길동', 'rider001', '900101-1234567', '010-1234-5678', '국민은행', '123-456-7890123', '홍길동'],
-    ['2026-01-15', '김철수', 'rider002', '850520-1234567', '010-9876-5432', '신한은행', '110-123-456789', '김철수'],
+    ['가?�일', '?�이?�명*', '?�이??, '주�??�록번호', '?�락�?, '?�?�명', '계좌번호', '?�금주명'],
+    ['2026-01-01', '?�길??, 'rider001', '900101-1234567', '010-1234-5678', '�???�??, '123-456-7890123', '?�길??],
+    ['2026-01-15', '김철수', 'rider002', '850520-1234567', '010-9876-5432', '?�한?�??, '110-123-456789', '김철수'],
   ]
   const ws = XLSX.utils.aoa_to_sheet(data)
   ws['!cols'] = [
     { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
     { wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 12 },
   ]
-  XLSX.utils.book_append_sheet(wb, ws, '라이더목록')
-  XLSX.writeFile(wb, '라이더_대량등록_양식.xlsx')
+  XLSX.utils.book_append_sheet(wb, ws, '?�이?�목�?)
+  XLSX.writeFile(wb, '?�이???�?�등�??�식.xlsx')
 }
 
 const emptyForm = {
@@ -101,7 +101,7 @@ export default function RidersPage() {
   const [bulkSaving, setBulkSaving] = useState(false)
   const [bulkFileName, setBulkFileName] = useState('')
 
-  // 선택 관련 상태
+  // ?�택 관???�태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkActionConfirm, setBulkActionConfirm] = useState<'deactivate' | 'delete' | null>(null)
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -138,20 +138,20 @@ export default function RidersPage() {
     const dup = riders.some(r =>
       (r.rider_username ?? '').toLowerCase() === val.trim().toLowerCase() && r.id !== currentId
     )
-    setUsernameError(dup ? '이미 사용 중인 아이디입니다.' : '')
+    setUsernameError(dup ? '?��? ?�용 중인 ?�이?�입?�다.' : '')
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast.error('라이더명을 입력해주세요.'); return }
+    if (!form.name.trim()) { toast.error('?�이?�명???�력?�주?�요.'); return }
 
     if (form.rider_username.trim()) {
       const dup = riders.some(
         r => (r.rider_username ?? '').toLowerCase() === form.rider_username.trim().toLowerCase()
           && r.id !== editingRider?.id
       )
-      if (dup) { setUsernameError('이미 사용 중인 아이디입니다.'); toast.error('이미 사용 중인 아이디입니다.'); return }
+      if (dup) { setUsernameError('?��? ?�용 중인 ?�이?�입?�다.'); toast.error('?��? ?�용 중인 ?�이?�입?�다.'); return }
     }
-    if (usernameError) { toast.error('아이디 중복을 확인해주세요.'); return }
+    if (usernameError) { toast.error('?�이??중복???�인?�주?�요.'); return }
 
     setSaving(true)
     try {
@@ -174,14 +174,14 @@ export default function RidersPage() {
       })
       const data = await res.json().catch(() => ({}))
 
-      if (!res.ok) { toast.error(data?.error ?? '저장 실패'); return }
+      if (!res.ok) { toast.error(data?.error ?? '?�???�패'); return }
 
-      toast.success(editingRider ? '라이더 정보가 수정되었습니다.' : '라이더가 등록되었습니다.')
+      toast.success(editingRider ? '?�이???�보가 ?�정?�었?�니??' : '?�이?��? ?�록?�었?�니??')
       setDialogOpen(false)
       setSearch('')
       refreshRiders(true)
     } catch (e) {
-      toast.error('저장 실패: 네트워크 오류가 발생했습니다.')
+      toast.error('?�???�패: ?�트?�크 ?�류가 발생?�습?�다.')
     } finally {
       setSaving(false)
     }
@@ -206,11 +206,11 @@ export default function RidersPage() {
           status: newStatus,
         }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
-      toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('?�태 변�??�패: ' + (d?.error ?? '')); return }
+      toast.success(`${rider.name} ?�이?��? ${newStatus === 'active' ? '?�성?? : '비활?�화'}?�습?�다.`)
       refreshRiders(true)
     } catch {
-      toast.error('상태 변경 실패: 네트워크 오류')
+      toast.error('?�태 변�??�패: ?�트?�크 ?�류')
     }
   }
 
@@ -221,12 +221,12 @@ export default function RidersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: rider.id }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('삭제 실패: ' + (d?.error ?? '')); return }
-      toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('??�� ?�패: ' + (d?.error ?? '')); return }
+      toast.success(`${rider.name} ?�이?��? ??��?�었?�니??`)
       setDeleteConfirmId(null)
       refreshRiders(true)
     } catch {
-      toast.error('삭제 실패: 네트워크 오류')
+      toast.error('??�� ?�패: ?�트?�크 ?�류')
     }
   }
 
@@ -234,19 +234,17 @@ export default function RidersPage() {
     setBulkFileName(file.name)
     const reader = new FileReader()
     reader.onload = (e) => {
-      // cellDates: true → 엑셀 날짜 일련번호를 JS Date 객체로 자동 변환
-      const wb = XLSX.read(e.target?.result, { type: 'array', cellDates: true })
+      // cellDates: true ???��? ?�짜 ?�련번호�?JS Date 객체�??�동 변??      const wb = XLSX.read(e.target?.result, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
       const existingUsernames = new Set(riders.map(r => r.rider_username).filter(Boolean))
 
       const normalize = (s: string) => String(s ?? '').trim().replace(/[\s*]/g, '')
 
-      // 날짜 값을 YYYY-MM-DD 문자열로 변환
-      const toDateStr = (val: unknown): string => {
+      // ?�짜 값을 YYYY-MM-DD 문자?�로 변??      const toDateStr = (val: unknown): string => {
         if (!val) return ''
         if (val instanceof Date) {
-          // 유효한 날짜인지 확인
+          // ?�효???�짜?��? ?�인
           if (isNaN(val.getTime())) return ''
           const y = val.getFullYear()
           const m = String(val.getMonth() + 1).padStart(2, '0')
@@ -254,15 +252,14 @@ export default function RidersPage() {
           return `${y}-${m}-${d}`
         }
         const str = String(val).trim()
-        // 숫자 일련번호가 넘어온 경우 xlsx로 재변환
-        if (/^\d{5}$/.test(str)) {
+        // ?�자 ?�련번호가 ?�어??경우 xlsx�??��???        if (/^\d{5}$/.test(str)) {
           const date = new Date(Math.round((Number(str) - 25569) * 86400 * 1000))
           const y = date.getUTCFullYear()
           const m = String(date.getUTCMonth() + 1).padStart(2, '0')
           const d = String(date.getUTCDate()).padStart(2, '0')
           return `${y}-${m}-${d}`
         }
-        // 이미 날짜 형식 문자열 (YYYY-MM-DD, YYYY/MM/DD 등)
+        // ?��? ?�짜 ?�식 문자??(YYYY-MM-DD, YYYY/MM/DD ??
         const clean = str.replace(/[./]/g, '-')
         if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(clean)) return clean
         return str
@@ -280,30 +277,30 @@ export default function RidersPage() {
             return key ? row[key] : ''
           }
 
-          const join_date      = toDateStr(getRaw(['가입일', 'joindate', 'join']))
-          const name           = get(['라이더명', '이름', '성명', '기사명', 'name'])
-          const rider_username = get(['아이디', '라이더아이디', 'userid', 'username', 'id'])
-          const id_number      = get(['주민등록번호', '주민번호', '주민', 'idnumber'])
-          const phone          = get(['연락처', '전화', '휴대폰', '핸드폰', 'phone'])
-          const bank_name      = get(['은행명', '은행', 'bank'])
+          const join_date      = toDateStr(getRaw(['가?�일', 'joindate', 'join']))
+          const name           = get(['?�이?�명', '?�름', '?�명', '기사�?, 'name'])
+          const rider_username = get(['?�이??, '?�이?�아?�디', 'userid', 'username', 'id'])
+          const id_number      = get(['주�??�록번호', '주�?번호', '주�?', 'idnumber'])
+          const phone          = get(['?�락�?, '?�화', '?��???, '?�드??, 'phone'])
+          const bank_name      = get(['?�?�명', '?�??, 'bank'])
           const bank_account   = get(['계좌번호', '계좌', 'account'])
-          const account_holder = get(['예금주명', '예금주', 'holder'])
+          const account_holder = get(['?�금주명', '?�금�?, 'holder'])
 
-          const baseError = !name ? '라이더명 필수' : ''
+          const baseError = !name ? '?�이?�명 ?�수' : ''
           return { join_date, name, rider_username, id_number, phone, bank_name, bank_account, account_holder, valid: !baseError, error: baseError }
         })
         .filter(r => r.name || r.phone)
 
-      // 아이디 중복 체크 (기존 DB + 파일 내 중복)
+      // ?�이??중복 체크 (기존 DB + ?�일 ??중복)
       const seenInFile = new Set<string>()
       const rows = parsed.map(row => {
         if (row.error) return row
         if (!row.rider_username) return row
         if (existingUsernames.has(row.rider_username)) {
-          return { ...row, valid: false, error: '아이디 중복(기존)' }
+          return { ...row, valid: false, error: '?�이??중복(기존)' }
         }
         if (seenInFile.has(row.rider_username)) {
-          return { ...row, valid: false, error: '아이디 중복(파일내)' }
+          return { ...row, valid: false, error: '?�이??중복(?�일??' }
         }
         seenInFile.add(row.rider_username)
         return row
@@ -329,7 +326,7 @@ export default function RidersPage() {
 
   const handleBulkSave = async () => {
     const validRows = bulkRows.filter(r => r.valid)
-    if (validRows.length === 0) { toast.error('등록 가능한 데이터가 없습니다.'); return }
+    if (validRows.length === 0) { toast.error('?�록 가?�한 ?�이?��? ?�습?�다.'); return }
     setBulkSaving(true)
 
     try {
@@ -354,16 +351,16 @@ export default function RidersPage() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        toast.error('저장 실패: ' + (data?.error ?? res.statusText))
+        toast.error('?�???�패: ' + (data?.error ?? res.statusText))
         return
       }
-      toast.success(`${validRows.length}명의 라이더가 등록되었습니다.`)
+      toast.success(`${validRows.length}명의 ?�이?��? ?�록?�었?�니??`)
       setBulkDialogOpen(false)
       setBulkRows([])
       setBulkFileName('')
       refreshRiders(true)
     } catch (e) {
-      toast.error('저장 실패: 네트워크 오류')
+      toast.error('?�???�패: ?�트?�크 ?�류')
     } finally {
       setBulkSaving(false)
     }
@@ -380,7 +377,7 @@ export default function RidersPage() {
     r.name.includes(search) || (r.phone ?? '').includes(search) || (r.rider_username ?? '').includes(search)
   )
 
-  // 이름순 정렬 (한국어 로케일)
+  // ?�름???�렬 (?�국??로�???
   const sorted = useMemo(
     () => [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     [filtered]
@@ -438,7 +435,7 @@ export default function RidersPage() {
         }),
       })
     ))
-    toast.success(`${targets.length}명을 비활성화했습니다.`)
+    toast.success(`${targets.length}명을 비활?�화?�습?�다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
@@ -456,8 +453,8 @@ export default function RidersPage() {
       })
     ))
     const failCount = results.filter(r => !r.ok).length
-    if (failCount > 0) toast.error(`${failCount}명 삭제 실패`)
-    else toast.success(`${ids.length}명을 삭제했습니다.`)
+    if (failCount > 0) toast.error(`${failCount}�???�� ?�패`)
+    else toast.success(`${ids.length}명을 ??��?�습?�다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
@@ -465,21 +462,21 @@ export default function RidersPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-white">라이더 관리</h2>
-          <p className="text-slate-400 text-sm mt-1">라이더 등록, 수정, 관리</p>
+          <h2 className="text-2xl font-bold text-white">?�이??관�?/h2>
+          <p className="text-slate-400 text-sm mt-1">?�이???�록, ?�정, 관�?/p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => downloadRiderList(filtered, activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성')}
+            onClick={() => downloadRiderList(filtered, activeTab === 'all' ? '?�체' : activeTab === 'active' ? '?�성' : '비활??)}
             variant="outline"
             className="border-slate-600 text-slate-300 hover:bg-slate-800"
             disabled={filtered.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
-            목록 다운로드
+            목록 ?�운로드
           </Button>
           <Button
             onClick={() => { setBulkRows([]); setBulkFileName(''); setBulkDialogOpen(true) }}
@@ -487,16 +484,15 @@ export default function RidersPage() {
             className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/20"
           >
             <FileSpreadsheet className="h-4 w-4 mr-2" />
-            엑셀 대량등록
-          </Button>
+            ?��? ?�?�등�?          </Button>
           <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-700 text-white">
             <Plus className="h-4 w-4 mr-2" />
-            라이더 등록
+            ?�이???�록
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card
           onClick={() => { setActiveTab('all'); setSelectedIds(new Set()); setPage(1) }}
           className={`border-slate-700 bg-slate-900 cursor-pointer transition-all ${activeTab === 'all' ? 'ring-2 ring-blue-500 bg-blue-900/10' : 'hover:bg-slate-800'}`}
@@ -504,7 +500,7 @@ export default function RidersPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Users className="h-8 w-8 text-blue-400" />
             <div>
-              <p className="text-slate-400 text-xs">전체 라이더</p>
+              <p className="text-slate-400 text-xs">?�체 ?�이??/p>
               <p className="text-white text-2xl font-bold">{riders.length}</p>
             </div>
           </CardContent>
@@ -516,7 +512,7 @@ export default function RidersPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <UserCheck className="h-8 w-8 text-emerald-400" />
             <div>
-              <p className="text-slate-400 text-xs">활성 라이더</p>
+              <p className="text-slate-400 text-xs">?�성 ?�이??/p>
               <p className="text-emerald-400 text-2xl font-bold">{activeCount}</p>
             </div>
           </CardContent>
@@ -528,7 +524,7 @@ export default function RidersPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <UserX className="h-8 w-8 text-slate-500" />
             <div>
-              <p className="text-slate-400 text-xs">비활성 라이더</p>
+              <p className="text-slate-400 text-xs">비활???�이??/p>
               <p className="text-slate-400 text-2xl font-bold">{inactiveCount}</p>
             </div>
           </CardContent>
@@ -538,7 +534,7 @@ export default function RidersPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <Input
-          placeholder="라이더명, 아이디, 연락처로 검색..."
+          placeholder="?�이?�명, ?�이?? ?�락처로 검??.."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           className="pl-10 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
@@ -549,11 +545,11 @@ export default function RidersPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-white text-base">
-              {activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성'} 라이더 목록 ({sorted.length}명)
+              {activeTab === 'all' ? '?�체' : activeTab === 'active' ? '?�성' : '비활??} ?�이??목록 ({sorted.length}�?
             </CardTitle>
             {someSelected && (
               <div className="flex items-center gap-2">
-                <span className="text-slate-400 text-sm">{selectedIds.size}명 선택됨</span>
+                <span className="text-slate-400 text-sm">{selectedIds.size}�??�택??/span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -561,7 +557,7 @@ export default function RidersPage() {
                   className="border-amber-600 text-amber-400 hover:bg-amber-900/20 h-8 text-xs"
                 >
                   <UserX className="h-3.5 w-3.5 mr-1" />
-                  선택 비활성화
+                  ?�택 비활?�화
                 </Button>
                 <Button
                   size="sm"
@@ -570,7 +566,7 @@ export default function RidersPage() {
                   className="border-rose-600 text-rose-400 hover:bg-rose-900/20 h-8 text-xs"
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  선택 삭제
+                  ?�택 ??��
                 </Button>
                 <Button
                   size="sm"
@@ -578,7 +574,7 @@ export default function RidersPage() {
                   onClick={() => setSelectedIds(new Set())}
                   className="text-slate-400 hover:text-white h-8 text-xs"
                 >
-                  선택 해제
+                  ?�택 ?�제
                 </Button>
               </div>
             )}
@@ -598,26 +594,26 @@ export default function RidersPage() {
                       className="w-4 h-4 accent-blue-500 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="text-slate-400">가입일</TableHead>
-                  <TableHead className="text-slate-400">라이더명</TableHead>
-                  <TableHead className="text-slate-400">아이디</TableHead>
-                  <TableHead className="text-slate-400">주민번호</TableHead>
-                  <TableHead className="text-slate-400">연락처</TableHead>
-                  <TableHead className="text-slate-400">은행</TableHead>
+                  <TableHead className="text-slate-400">가?�일</TableHead>
+                  <TableHead className="text-slate-400">?�이?�명</TableHead>
+                  <TableHead className="text-slate-400">?�이??/TableHead>
+                  <TableHead className="text-slate-400">주�?번호</TableHead>
+                  <TableHead className="text-slate-400">?�락�?/TableHead>
+                  <TableHead className="text-slate-400">?�??/TableHead>
                   <TableHead className="text-slate-400">계좌번호</TableHead>
-                  <TableHead className="text-slate-400">예금주</TableHead>
-                  <TableHead className="text-slate-400">상태</TableHead>
-                  <TableHead className="text-slate-400 text-right">관리</TableHead>
+                  <TableHead className="text-slate-400">?�금�?/TableHead>
+                  <TableHead className="text-slate-400">?�태</TableHead>
+                  <TableHead className="text-slate-400 text-right">관�?/TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">로딩 중...</TableCell>
+                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">로딩 �?..</TableCell>
                   </TableRow>
                 ) : paged.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">등록된 라이더가 없습니다.</TableCell>
+                    <TableCell colSpan={11} className="text-center text-slate-500 py-8">?�록???�이?��? ?�습?�다.</TableCell>
                   </TableRow>
                 ) : (
                   paged.map(rider => (
@@ -655,7 +651,7 @@ export default function RidersPage() {
                       <TableCell className="text-slate-300 text-sm">{rider.account_holder ?? '-'}</TableCell>
                       <TableCell>
                         <Badge className={rider.status === 'active' ? 'bg-emerald-700' : 'bg-slate-700'}>
-                          {rider.status === 'active' ? '활성' : '비활성'}
+                          {rider.status === 'active' ? '?�성' : '비활??}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -683,8 +679,7 @@ export default function RidersPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
               <p className="text-slate-400 text-sm">
-                {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} / {sorted.length}명
-              </p>
+                {(safePage - 1) * PAGE_SIZE + 1}??Math.min(safePage * PAGE_SIZE, sorted.length)} / {sorted.length}�?              </p>
               <div className="flex items-center gap-1">
                 <Button
                   size="sm" variant="ghost"
@@ -703,7 +698,7 @@ export default function RidersPage() {
                   }, [])
                   .map((p, i) =>
                     p === '...' ? (
-                      <span key={`ellipsis-${i}`} className="text-slate-500 px-1 text-sm">…</span>
+                      <span key={`ellipsis-${i}`} className="text-slate-500 px-1 text-sm">??/span>
                     ) : (
                       <Button
                         key={p}
@@ -729,16 +724,16 @@ export default function RidersPage() {
         </CardContent>
       </Card>
 
-      {/* 개별 등록/수정 다이얼로그 */}
+      {/* 개별 ?�록/?�정 ?�이?�로�?*/}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white">{editingRider ? '라이더 수정' : '라이더 등록'}</DialogTitle>
+            <DialogTitle className="text-white">{editingRider ? '?�이???�정' : '?�이???�록'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-slate-300">가입일</Label>
+                <Label className="text-slate-300">가?�일</Label>
                 <Input
                   type="date"
                   value={form.join_date}
@@ -747,18 +742,18 @@ export default function RidersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-300">라이더명 <span className="text-red-400">*</span></Label>
+                <Label className="text-slate-300">?�이?�명 <span className="text-red-400">*</span></Label>
                 <Input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="홍길동"
+                  placeholder="?�길??
                   className="bg-slate-800 border-slate-600 text-white"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-slate-300">아이디</Label>
+                <Label className="text-slate-300">?�이??/Label>
                 <Input
                   value={form.rider_username}
                   onChange={e => {
@@ -776,7 +771,7 @@ export default function RidersPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-300">주민등록번호</Label>
+                <Label className="text-slate-300">주�??�록번호</Label>
                 <Input
                   value={form.id_number}
                   onChange={e => setForm(f => ({ ...f, id_number: e.target.value }))}
@@ -786,7 +781,7 @@ export default function RidersPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">연락처</Label>
+              <Label className="text-slate-300">?�락�?/Label>
               <Input
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
@@ -796,11 +791,11 @@ export default function RidersPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-slate-300">은행명</Label>
+                <Label className="text-slate-300">?�?�명</Label>
                 <Input
                   value={form.bank_name}
                   onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))}
-                  placeholder="국민은행"
+                  placeholder="�???�??
                   className="bg-slate-800 border-slate-600 text-white"
                 />
               </div>
@@ -814,25 +809,25 @@ export default function RidersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-300">예금주명</Label>
+                <Label className="text-slate-300">?�금주명</Label>
                 <Input
                   value={form.account_holder}
                   onChange={e => setForm(f => ({ ...f, account_holder: e.target.value }))}
-                  placeholder="홍길동"
+                  placeholder="?�길??
                   className="bg-slate-800 border-slate-600 text-white"
                 />
               </div>
             </div>
             {editingRider && (
               <div className="space-y-1.5">
-                <Label className="text-slate-300">상태</Label>
+                <Label className="text-slate-300">?�태</Label>
                 <Select value={form.status} onValueChange={(v: 'active' | 'inactive') => setForm(f => ({ ...f, status: v }))}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-600">
-                    <SelectItem value="active" className="text-white">활성</SelectItem>
-                    <SelectItem value="inactive" className="text-white">비활성</SelectItem>
+                    <SelectItem value="active" className="text-white">?�성</SelectItem>
+                    <SelectItem value="inactive" className="text-white">비활??/SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -841,19 +836,19 @@ export default function RidersPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)} className="text-slate-400 hover:text-white">취소</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
-              {saving ? '저장 중...' : editingRider ? '수정 저장' : '등록'}
+              {saving ? '?�??�?..' : editingRider ? '?�정 ?�?? : '?�록'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 삭제 확인 다이얼로그 */}
+      {/* ??�� ?�인 ?�이?�로�?*/}
       <Dialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null) }}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-rose-400" />
-              라이더 삭제
+              ?�이????��
             </DialogTitle>
           </DialogHeader>
           <div className="py-3">
@@ -862,12 +857,12 @@ export default function RidersPage() {
               return (
                 <div className="space-y-3">
                   <p className="text-slate-300 text-sm">
-                    <span className="text-white font-semibold">{target?.name}</span> 라이더를 완전히 삭제합니다.
+                    <span className="text-white font-semibold">{target?.name}</span> ?�이?��? ?�전????��?�니??
                   </p>
                   <div className="bg-rose-900/20 border border-rose-800 rounded-lg p-3">
                     <p className="text-rose-300 text-xs flex items-center gap-1.5">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      삭제된 데이터는 복구할 수 없습니다.
+                      ??��???�이?�는 복구?????�습?�다.
                     </p>
                   </div>
                 </div>
@@ -880,42 +875,42 @@ export default function RidersPage() {
               onClick={() => { const r = riders.find(x => x.id === deleteConfirmId); if (r) deleteRider(r) }}
               className="bg-rose-600 hover:bg-rose-700 text-white"
             >
-              <Trash2 className="h-4 w-4 mr-2" />삭제
+              <Trash2 className="h-4 w-4 mr-2" />??��
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 일괄 비활성화/삭제 확인 다이얼로그 */}
+      {/* ?�괄 비활?�화/??�� ?�인 ?�이?�로�?*/}
       <Dialog open={bulkActionConfirm !== null} onOpenChange={open => { if (!open) setBulkActionConfirm(null) }}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white">
-              {bulkActionConfirm === 'deactivate' ? '선택 라이더 비활성화' : '선택 라이더 삭제'}
+              {bulkActionConfirm === 'deactivate' ? '?�택 ?�이??비활?�화' : '?�택 ?�이????��'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {bulkActionConfirm === 'deactivate' ? (
               <>
                 <p className="text-slate-300 text-sm">
-                  선택한 <span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id) && r.status === 'active').length}명</span>의 활성 라이더를 비활성화합니다.
+                  ?�택??<span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id) && r.status === 'active').length}�?/span>???�성 ?�이?��? 비활?�화?�니??
                 </p>
                 <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-3">
                   <p className="text-amber-300 text-xs flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    이미 비활성 상태인 라이더는 건너뜁니다.
+                    ?��? 비활???�태???�이?�는 건너?�니??
                   </p>
                 </div>
               </>
             ) : (
               <>
                 <p className="text-slate-300 text-sm">
-                  선택한 <span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id)).length}명</span>의 라이더를 완전히 삭제합니다.
+                  ?�택??<span className="text-white font-semibold">{filtered.filter(r => selectedIds.has(r.id)).length}�?/span>???�이?��? ?�전????��?�니??
                 </p>
                 <div className="bg-rose-900/20 border border-rose-800 rounded-lg p-3">
                   <p className="text-rose-300 text-xs flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    삭제된 데이터는 복구할 수 없습니다. 관련 정산 데이터도 함께 삭제됩니다.
+                    ??��???�이?�는 복구?????�습?�다. 관???�산 ?�이?�도 ?�께 ??��?�니??
                   </p>
                 </div>
               </>
@@ -928,24 +923,23 @@ export default function RidersPage() {
               disabled={bulkProcessing}
               className={bulkActionConfirm === 'deactivate' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white'}
             >
-              {bulkProcessing ? '처리 중...' : bulkActionConfirm === 'deactivate' ? (
-                <><UserX className="h-4 w-4 mr-2" />비활성화</>
+              {bulkProcessing ? '처리 �?..' : bulkActionConfirm === 'deactivate' ? (
+                <><UserX className="h-4 w-4 mr-2" />비활?�화</>
               ) : (
-                <><Trash2 className="h-4 w-4 mr-2" />삭제</>
+                <><Trash2 className="h-4 w-4 mr-2" />??��</>
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 엑셀 대량등록 다이얼로그 */}
+      {/* ?��? ?�?�등�??�이?�로�?*/}
       <Dialog open={bulkDialogOpen} onOpenChange={(open) => { setBulkDialogOpen(open); if (!open) { setBulkRows([]); setBulkFileName('') } }}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
-              라이더 엑셀 대량등록
-            </DialogTitle>
+              ?�이???��? ?�?�등�?            </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 overflow-auto space-y-4 py-2">
@@ -953,14 +947,14 @@ export default function RidersPage() {
               <div className="flex items-center gap-2 text-sm text-slate-300">
                 <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
                 <span>
-                  <span className="font-bold text-white">라이더명</span>은 필수입니다.
-                  컬럼 순서가 달라도 헤더명으로 자동 인식합니다.
+                  <span className="font-bold text-white">?�이?�명</span>?� ?�수?�니??
+                  컬럼 ?�서가 ?�라???�더명으�??�동 ?�식?�니??
                 </span>
               </div>
               <Button size="sm" variant="outline" onClick={downloadSampleExcel}
                 className="border-slate-600 text-slate-300 hover:bg-slate-700 shrink-0 ml-3">
                 <Download className="h-3.5 w-3.5 mr-1.5" />
-                양식 다운로드
+                ?�식 ?�운로드
               </Button>
             </div>
 
@@ -975,8 +969,8 @@ export default function RidersPage() {
               >
                 <input id="bulk-file-input" type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleBulkFileInput} />
                 <Upload className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                <p className="text-white font-medium mb-1">엑셀 파일을 드래그하거나 클릭하여 업로드</p>
-                <p className="text-slate-400 text-sm">지원 형식: .xlsx, .xls, .csv</p>
+                <p className="text-white font-medium mb-1">?��? ?�일???�래그하거나 ?�릭?�여 ?�로??/p>
+                <p className="text-slate-400 text-sm">지???�식: .xlsx, .xls, .csv</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -984,19 +978,16 @@ export default function RidersPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-slate-400 text-sm">{bulkFileName}</span>
                     <Badge className="bg-emerald-800 text-emerald-300">
-                      <CheckCircle className="h-3 w-3 mr-1" />유효 {bulkRows.filter(r => r.valid).length}명
-                    </Badge>
+                      <CheckCircle className="h-3 w-3 mr-1" />?�효 {bulkRows.filter(r => r.valid).length}�?                    </Badge>
                     {bulkRows.filter(r => !r.valid).length > 0 && (
                       <Badge className="bg-rose-800 text-rose-300">
-                        <AlertTriangle className="h-3 w-3 mr-1" />오류 {bulkRows.filter(r => !r.valid).length}행
-                      </Badge>
+                        <AlertTriangle className="h-3 w-3 mr-1" />?�류 {bulkRows.filter(r => !r.valid).length}??                      </Badge>
                     )}
                   </div>
                   <Button size="sm" variant="ghost"
                     onClick={() => { setBulkRows([]); setBulkFileName('') }}
                     className="text-slate-400 hover:text-white text-xs">
-                    다시 업로드
-                  </Button>
+                    ?�시 ?�로??                  </Button>
                 </div>
 
                 <div className="border border-slate-700 rounded-lg max-h-72 overflow-y-auto overflow-x-auto">
@@ -1005,15 +996,15 @@ export default function RidersPage() {
                     <TableHeader>
                       <TableRow className="border-slate-700 hover:bg-transparent">
                         <TableHead className="text-slate-400 w-8">#</TableHead>
-                        <TableHead className="text-slate-400">가입일</TableHead>
-                        <TableHead className="text-slate-400">라이더명</TableHead>
-                        <TableHead className="text-slate-400">아이디</TableHead>
-                        <TableHead className="text-slate-400">주민등록번호</TableHead>
-                        <TableHead className="text-slate-400">연락처</TableHead>
-                        <TableHead className="text-slate-400">은행명</TableHead>
+                        <TableHead className="text-slate-400">가?�일</TableHead>
+                        <TableHead className="text-slate-400">?�이?�명</TableHead>
+                        <TableHead className="text-slate-400">?�이??/TableHead>
+                        <TableHead className="text-slate-400">주�??�록번호</TableHead>
+                        <TableHead className="text-slate-400">?�락�?/TableHead>
+                        <TableHead className="text-slate-400">?�?�명</TableHead>
                         <TableHead className="text-slate-400">계좌번호</TableHead>
-                        <TableHead className="text-slate-400">예금주명</TableHead>
-                        <TableHead className="text-slate-400">상태</TableHead>
+                        <TableHead className="text-slate-400">?�금주명</TableHead>
+                        <TableHead className="text-slate-400">?�태</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1022,7 +1013,7 @@ export default function RidersPage() {
                           <TableCell className="text-slate-500 text-xs">{i + 1}</TableCell>
                           <TableCell className="text-slate-300 text-sm">{row.join_date || '-'}</TableCell>
                           <TableCell className={`font-medium ${row.valid ? 'text-white' : 'text-rose-400'}`}>
-                            {row.name || <span className="text-slate-500 italic">비어있음</span>}
+                            {row.name || <span className="text-slate-500 italic">비어?�음</span>}
                           </TableCell>
                           <TableCell className="text-slate-300 text-sm">{row.rider_username || '-'}</TableCell>
                           <TableCell className="text-slate-300 font-mono text-sm">
@@ -1034,7 +1025,7 @@ export default function RidersPage() {
                           <TableCell className="text-slate-300 text-sm">{row.account_holder || '-'}</TableCell>
                           <TableCell>
                             {row.valid
-                              ? <Badge className="bg-emerald-900/40 text-emerald-300 text-xs">정상</Badge>
+                              ? <Badge className="bg-emerald-900/40 text-emerald-300 text-xs">?�상</Badge>
                               : <Badge className="bg-rose-900/40 text-rose-300 text-xs">{row.error}</Badge>}
                           </TableCell>
                         </TableRow>
@@ -1053,8 +1044,8 @@ export default function RidersPage() {
               <Button onClick={handleBulkSave} disabled={bulkSaving || bulkRows.filter(r => r.valid).length === 0}
                 className="bg-emerald-600 hover:bg-emerald-700">
                 {bulkSaving
-                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />저장 중...</>
-                  : <><CheckCircle className="h-4 w-4 mr-2" />{bulkRows.filter(r => r.valid).length}명 등록</>}
+                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />?�??�?..</>
+                  : <><CheckCircle className="h-4 w-4 mr-2" />{bulkRows.filter(r => r.valid).length}�??�록</>}
               </Button>
             )}
           </DialogFooter>
