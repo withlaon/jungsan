@@ -118,7 +118,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login?force=1"
-              className="hidden md:inline-flex px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+              className="inline-flex px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-all border border-white/10 md:border-transparent"
             >
               로그인
             </Link>
