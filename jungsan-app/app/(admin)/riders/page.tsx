@@ -154,56 +154,69 @@ export default function RidersPage() {
     if (usernameError) { toast.error('아이디 중복을 확인해주세요.'); return }
 
     setSaving(true)
-    const payload = {
-      join_date: form.join_date || null,
-      name: form.name.trim(),
-      rider_username: form.rider_username.trim() || null,
-      id_number: form.id_number.trim() || null,
-      phone: form.phone.trim() || null,
-      bank_name: form.bank_name.trim() || null,
-      bank_account: form.bank_account.trim() || null,
-      account_holder: form.account_holder.trim() || null,
-      status: form.status,
+    try {
+      const payload = {
+        join_date: form.join_date || null,
+        name: form.name.trim(),
+        rider_username: form.rider_username.trim() || null,
+        id_number: form.id_number.trim() || null,
+        phone: form.phone.trim() || null,
+        bank_name: form.bank_name.trim() || null,
+        bank_account: form.bank_account.trim() || null,
+        account_holder: form.account_holder.trim() || null,
+        status: form.status,
+      }
+
+      const res = await fetch('/api/admin/rider', {
+        method: editingRider ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingRider ? { id: editingRider.id, ...payload } : payload),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) { toast.error(data?.error ?? '저장 실패'); return }
+
+      toast.success(editingRider ? '라이더 정보가 수정되었습니다.' : '라이더가 등록되었습니다.')
+      setDialogOpen(false)
+      setSearch('')
+      refreshRiders(true)
+    } catch (e) {
+      toast.error('저장 실패: 네트워크 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
     }
-
-    const res = await fetch('/api/admin/rider', {
-      method: editingRider ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingRider ? { id: editingRider.id, ...payload } : payload),
-    })
-    const data = await res.json().catch(() => ({}))
-    setSaving(false)
-
-    if (!res.ok) { toast.error(data?.error ?? '저장 실패'); return }
-
-    toast.success(editingRider ? '라이더 정보가 수정되었습니다.' : '라이더가 등록되었습니다.')
-    setDialogOpen(false)
-    setSearch('')
-    await refreshRiders()
   }
 
   const toggleStatus = async (rider: Rider) => {
     const newStatus = rider.status === 'active' ? 'inactive' : 'active'
-    const res = await fetch('/api/admin/rider', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: rider.id, ...rider, status: newStatus }),
-    })
-    if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
-    toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
-    refreshRiders()
+    try {
+      const res = await fetch('/api/admin/rider', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rider.id, ...rider, status: newStatus }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
+      toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
+      refreshRiders(true)
+    } catch {
+      toast.error('상태 변경 실패: 네트워크 오류')
+    }
   }
 
   const deleteRider = async (rider: Rider) => {
-    const res = await fetch('/api/admin/rider', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: rider.id }),
-    })
-    if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('삭제 실패: ' + (d?.error ?? '')); return }
-    toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
-    setDeleteConfirmId(null)
-    refreshRiders()
+    try {
+      const res = await fetch('/api/admin/rider', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rider.id }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('삭제 실패: ' + (d?.error ?? '')); return }
+      toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
+      setDeleteConfirmId(null)
+      refreshRiders(true)
+    } catch {
+      toast.error('삭제 실패: 네트워크 오류')
+    }
   }
 
   const parseBulkExcel = useCallback((file: File) => {

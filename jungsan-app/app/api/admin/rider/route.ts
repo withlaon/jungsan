@@ -61,16 +61,18 @@ export async function PATCH(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
     if (!name?.trim()) return NextResponse.json({ error: '라이더명을 입력해주세요.' }, { status: 400 })
 
+  const trim = (v: unknown) => (v != null && String(v).trim()) || null
+
     const admin = createAdminClient()
     const { error } = await admin.from('riders').update({
-      join_date: join_date?.trim() || null,
-      name: String(name).trim(),
-      rider_username: rider_username?.trim() || null,
-      id_number: id_number?.trim() || null,
-      phone: phone?.trim() || null,
-      bank_name: bank_name?.trim() || null,
-      bank_account: bank_account?.trim() || null,
-      account_holder: account_holder?.trim() || null,
+      join_date:       trim(join_date),
+      name:            String(name).trim(),
+      rider_username:  trim(rider_username),
+      id_number:       trim(id_number),
+      phone:           trim(phone),
+      bank_name:       trim(bank_name),
+      bank_account:    trim(bank_account),
+      account_holder:  trim(account_holder),
       status: status === 'inactive' ? 'inactive' : 'active',
     }).eq('id', id)
 
