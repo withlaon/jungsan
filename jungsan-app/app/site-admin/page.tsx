@@ -14,7 +14,8 @@ import {
 import {
   Users, Pencil, Loader2, RefreshCw, Eye, ExternalLink,
   MessageSquare, ChevronLeft, ChevronRight, Send,
-  Clock, CheckCircle2, EyeOff,
+  Clock, CheckCircle2, EyeOff, BarChart3, TrendingUp,
+  UserPlus, CalendarDays, Activity,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -72,10 +73,228 @@ function PlatformBadge({ platform }: { platform: string | null }) {
   return <span className="text-slate-400 text-xs">{platform}</span>
 }
 
+/* ─── 접속통계 패널 ─── */
+function StatsPanel({
+  members,
+  inquiries,
+  inquiryTotal,
+  loading,
+}: {
+  members: MemberProfile[]
+  inquiries: InquiryItem[]
+  inquiryTotal: number
+  loading: boolean
+}) {
+  const now = new Date()
+
+  const startOf = (unit: 'day' | 'week' | 'month') => {
+    const d = new Date(now)
+    if (unit === 'day') { d.setHours(0, 0, 0, 0) }
+    else if (unit === 'week') { const day = d.getDay(); d.setDate(d.getDate() - day); d.setHours(0, 0, 0, 0) }
+    else { d.setDate(1); d.setHours(0, 0, 0, 0) }
+    return d
+  }
+
+  const todayCount  = members.filter(m => m.created_at && new Date(m.created_at) >= startOf('day')).length
+  const weekCount   = members.filter(m => m.created_at && new Date(m.created_at) >= startOf('week')).length
+  const monthCount  = members.filter(m => m.created_at && new Date(m.created_at) >= startOf('month')).length
+  const totalCount  = members.length
+
+  const baeminCount  = members.filter(m => m.platform === 'baemin'  || m.platform === '배민').length
+  const coupangCount = members.filter(m => m.platform === 'coupang' || m.platform === '쿠팡').length
+  const etcCount     = totalCount - baeminCount - coupangCount
+
+  const pendingInquiries  = inquiries.filter(i => i.status === 'pending').length
+  const answeredInquiries = inquiries.filter(i => i.status === 'answered').length
+
+  // 최근 8주 가입 추이
+  const weeklyData: { label: string; count: number }[] = []
+  for (let i = 7; i >= 0; i--) {
+    const weekStart = new Date(now)
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() - i * 7)
+    weekStart.setHours(0, 0, 0, 0)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 7)
+    const month = weekStart.getMonth() + 1
+    const date  = weekStart.getDate()
+    weeklyData.push({
+      label: `${month}/${date}`,
+      count: members.filter(m => {
+        if (!m.created_at) return false
+        const d = new Date(m.created_at)
+        return d >= weekStart && d < weekEnd
+      }).length,
+    })
+  }
+  const maxWeekly = Math.max(...weeklyData.map(w => w.count), 1)
+
+  // 최근 가입 5명
+  const recentMembers = [...members]
+    .filter(m => m.created_at)
+    .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())
+    .slice(0, 5)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 요약 카드 4개 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { icon: Users,     label: '전체 회원',      value: totalCount,  color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/30' },
+          { icon: UserPlus,  label: '이번달 신규',    value: monthCount,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+          { icon: CalendarDays, label: '이번주 신규', value: weekCount,   color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
+          { icon: Activity,  label: '오늘 신규',      value: todayCount,  color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30' },
+        ].map(({ icon: Icon, label, value, color, bg, border }) => (
+          <Card key={label} className={`border ${border} ${bg} bg-transparent`}>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-slate-400 text-xs font-medium">{label}</span>
+                <Icon className={`h-4 w-4 ${color}`} />
+              </div>
+              <p className={`text-3xl font-bold ${color}`}>{value}</p>
+              <p className="text-slate-500 text-xs mt-1">명</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 주간 가입 추이 바 차트 */}
+        <Card className="border-slate-700 bg-slate-900 lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-400" />
+              주간 신규 가입 추이 (최근 8주)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-2 h-36 mt-2">
+              {weeklyData.map((w, idx) => {
+                const heightPct = maxWeekly === 0 ? 0 : Math.max((w.count / maxWeekly) * 100, w.count > 0 ? 8 : 0)
+                const isLast = idx === weeklyData.length - 1
+                return (
+                  <div key={w.label} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                    <span className="text-xs text-slate-400 tabular-nums">{w.count > 0 ? w.count : ''}</span>
+                    <div className="w-full flex items-end" style={{ height: '96px' }}>
+                      <div
+                        className={`w-full rounded-t-sm transition-all ${isLast ? 'bg-blue-500' : 'bg-slate-600'}`}
+                        style={{ height: `${heightPct}%`, minHeight: w.count > 0 ? '4px' : '0' }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{w.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 플랫폼 분포 + 문의 현황 */}
+        <div className="space-y-4">
+          {/* 플랫폼 분포 */}
+          <Card className="border-slate-700 bg-slate-900">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm flex items-center gap-2">
+                <Users className="h-4 w-4 text-cyan-400" />
+                플랫폼 분포
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { label: '배달의 민족', count: baeminCount,  color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                { label: '쿠팡이츠',   count: coupangCount, color: 'bg-yellow-500',  textColor: 'text-yellow-400' },
+                { label: '기타/미설정', count: etcCount,     color: 'bg-slate-500',  textColor: 'text-slate-400' },
+              ].map(({ label, count, color, textColor }) => (
+                <div key={label}>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="text-slate-300">{label}</span>
+                    <span className={`font-semibold ${textColor}`}>{count}명</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${color} rounded-full transition-all`}
+                      style={{ width: totalCount > 0 ? `${(count / totalCount) * 100}%` : '0%' }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* 문의 현황 */}
+          <Card className="border-slate-700 bg-slate-900">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-violet-400" />
+                문의 현황
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { label: '전체 문의',  count: inquiryTotal,     color: 'text-white' },
+                { label: '답변 대기',  count: pendingInquiries,  color: 'text-amber-400' },
+                { label: '답변 완료',  count: answeredInquiries, color: 'text-emerald-400' },
+              ].map(({ label, count, color }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-slate-400 text-sm">{label}</span>
+                  <span className={`text-sm font-semibold ${color}`}>{count}건</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 최근 가입 회원 */}
+      <Card className="border-slate-700 bg-slate-900">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-white text-sm flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-emerald-400" />
+            최근 가입 회원 (최신 5명)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {recentMembers.length === 0 ? (
+            <p className="text-slate-500 text-sm py-6 text-center">등록된 회원이 없습니다.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700 bg-slate-800/50">
+                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">아이디</th>
+                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">회사명</th>
+                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">플랫폼</th>
+                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium whitespace-nowrap">가입일시</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentMembers.map((m) => (
+                  <tr key={m.id} className="border-b border-slate-800 last:border-0">
+                    <td className="py-2.5 px-4 text-blue-400 font-medium">{m.username ?? '-'}</td>
+                    <td className="py-2.5 px-4 text-slate-300">{m.company_name ?? '-'}</td>
+                    <td className="py-2.5 px-4"><PlatformBadge platform={m.platform} /></td>
+                    <td className="py-2.5 px-4 text-slate-400 text-xs">{m.created_at ? formatDate(m.created_at) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 /* ════════════════════════════════════════ */
 export default function SiteAdminPage() {
   const supabase = createClient()
-  const [activeTab, setActiveTab] = useState<'members' | 'inquiries'>('inquiries')
+  const [activeTab, setActiveTab] = useState<'members' | 'inquiries' | 'stats'>('inquiries')
 
   /* ── 회원 목록 상태 ── */
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -299,6 +518,17 @@ export default function SiteAdminPage() {
             {members.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab('stats')}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'stats'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+          접속통계
+        </button>
       </div>
 
       {/* ══ 회원 목록 탭 ══ */}
@@ -395,6 +625,11 @@ export default function SiteAdminPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ══ 접속통계 탭 ══ */}
+      {activeTab === 'stats' && (
+        <StatsPanel members={members} inquiries={inquiries} inquiryTotal={inquiryTotal} loading={membersLoading} />
       )}
 
       {/* ══ 문의하기 탭 ══ */}
