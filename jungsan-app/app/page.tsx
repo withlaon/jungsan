@@ -368,18 +368,39 @@ export default function LandingPage() {
       </section>
 
       {/* ── 푸터 ── */}
-      <footer className="border-t border-white/5 py-10 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-              <Zap className="w-3 h-3 text-white fill-white" />
+      <footer className="border-t border-white/5 py-12 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-8">
+            {/* 브랜드 + 사업자 정보 */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+                  <Zap className="w-3 h-3 text-white fill-white" />
+                </div>
+                <span className="text-sm font-medium text-slate-400">JUNGSAN-TIME</span>
+              </div>
+              <div className="text-xs text-slate-600 leading-relaxed space-y-1">
+                <p><span className="text-slate-500">상호</span> &nbsp;위드라온</p>
+                <p><span className="text-slate-500">대표자</span> &nbsp;김형진</p>
+                <p><span className="text-slate-500">사업자등록번호</span> &nbsp;628-27-01385</p>
+                <p><span className="text-slate-500">통신판매신고번호</span> &nbsp;제 2025-부천소사-0308 호</p>
+                <p><span className="text-slate-500">주소</span> &nbsp;경기도 부천시 성주로 96 제일빌딩 5층</p>
+                <p><span className="text-slate-500">연락처</span> &nbsp;070-8949-7469 &nbsp;·&nbsp; jimcard@naver.com</p>
+              </div>
             </div>
-            <span>JUNGSAN-TIME</span>
+            {/* 링크 영역 */}
+            <div className="flex flex-col items-start lg:items-end gap-3 text-sm text-slate-500">
+              <Link href="/terms" className="hover:text-slate-300 transition-colors">
+                이용약관
+              </Link>
+              <Link href="/login?force=1" className="hover:text-slate-300 transition-colors">
+                관리자 로그인 →
+              </Link>
+            </div>
           </div>
-          <p>© 2025 위드라온 · 라이더 정산 자동화 플랫폼 · jimcard@naver.com</p>
-          <Link href="/login?force=1" className="text-slate-500 hover:text-slate-300 transition-colors">
-            관리자 로그인 →
-          </Link>
+          <div className="mt-8 pt-6 border-t border-white/5 text-xs text-slate-600 text-center">
+            © 2025 위드라온 · 라이더 정산 자동화 플랫폼
+          </div>
         </div>
       </footer>
     </div>
