@@ -92,6 +92,17 @@ function LogoutHandler() {
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
 
+  useEffect(() => {
+    fetch('/api/track-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: window.location.pathname,
+        referrer: document.referrer || null,
+      }),
+    }).catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#070B14] text-white overflow-x-hidden">
       <Suspense fallback={null}><LogoutHandler /></Suspense>

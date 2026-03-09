@@ -15,7 +15,7 @@ import {
   Users, Pencil, Loader2, RefreshCw, Eye, ExternalLink,
   MessageSquare, ChevronLeft, ChevronRight, Send,
   Clock, CheckCircle2, EyeOff, BarChart3, TrendingUp,
-  UserPlus, CalendarDays, Activity,
+  UserPlus, CalendarDays, Activity, Globe, MousePointerClick,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -73,6 +73,16 @@ function PlatformBadge({ platform }: { platform: string | null }) {
   return <span className="text-slate-400 text-xs">{platform}</span>
 }
 
+interface VisitStats {
+  total: number
+  today: number
+  week: number
+  month: number
+  weeklyStats: { label: string; count: number }[]
+  dailyStats:  { label: string; count: number }[]
+  topPaths: { path: string; count: number }[]
+}
+
 /* ─── 접속통계 패널 ─── */
 function StatsPanel({
   members,
@@ -86,6 +96,19 @@ function StatsPanel({
   loading: boolean
 }) {
   const now = new Date()
+
+  /* ── 방문자 데이터 ── */
+  const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
+  const [visitLoading, setVisitLoading] = useState(true)
+
+  useEffect(() => {
+    setVisitLoading(true)
+    fetch('/api/site-admin/visits')
+      .then(r => r.json())
+      .then(data => setVisitStats(data))
+      .catch(() => {})
+      .finally(() => setVisitLoading(false))
+  }, [])
 
   const startOf = (unit: 'day' | 'week' | 'month') => {
     const d = new Date(now)
@@ -142,151 +165,305 @@ function StatsPanel({
     )
   }
 
+  const maxDaily   = Math.max(...(visitStats?.dailyStats  ?? []).map(d => d.count), 1)
+  const maxVisitW  = Math.max(...(visitStats?.weeklyStats ?? []).map(w => w.count), 1)
+
   return (
-    <div className="space-y-6">
-      {/* 요약 카드 4개 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { icon: Users,     label: '전체 회원',      value: totalCount,  color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/30' },
-          { icon: UserPlus,  label: '이번달 신규',    value: monthCount,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-          { icon: CalendarDays, label: '이번주 신규', value: weekCount,   color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
-          { icon: Activity,  label: '오늘 신규',      value: todayCount,  color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30' },
-        ].map(({ icon: Icon, label, value, color, bg, border }) => (
-          <Card key={label} className={`border ${border} ${bg} bg-transparent`}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-slate-400 text-xs font-medium">{label}</span>
-                <Icon className={`h-4 w-4 ${color}`} />
-              </div>
-              <p className={`text-3xl font-bold ${color}`}>{value}</p>
-              <p className="text-slate-500 text-xs mt-1">명</p>
+    <div className="space-y-8">
+
+      {/* ══ 방문자 현황 섹션 ══ */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Globe className="h-4 w-4 text-cyan-400" />
+          <h3 className="text-sm font-semibold text-white">사이트 방문자 현황 (jungsan-time.com)</h3>
+          {visitLoading && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}
+        </div>
+
+        {/* 방문자 요약 카드 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[
+            { icon: Globe,            label: '전체 방문',   value: visitStats?.total ?? '-', color: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30' },
+            { icon: CalendarDays,     label: '이번달 방문', value: visitStats?.month ?? '-', color: 'text-blue-400',    bg: 'bg-blue-500/10',    border: 'border-blue-500/30' },
+            { icon: TrendingUp,       label: '이번주 방문', value: visitStats?.week  ?? '-', color: 'text-violet-400',  bg: 'bg-violet-500/10',  border: 'border-violet-500/30' },
+            { icon: MousePointerClick,label: '오늘 방문',   value: visitStats?.today ?? '-', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+          ].map(({ icon: Icon, label, value, color, bg, border }) => (
+            <Card key={label} className={`border ${border} ${bg} bg-transparent`}>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-slate-400 text-xs font-medium">{label}</span>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                <p className="text-slate-500 text-xs mt-1">회</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 일별 방문 (7일) */}
+          <Card className="border-slate-700 bg-slate-900 lg:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm flex items-center gap-2">
+                <Activity className="h-4 w-4 text-cyan-400" />
+                일별 방문 추이 (최근 7일)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visitLoading ? (
+                <div className="flex items-center justify-center h-28">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                </div>
+              ) : (
+                <div className="flex items-end gap-2 h-28 mt-2">
+                  {(visitStats?.dailyStats ?? []).map((d, idx) => {
+                    const hp = maxDaily === 0 ? 0 : Math.max((d.count / maxDaily) * 100, d.count > 0 ? 8 : 0)
+                    const isToday = idx === (visitStats?.dailyStats.length ?? 1) - 1
+                    return (
+                      <div key={d.label} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                        <span className="text-xs text-slate-400 tabular-nums">{d.count > 0 ? d.count : ''}</span>
+                        <div className="w-full flex items-end" style={{ height: '80px' }}>
+                          <div
+                            className={`w-full rounded-t-sm transition-all ${isToday ? 'bg-cyan-500' : 'bg-slate-600'}`}
+                            style={{ height: `${hp}%`, minHeight: d.count > 0 ? '4px' : '0' }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{d.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 주간 가입 추이 바 차트 */}
-        <Card className="border-slate-700 bg-slate-900 lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-sm flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-400" />
-              주간 신규 가입 추이 (최근 8주)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-2 h-36 mt-2">
-              {weeklyData.map((w, idx) => {
-                const heightPct = maxWeekly === 0 ? 0 : Math.max((w.count / maxWeekly) * 100, w.count > 0 ? 8 : 0)
-                const isLast = idx === weeklyData.length - 1
-                return (
-                  <div key={w.label} className="flex flex-col items-center gap-1 flex-1 min-w-0">
-                    <span className="text-xs text-slate-400 tabular-nums">{w.count > 0 ? w.count : ''}</span>
-                    <div className="w-full flex items-end" style={{ height: '96px' }}>
-                      <div
-                        className={`w-full rounded-t-sm transition-all ${isLast ? 'bg-blue-500' : 'bg-slate-600'}`}
-                        style={{ height: `${heightPct}%`, minHeight: w.count > 0 ? '4px' : '0' }}
-                      />
+          {/* 인기 페이지 TOP 5 */}
+          <Card className="border-slate-700 bg-slate-900">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm flex items-center gap-2">
+                <MousePointerClick className="h-4 w-4 text-emerald-400" />
+                인기 페이지 TOP 5
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visitLoading ? (
+                <div className="flex items-center justify-center h-20">
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                </div>
+              ) : (visitStats?.topPaths ?? []).length === 0 ? (
+                <p className="text-slate-500 text-xs py-4 text-center">데이터 없음</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {(visitStats?.topPaths ?? []).map(({ path, count }) => (
+                    <div key={path}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-300 truncate max-w-[130px]" title={path}>{path || '/'}</span>
+                        <span className="text-cyan-400 font-semibold ml-1">{count}회</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-cyan-500/60 rounded-full"
+                          style={{ width: visitStats!.total > 0 ? `${(count / visitStats!.total) * 100}%` : '0%' }}
+                        />
+                      </div>
                     </div>
-                    <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{w.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 플랫폼 분포 + 문의 현황 */}
-        <div className="space-y-4">
-          {/* 플랫폼 분포 */}
-          <Card className="border-slate-700 bg-slate-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-sm flex items-center gap-2">
-                <Users className="h-4 w-4 text-cyan-400" />
-                플랫폼 분포
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { label: '배달의 민족', count: baeminCount,  color: 'bg-emerald-500', textColor: 'text-emerald-400' },
-                { label: '쿠팡이츠',   count: coupangCount, color: 'bg-yellow-500',  textColor: 'text-yellow-400' },
-                { label: '기타/미설정', count: etcCount,     color: 'bg-slate-500',  textColor: 'text-slate-400' },
-              ].map(({ label, count, color, textColor }) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="text-slate-300">{label}</span>
-                    <span className={`font-semibold ${textColor}`}>{count}명</span>
-                  </div>
-                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${color} rounded-full transition-all`}
-                      style={{ width: totalCount > 0 ? `${(count / totalCount) * 100}%` : '0%' }}
-                    />
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* 문의 현황 */}
-          <Card className="border-slate-700 bg-slate-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-sm flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-violet-400" />
-                문의 현황
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { label: '전체 문의',  count: inquiryTotal,     color: 'text-white' },
-                { label: '답변 대기',  count: pendingInquiries,  color: 'text-amber-400' },
-                { label: '답변 완료',  count: answeredInquiries, color: 'text-emerald-400' },
-              ].map(({ label, count, color }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-slate-400 text-sm">{label}</span>
-                  <span className={`text-sm font-semibold ${color}`}>{count}건</span>
-                </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>
+
+        {/* 주간 방문 추이 (8주) */}
+        <Card className="border-slate-700 bg-slate-900 mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-400" />
+              주간 방문 추이 (최근 8주)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {visitLoading ? (
+              <div className="flex items-center justify-center h-28">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+              </div>
+            ) : (
+              <div className="flex items-end gap-2 h-28 mt-2">
+                {(visitStats?.weeklyStats ?? []).map((w, idx) => {
+                  const hp = maxVisitW === 0 ? 0 : Math.max((w.count / maxVisitW) * 100, w.count > 0 ? 8 : 0)
+                  const isLast = idx === (visitStats?.weeklyStats.length ?? 1) - 1
+                  return (
+                    <div key={w.label} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                      <span className="text-xs text-slate-400 tabular-nums">{w.count > 0 ? w.count : ''}</span>
+                      <div className="w-full flex items-end" style={{ height: '80px' }}>
+                        <div
+                          className={`w-full rounded-t-sm transition-all ${isLast ? 'bg-blue-500' : 'bg-slate-600'}`}
+                          style={{ height: `${hp}%`, minHeight: w.count > 0 ? '4px' : '0' }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{w.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* 최근 가입 회원 */}
-      <Card className="border-slate-700 bg-slate-900">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-white text-sm flex items-center gap-2">
-            <UserPlus className="h-4 w-4 text-emerald-400" />
-            최근 가입 회원 (최신 5명)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {recentMembers.length === 0 ? (
-            <p className="text-slate-500 text-sm py-6 text-center">등록된 회원이 없습니다.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-800/50">
-                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">아이디</th>
-                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">회사명</th>
-                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium">플랫폼</th>
-                  <th className="text-left py-2.5 px-4 text-slate-400 font-medium whitespace-nowrap">가입일시</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentMembers.map((m) => (
-                  <tr key={m.id} className="border-b border-slate-800 last:border-0">
-                    <td className="py-2.5 px-4 text-blue-400 font-medium">{m.username ?? '-'}</td>
-                    <td className="py-2.5 px-4 text-slate-300">{m.company_name ?? '-'}</td>
-                    <td className="py-2.5 px-4"><PlatformBadge platform={m.platform} /></td>
-                    <td className="py-2.5 px-4 text-slate-400 text-xs">{m.created_at ? formatDate(m.created_at) : '-'}</td>
-                  </tr>
+      {/* 구분선 */}
+      <div className="border-t border-slate-700/60" />
+
+      {/* ══ 회원 현황 섹션 ══ */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="h-4 w-4 text-blue-400" />
+          <h3 className="text-sm font-semibold text-white">회원 현황</h3>
+        </div>
+
+        {/* 요약 카드 4개 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: Users,        label: '전체 회원',   value: totalCount,  color: 'text-blue-400',    bg: 'bg-blue-500/10',    border: 'border-blue-500/30' },
+            { icon: UserPlus,     label: '이번달 신규', value: monthCount,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+            { icon: CalendarDays, label: '이번주 신규', value: weekCount,   color: 'text-violet-400',  bg: 'bg-violet-500/10',  border: 'border-violet-500/30' },
+            { icon: Activity,     label: '오늘 신규',   value: todayCount,  color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30' },
+          ].map(({ icon: Icon, label, value, color, bg, border }) => (
+            <Card key={label} className={`border ${border} ${bg} bg-transparent`}>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-slate-400 text-xs font-medium">{label}</span>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                <p className="text-slate-500 text-xs mt-1">명</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* 주간 가입 추이 */}
+          <Card className="border-slate-700 bg-slate-900 lg:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-blue-400" />
+                주간 신규 가입 추이 (최근 8주)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-2 h-36 mt-2">
+                {weeklyData.map((w, idx) => {
+                  const heightPct = maxWeekly === 0 ? 0 : Math.max((w.count / maxWeekly) * 100, w.count > 0 ? 8 : 0)
+                  const isLast = idx === weeklyData.length - 1
+                  return (
+                    <div key={w.label} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                      <span className="text-xs text-slate-400 tabular-nums">{w.count > 0 ? w.count : ''}</span>
+                      <div className="w-full flex items-end" style={{ height: '96px' }}>
+                        <div
+                          className={`w-full rounded-t-sm transition-all ${isLast ? 'bg-blue-500' : 'bg-slate-600'}`}
+                          style={{ height: `${heightPct}%`, minHeight: w.count > 0 ? '4px' : '0' }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{w.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 플랫폼 분포 + 문의 현황 */}
+          <div className="space-y-4">
+            <Card className="border-slate-700 bg-slate-900">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white text-sm flex items-center gap-2">
+                  <Users className="h-4 w-4 text-cyan-400" />
+                  플랫폼 분포
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  { label: '배달의 민족', count: baeminCount,  color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                  { label: '쿠팡이츠',   count: coupangCount, color: 'bg-yellow-500',  textColor: 'text-yellow-400' },
+                  { label: '기타/미설정', count: etcCount,     color: 'bg-slate-500',  textColor: 'text-slate-400' },
+                ].map(({ label, count, color, textColor }) => (
+                  <div key={label}>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-slate-300">{label}</span>
+                      <span className={`font-semibold ${textColor}`}>{count}명</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${color} rounded-full transition-all`}
+                        style={{ width: totalCount > 0 ? `${(count / totalCount) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-700 bg-slate-900">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white text-sm flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-violet-400" />
+                  문의 현황
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  { label: '전체 문의', count: inquiryTotal,      color: 'text-white' },
+                  { label: '답변 대기', count: pendingInquiries,  color: 'text-amber-400' },
+                  { label: '답변 완료', count: answeredInquiries, color: 'text-emerald-400' },
+                ].map(({ label, count, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-slate-400 text-sm">{label}</span>
+                    <span className={`text-sm font-semibold ${color}`}>{count}건</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* 최근 가입 회원 */}
+        <Card className="border-slate-700 bg-slate-900 mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-sm flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-emerald-400" />
+              최근 가입 회원 (최신 5명)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentMembers.length === 0 ? (
+              <p className="text-slate-500 text-sm py-6 text-center">등록된 회원이 없습니다.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-700 bg-slate-800/50">
+                    <th className="text-left py-2.5 px-4 text-slate-400 font-medium">아이디</th>
+                    <th className="text-left py-2.5 px-4 text-slate-400 font-medium">회사명</th>
+                    <th className="text-left py-2.5 px-4 text-slate-400 font-medium">플랫폼</th>
+                    <th className="text-left py-2.5 px-4 text-slate-400 font-medium whitespace-nowrap">가입일시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentMembers.map((m) => (
+                    <tr key={m.id} className="border-b border-slate-800 last:border-0">
+                      <td className="py-2.5 px-4 text-blue-400 font-medium">{m.username ?? '-'}</td>
+                      <td className="py-2.5 px-4 text-slate-300">{m.company_name ?? '-'}</td>
+                      <td className="py-2.5 px-4"><PlatformBadge platform={m.platform} /></td>
+                      <td className="py-2.5 px-4 text-slate-400 text-xs">{m.created_at ? formatDate(m.created_at) : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   )
 }
