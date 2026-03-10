@@ -272,10 +272,13 @@ export function Sidebar() {
         setWithdrawing(false)
         return
       }
-      // 데이터 삭제 완료 후 세션 종료 및 랜딩 이동
-      await supabase.auth.signOut()
-      window.location.replace('/')
-    } catch (err) {
+      // auth.users 삭제 완료 → signOut() 호출 시 삭제된 계정으로 서버 요청이 가서 멈춤
+      // 대신 서버측 쿠키 정리 API를 호출한 뒤 즉시 랜딩 페이지로 이동
+      try {
+        await fetch('/api/auth/signout', { method: 'POST', keepalive: true })
+      } catch { /* 쿠키 정리 실패해도 계속 진행 */ }
+      window.location.href = 'https://jungsan-time.com/'
+    } catch {
       setWithdrawMsg('탈퇴 처리 중 오류가 발생했습니다.')
       setWithdrawing(false)
     }
