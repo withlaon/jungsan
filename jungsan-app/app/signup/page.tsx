@@ -145,6 +145,9 @@ export default function SignupPage() {
     // 플랫폼 + 비밀번호 저장 (프로필 생성 후 업데이트)
     await supabase.from('profiles').update({ platform, plain_password: form.password }).eq('id', authData.user.id)
 
+    // site-admin 회원 목록 실시간 갱신 트리거
+    fetch('/api/notify/member-change', { method: 'POST' }).catch(() => {})
+
     setLoading(false)
     router.push('/')
   }

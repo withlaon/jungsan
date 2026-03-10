@@ -504,18 +504,39 @@ export default function SiteAdminPage() {
   useEffect(() => { fetchVisitStats() }, [fetchVisitStats])
 
   /* ── 회원 목록 로드 ── */
-  const fetchMembers = useCallback(async () => {
-    setMembersLoading(true)
+  const fetchMembers = useCallback(async (silent = false) => {
+    if (!silent) setMembersLoading(true)
     try {
-      const res = await fetch('/api/admin/profiles')
+      const res = await fetch('/api/admin/profiles', { cache: 'no-store' })
+      if (res.status === 401 || res.status === 403) {
+        // 인증 만료 시 조용히 무시 (페이지 자체가 인증 체크함)
+        if (!silent) setMembersLoading(false)
+        return
+      }
       const data = await res.json()
-      if (!res.ok) { toast.error('회원 목록 조회 실패') }
-      else setMembers((Array.isArray(data) ? data : []) as MemberProfile[])
-    } catch { toast.error('회원 목록 조회 실패') }
-    setMembersLoading(false)
+      if (!res.ok) {
+        if (!silent) toast.error('회원 목록 조회 실패: ' + (data?.error ?? res.statusText))
+      } else {
+        setMembers((Array.isArray(data) ? data : []) as MemberProfile[])
+      }
+    } catch {
+      if (!silent) toast.error('회원 목록 조회 실패')
+    }
+    if (!silent) setMembersLoading(false)
   }, [])
 
   useEffect(() => { fetchMembers() }, [fetchMembers])
+
+  /* ── 실시간: 신규 가입 / 탈퇴 감지 → 회원 목록 자동 갱신 ── */
+  useEffect(() => {
+    const channel = supabase
+      .channel('member-changes')
+      .on('broadcast', { event: 'member_change' }, () => {
+        fetchMembers(true)
+      })
+      .subscribe()
+    return () => { channel.unsubscribe() }
+  }, [fetchMembers, supabase])
 
   /* ── 문의 목록 로드 ── */
   const fetchInquiries = useCallback(async (p = 1) => {
@@ -648,7 +669,7 @@ export default function SiteAdminPage() {
           <p className="text-slate-400 text-sm mt-1">회원 정보 및 문의 관리</p>
         </div>
         {activeTab === 'members' && (
-          <Button variant="outline" onClick={fetchMembers} disabled={membersLoading}
+          <Button variant="outline" onClick={() => fetchMembers()} disabled={membersLoading}
             className="border-slate-600 text-slate-300">
             <RefreshCw className={`h-4 w-4 mr-2 ${membersLoading ? 'animate-spin' : ''}`} />
             새로고침

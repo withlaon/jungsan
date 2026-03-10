@@ -60,6 +60,19 @@ export async function POST() {
       console.warn('auth.deleteUser warning:', deleteAuthErr.message)
     }
 
+    // 11. site-admin 회원 목록 실시간 갱신 트리거 (fire-and-forget)
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') || ''}/realtime/v1/api/broadcast`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+      },
+      body: JSON.stringify({
+        messages: [{ topic: 'realtime:member-changes', event: 'member_change', payload: {}, private: false }],
+      }),
+    }).catch(() => {})
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('withdraw error:', err)
