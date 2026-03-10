@@ -739,6 +739,7 @@ export default function SiteAdminPage() {
                     <thead>
                       <tr className="border-b border-slate-700 bg-slate-800/50">
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">아이디</th>
+                        <th className="text-left py-3 px-4 text-slate-400 font-medium">비밀번호</th>
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">회사명</th>
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">사업자번호</th>
                         <th className="text-left py-3 px-4 text-slate-400 font-medium">업체</th>
@@ -759,6 +760,11 @@ export default function SiteAdminPage() {
                               {m.username ?? '-'}
                               {m.username && <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
                             </button>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-slate-300 font-mono text-xs">
+                              {m.plain_password ?? '-'}
+                            </span>
                           </td>
                           <td className="py-3 px-4">
                             <button onClick={() => m.username && window.open(`${window.location.origin}/dashboard`, '_blank')}
