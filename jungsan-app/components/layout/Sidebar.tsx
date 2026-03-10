@@ -264,14 +264,21 @@ export function Sidebar() {
   const handleWithdraw = async () => {
     setWithdrawing(true)
     setWithdrawMsg('')
-    const { error } = await supabase.rpc('delete_own_account')
-    if (error) {
-      setWithdrawMsg('탈퇴 처리 실패: ' + error.message)
+    try {
+      const res = await fetch('/api/auth/withdraw', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setWithdrawMsg('탈퇴 처리 실패: ' + (json?.error ?? res.statusText))
+        setWithdrawing(false)
+        return
+      }
+      // 데이터 삭제 완료 후 세션 종료 및 랜딩 이동
+      await supabase.auth.signOut()
+      window.location.replace('/')
+    } catch (err) {
+      setWithdrawMsg('탈퇴 처리 중 오류가 발생했습니다.')
       setWithdrawing(false)
-      return
     }
-    await supabase.auth.signOut()
-    router.push('/')
   }
 
   // 모바일에서 경로 변경 시 드로어 닫기

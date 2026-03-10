@@ -1,0 +1,71 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+/**
+ * 회원 본인 탈퇴 API
+ * - 로그인된 사용자의 모든 데이터를 FK 순서에 맞춰 삭제
+ * - auth.users에서도 완전 삭제
+ */
+export async function POST() {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
+    const userId = user.id
+    const admin = createAdminClient()
+
+    // 1. settlement_details (weekly_settlements FK 참조)
+    const { data: settlements } = await admin
+      .from('weekly_settlements')
+      .select('id')
+      .eq('user_id', userId)
+
+    const settlementIds = (settlements ?? []).map((s: { id: string }) => s.id)
+    if (settlementIds.length > 0) {
+      await admin.from('settlement_details').delete().in('settlement_id', settlementIds)
+    }
+
+    // 2. advance_payments
+    await admin.from('advance_payments').delete().eq('user_id', userId)
+
+    // 3. promotions
+    await admin.from('promotions').delete().eq('user_id', userId)
+
+    // 4. management_fees
+    await admin.from('management_fees').delete().eq('user_id', userId)
+
+    // 5. insurance_fees
+    await admin.from('insurance_fees').delete().eq('user_id', userId)
+
+    // 6. weekly_settlements
+    await admin.from('weekly_settlements').delete().eq('user_id', userId)
+
+    // 7. riders
+    await admin.from('riders').delete().eq('user_id', userId)
+
+    // 8. member_features
+    await admin.from('member_features').delete().eq('user_id', userId)
+
+    // 9. profiles
+    await admin.from('profiles').delete().eq('id', userId)
+
+    // 10. auth.users (완전 삭제)
+    const { error: deleteAuthErr } = await admin.auth.admin.deleteUser(userId)
+    if (deleteAuthErr) {
+      console.warn('auth.deleteUser warning:', deleteAuthErr.message)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('withdraw error:', err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : '탈퇴 처리 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
+  }
+}
