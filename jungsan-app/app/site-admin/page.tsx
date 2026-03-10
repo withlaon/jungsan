@@ -88,27 +88,18 @@ function StatsPanel({
   members,
   inquiries,
   inquiryTotal,
-  loading,
+  membersLoading,
+  visitStats,
+  visitLoading,
 }: {
   members: MemberProfile[]
   inquiries: InquiryItem[]
   inquiryTotal: number
-  loading: boolean
+  membersLoading: boolean
+  visitStats: VisitStats | null
+  visitLoading: boolean
 }) {
   const now = new Date()
-
-  /* ── 방문자 데이터 ── */
-  const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
-  const [visitLoading, setVisitLoading] = useState(true)
-
-  useEffect(() => {
-    setVisitLoading(true)
-    fetch('/api/site-admin/visits')
-      .then(r => r.json())
-      .then(data => setVisitStats(data))
-      .catch(() => {})
-      .finally(() => setVisitLoading(false))
-  }, [])
 
   const startOf = (unit: 'day' | 'week' | 'month') => {
     const d = new Date(now)
@@ -156,14 +147,6 @@ function StatsPanel({
     .filter(m => m.created_at)
     .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())
     .slice(0, 5)
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-40">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
-      </div>
-    )
-  }
 
   const maxDaily   = Math.max(...(visitStats?.dailyStats  ?? []).map(d => d.count), 1)
   const maxVisitW  = Math.max(...(visitStats?.weeklyStats ?? []).map(w => w.count), 1)
@@ -319,6 +302,7 @@ function StatsPanel({
         <div className="flex items-center gap-2 mb-4">
           <Users className="h-4 w-4 text-blue-400" />
           <h3 className="text-sm font-semibold text-white">회원 현황</h3>
+          {membersLoading && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}
         </div>
 
         {/* 요약 카드 4개 */}
@@ -503,15 +487,31 @@ export default function SiteAdminPage() {
 
   const inquiryTotalPages = Math.max(1, Math.ceil(inquiryTotal / PAGE_SIZE))
 
+  /* ── 방문통계 상태 ── */
+  const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
+  const [visitLoading, setVisitLoading] = useState(false)
+
+  const fetchVisitStats = useCallback(async () => {
+    setVisitLoading(true)
+    try {
+      const res = await fetch('/api/site-admin/visits')
+      const data = await res.json()
+      if (res.ok) setVisitStats(data)
+    } catch { /* ignore */ }
+    setVisitLoading(false)
+  }, [])
+
+  useEffect(() => { fetchVisitStats() }, [fetchVisitStats])
+
   /* ── 회원 목록 로드 ── */
   const fetchMembers = useCallback(async () => {
     setMembersLoading(true)
     try {
       const res = await fetch('/api/admin/profiles')
       const data = await res.json()
-      if (!res.ok) { toast.error('회원 목록 조회 실패'); setMembers([]) }
+      if (!res.ok) { toast.error('회원 목록 조회 실패') }
       else setMembers((Array.isArray(data) ? data : []) as MemberProfile[])
-    } catch { toast.error('회원 목록 조회 실패'); setMembers([]) }
+    } catch { toast.error('회원 목록 조회 실패') }
     setMembersLoading(false)
   }, [])
 
@@ -661,6 +661,13 @@ export default function SiteAdminPage() {
             새로고침
           </Button>
         )}
+        {activeTab === 'stats' && (
+          <Button variant="outline" onClick={() => { fetchMembers(); fetchVisitStats() }} disabled={membersLoading || visitLoading}
+            className="border-slate-600 text-slate-300">
+            <RefreshCw className={`h-4 w-4 mr-2 ${(membersLoading || visitLoading) ? 'animate-spin' : ''}`} />
+            새로고침
+          </Button>
+        )}
       </div>
 
       {/* 탭 */}
@@ -716,10 +723,11 @@ export default function SiteAdminPage() {
               <CardTitle className="text-white flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" />
                 회원정보 ({members.length}명)
+                {membersLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {membersLoading ? (
+              {membersLoading && pagedMembers.length === 0 ? (
                 <div className="py-12 flex justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                 </div>
@@ -806,7 +814,14 @@ export default function SiteAdminPage() {
 
       {/* ══ 접속통계 탭 ══ */}
       {activeTab === 'stats' && (
-        <StatsPanel members={members} inquiries={inquiries} inquiryTotal={inquiryTotal} loading={membersLoading} />
+        <StatsPanel
+          members={members}
+          inquiries={inquiries}
+          inquiryTotal={inquiryTotal}
+          membersLoading={membersLoading}
+          visitStats={visitStats}
+          visitLoading={visitLoading}
+        />
       )}
 
       {/* ══ 문의하기 탭 ══ */}
