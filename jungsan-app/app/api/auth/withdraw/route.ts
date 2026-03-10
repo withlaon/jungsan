@@ -1,23 +1,32 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * 회원 본인 탈퇴 API
+ * - Authorization 헤더의 Bearer 토큰으로 본인 인증 (쿠키 만료 문제 방지)
  * - 로그인된 사용자의 모든 데이터를 FK 순서에 맞춰 삭제
  * - auth.users에서도 완전 삭제
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const admin = createAdminClient()
+
+    // 클라이언트가 전달한 Bearer 토큰으로 사용자 인증
+    // (proxy.ts가 /api/ 경로를 토큰 갱신에서 제외하므로 쿠키 대신 헤더 사용)
+    const authHeader = req.headers.get('authorization') ?? ''
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+
+    if (!token) {
+      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
+    const { data: { user }, error: authError } = await admin.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
 
     const userId = user.id
-    const admin = createAdminClient()
 
     // 1. settlement_details (weekly_settlements FK 참조)
     const { data: settlements } = await admin

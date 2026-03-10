@@ -265,18 +265,27 @@ export function Sidebar() {
     setWithdrawing(true)
     setWithdrawMsg('')
     try {
-      const res = await fetch('/api/auth/withdraw', { method: 'POST' })
+      // 클라이언트에서 최신 토큰을 직접 가져와 헤더로 전달
+      // → 서버 쿠키가 만료된 경우에도 탈퇴 처리 가능
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+
+      const res = await fetch('/api/auth/withdraw', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         setWithdrawMsg('탈퇴 처리 실패: ' + (json?.error ?? res.statusText))
         setWithdrawing(false)
         return
       }
-      // auth.users 삭제 완료 → signOut() 호출 시 삭제된 계정으로 서버 요청이 가서 멈춤
-      // 대신 서버측 쿠키 정리 API를 호출한 뒤 즉시 랜딩 페이지로 이동
+      // auth.users 삭제 완료 → 쿠키 정리 후 랜딩 페이지로 이동
       try {
         await fetch('/api/auth/signout', { method: 'POST', keepalive: true })
-      } catch { /* 쿠키 정리 실패해도 계속 진행 */ }
+      } catch { /* 무시 */ }
       window.location.href = 'https://jungsan-time.com/'
     } catch {
       setWithdrawMsg('탈퇴 처리 중 오류가 발생했습니다.')
