@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
- * site-admin 회원 목록 실시간 갱신을 위한 브로드캐스트 엔드포인트.
- * 신규 가입 또는 회원 탈퇴 직후 이 endpoint를 POST 호출하면
- * Supabase Realtime Broadcast를 통해 site-admin 페이지가 즉시 목록을 재조회합니다.
+ * 신규 가입 완료 후 호출되는 알림 엔드포인트.
+ * A) member_change_notifications INSERT → postgres_changes 구독으로 즉시 전달
+ * B) Realtime Broadcast → broadcast 구독으로 즉시 전달
+ * 두 방식을 모두 사용해 신뢰성 확보.
  */
 export async function POST() {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-    const res = await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+  // A) DB INSERT (마이그레이션 적용 후 postgres_changes로 전달)
+  try {
+    const admin = createAdminClient()
+    await admin.from('member_change_notifications').insert({ event_type: 'signup' })
+  } catch { /* 테이블 미생성 시 무시 */ }
+
+  // B) Broadcast (마이그레이션 전/후 모두 즉시 전달)
+  try {
+    await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -18,26 +27,10 @@ export async function POST() {
         'Authorization': `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({
-        messages: [
-          {
-            topic: 'realtime:member-changes',
-            event: 'member_change',
-            payload: {},
-            private: false,
-          },
-        ],
+        messages: [{ topic: 'realtime:member-changes', event: 'member_change', payload: {} }],
       }),
     })
+  } catch { /* ignore */ }
 
-    if (!res.ok) {
-      const text = await res.text()
-      console.error('Realtime broadcast error:', res.status, text)
-      return NextResponse.json({ ok: false }, { status: 502 })
-    }
-
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error('notify member-change error:', err)
-    return NextResponse.json({ ok: false }, { status: 500 })
-  }
+  return NextResponse.json({ ok: true })
 }

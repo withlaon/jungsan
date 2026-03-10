@@ -527,16 +527,44 @@ export default function SiteAdminPage() {
 
   useEffect(() => { fetchMembers() }, [fetchMembers])
 
-  /* ── 실시간: 신규 가입 / 탈퇴 감지 → 회원 목록 자동 갱신 ── */
+  /* ── 실시간 3중 구독 ─────────────────────────────────────────── */
   useEffect(() => {
-    const channel = supabase
-      .channel('member-changes')
-      .on('broadcast', { event: 'member_change' }, () => {
-        fetchMembers(true)
-      })
+    // [1] postgres_changes: member_change_notifications INSERT 감지
+    //     (마이그레이션 적용 후 가장 신뢰성 높음)
+    const pgChannel = supabase
+      .channel('mcn_pg_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'member_change_notifications' },
+        () => { fetchMembers(true) }
+      )
       .subscribe()
-    return () => { channel.unsubscribe() }
+
+    // [2] Broadcast: 서버에서 직접 전송하는 즉시 알림
+    //     (마이그레이션 전후 모두 작동)
+    const bcChannel = supabase
+      .channel('member-changes')
+      .on('broadcast', { event: 'member_change' }, () => { fetchMembers(true) })
+      .subscribe()
+
+    return () => {
+      pgChannel.unsubscribe()
+      bcChannel.unsubscribe()
+    }
   }, [fetchMembers, supabase])
+
+  /* ── [3] 폴링 폴백: 15초마다 자동 갱신 (실시간 수신 실패 보험) ── */
+  useEffect(() => {
+    const id = setInterval(() => { fetchMembers(true) }, 15000)
+    return () => clearInterval(id)
+  }, [fetchMembers])
+
+  /* ── 탭 포커스 복귀 시 즉시 갱신 ── */
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) fetchMembers(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchMembers])
 
   /* ── 문의 목록 로드 ── */
   const fetchInquiries = useCallback(async (p = 1) => {

@@ -60,18 +60,30 @@ export async function POST() {
       console.warn('auth.deleteUser warning:', deleteAuthErr.message)
     }
 
-    // 11. site-admin 회원 목록 실시간 갱신 트리거 (fire-and-forget)
-    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') || ''}/realtime/v1/api/broadcast`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-      },
-      body: JSON.stringify({
-        messages: [{ topic: 'realtime:member-changes', event: 'member_change', payload: {}, private: false }],
-      }),
-    }).catch(() => {})
+    // 11. site-admin 실시간 갱신 트리거
+    // (await 필수: Vercel 서버리스에서 return 후 fetch는 즉시 종료됨)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+    // A) DB INSERT 방식 (마이그레이션 적용 후 postgres_changes로 전달)
+    try {
+      await admin.from('member_change_notifications').insert({ event_type: 'withdraw' })
+    } catch { /* 테이블 미생성 시 무시 */ }
+
+    // B) Broadcast 방식 (마이그레이션 전/후 모두 작동, 즉시 전달)
+    try {
+      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          messages: [{ topic: 'realtime:member-changes', event: 'member_change', payload: {} }],
+        }),
+      })
+    } catch { /* ignore */ }
 
     return NextResponse.json({ success: true })
   } catch (err) {
