@@ -187,8 +187,21 @@ export default function DashboardPage() {
 
   if (userLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-full min-h-screen text-slate-400">
-        <div className="animate-pulse text-lg">데이터 로딩 중...</div>
+      <div className="p-4 md:p-6 space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-slate-800 rounded-lg" />
+            <div className="h-4 w-36 bg-slate-800 rounded" />
+          </div>
+          <div className="h-10 w-64 bg-slate-800 rounded-lg" />
+        </div>
+        <div className="h-28 w-full bg-slate-800 rounded-2xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-20 bg-slate-800 rounded-xl" />
+          ))}
+        </div>
+        <div className="h-64 w-full bg-slate-800 rounded-2xl" />
       </div>
     )
   }

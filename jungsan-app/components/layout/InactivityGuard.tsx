@@ -8,30 +8,19 @@ import { toast } from 'sonner'
 
 /**
  * 관리자 레이아웃에 삽입되는 비활성 자동 로그아웃 감시 컴포넌트
- * - 창/탭 닫힘 시 서버 세션 자동 무효화 (sendBeacon)
  * - 1시간 무활동 시 Supabase 세션 삭제 + 로그인 페이지 이동
  * - 5분 전 toast 경고
- * - 브라우저 재시작 후 클라이언트 세션이 없으면 서버 쿠키도 정리 후 로그인으로 이동
+ * - 클라이언트 세션이 없으면 서버 쿠키도 정리 후 로그인으로 이동
+ *
+ * NOTE: pagehide 기반 signout은 제거.
+ * pagehide는 F5 새로고침 시에도 발생하여 쿠키가 지워지고 로그아웃되는 버그가 있었음.
+ * 세션 쿠키는 브라우저 완전 종료(모든 창 닫기) 시 OS가 자동으로 삭제한다.
  */
 export function InactivityGuard() {
   const router = useRouter()
   const supabase = createClient()
 
-  // 창/탭을 닫을 때 서버 세션 무효화
-  // pagehide: 탭 닫기, 브라우저 닫기, 새로고침, 뒤로가기 등 페이지 이탈 시 발생
-  // sendBeacon: 비동기 전송 → 브라우저가 응답을 기다리지 않고 확실히 전송
-  useEffect(() => {
-    const handlePageHide = (e: PageTransitionEvent) => {
-      // persisted=true 이면 bfcache(뒤로가기 캐시)로 저장되는 경우 → 로그아웃 안 함
-      if (e.persisted) return
-      navigator.sendBeacon('/api/auth/signout')
-    }
-    window.addEventListener('pagehide', handlePageHide)
-    return () => window.removeEventListener('pagehide', handlePageHide)
-  }, [])
-
-  // 브라우저 종료 후 재접속 시: sessionStorage가 비어있으면(클라이언트 세션 없음)
-  // 서버 쿠키도 정리하고 로그인 페이지로 강제 이동
+  // 세션이 없으면(브라우저 재시작 등) 쿠키도 정리하고 로그인 페이지로 이동
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
