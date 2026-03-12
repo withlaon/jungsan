@@ -40,8 +40,9 @@ function getWeekOptions() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const daysBack = (today.getDay() - 3 + 7) % 7
+  // 수요일이 되기 전까지는 맨 위에 전주(마지막 완료된 주)가 표시되도록 7일 앞당김
   const baseWed = new Date(today)
-  baseWed.setDate(today.getDate() - daysBack)
+  baseWed.setDate(today.getDate() - daysBack - 7)
   const dl = ['일', '월', '화', '수', '목', '금', '토']
   const fmt = (d: Date) => {
     const y = d.getFullYear()
