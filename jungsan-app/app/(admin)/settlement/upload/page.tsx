@@ -97,6 +97,7 @@ export default function SettlementUploadPage() {
   const [promotionsCache, setPromotionsCache] = useState<Promotion[]>([])
   const [results, setResults] = useState<RiderSettlementResult[]>([])
   const [saving, setSaving] = useState(false)
+  const [calculating, setCalculating] = useState(false)
 
   useEffect(() => {
     if (isAdmin || userId) {
@@ -375,81 +376,90 @@ export default function SettlementUploadPage() {
 
   // ── 정산 계산 ──
   const handlePreviewConfirm = async () => {
-    // settings가 없으면 기본 세율로 fallback (3.3% 원천세)
-    const effectiveSettings = settings ?? {
-      id: 'default', user_id: null,
-      insurance_rate: 0, income_tax_rate: 0.033,
-      management_fee_type: 'fixed' as const, management_fee_value: 0,
-      effective_from: '', note: null, created_at: '',
-    }
-    if (!settings) {
-      toast('설정값이 없어 기본 세율(원천세 3.3%)로 계산합니다.', { icon: '⚠️' })
-    }
-
-    const [promoRes, advanceRes] = await Promise.all([
-      (() => { let q = supabase.from('promotions').select('*').or('settlement_id.is.null'); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-      (() => { let q = supabase.from('advance_payments').select('*').is('deducted_settlement_id', null); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-    ])
-    const promotions: Promotion[] = promoRes.data ?? []
-    const advances: AdvancePayment[] = advanceRes.data ?? []
-
-    // 라이더 연결된 행만 추출
-    const rawInputs = parsedRows
-      .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
-      .map(r => {
-        const rId = riderMapping[r.name]
-        const officialName = riders.find(rd => rd.id === rId)?.name ?? r.name
-        return {
-          riderId:                  rId,
-          riderName:                officialName,
-          deliveryCount:            r.deliveryCount,
-          baseAmount:               r.baseAmount,
-          deliveryFee:              r.deliveryFee,
-          additionalPay:            r.additionalPay,
-          hourlyInsurance:          r.hourlyInsurance,
-          excelEmploymentInsurance: r.employmentInsurance,
-          excelAccidentInsurance:   r.accidentInsurance,
-        }
-      })
-
-    if (rawInputs.length === 0) {
-      const unmapped = parsedRows.length
-      if (unmapped === 0) {
-        toast.error('파싱된 라이더 데이터가 없습니다. 파일을 다시 업로드해주세요.')
-      } else {
-        toast.error(`${unmapped}명의 라이더가 모두 미연결 상태입니다. 우측 "라이더 연결" 드롭다운에서 연결해주세요.`)
+    if (calculating) return
+    setCalculating(true)
+    try {
+      // settings가 없으면 기본 세율로 fallback (3.3% 원천세)
+      const effectiveSettings = settings ?? {
+        id: 'default', user_id: null,
+        insurance_rate: 0, income_tax_rate: 0.033,
+        management_fee_type: 'fixed' as const, management_fee_value: 0,
+        effective_from: '', note: null, created_at: '',
       }
-      return
-    }
+      if (!settings) {
+        toast('설정값이 없어 기본 세율(원천세 3.3%)로 계산합니다.', { icon: '⚠️' })
+      }
 
-    // 같은 riderId가 여러 행인 경우 합산
-    const mergedMap = new Map<string, typeof rawInputs[0]>()
-    for (const input of rawInputs) {
-      const existing = mergedMap.get(input.riderId)
-      if (existing) {
-        mergedMap.set(input.riderId, {
-          ...existing,
-          deliveryCount:            existing.deliveryCount            + input.deliveryCount,
-          baseAmount:               existing.baseAmount               + input.baseAmount,
-          deliveryFee:              existing.deliveryFee              + input.deliveryFee,
-          additionalPay:            existing.additionalPay            + input.additionalPay,
-          hourlyInsurance:          existing.hourlyInsurance          + input.hourlyInsurance,
-          excelEmploymentInsurance: existing.excelEmploymentInsurance + input.excelEmploymentInsurance,
-          excelAccidentInsurance:   existing.excelAccidentInsurance   + input.excelAccidentInsurance,
+      const [promoRes, advanceRes] = await Promise.all([
+        (() => { let q = supabase.from('promotions').select('*').or('settlement_id.is.null'); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('advance_payments').select('*').is('deducted_settlement_id', null); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+      ])
+      const promotions: Promotion[] = promoRes.data ?? []
+      const advances: AdvancePayment[] = advanceRes.data ?? []
+
+      // 라이더 연결된 행만 추출
+      const rawInputs = parsedRows
+        .filter(r => riderMapping[r.name] && riderMapping[r.name] !== 'none')
+        .map(r => {
+          const rId = riderMapping[r.name]
+          const officialName = riders.find(rd => rd.id === rId)?.name ?? r.name
+          return {
+            riderId:                  rId,
+            riderName:                officialName,
+            deliveryCount:            r.deliveryCount,
+            baseAmount:               r.baseAmount,
+            deliveryFee:              r.deliveryFee,
+            additionalPay:            r.additionalPay,
+            hourlyInsurance:          r.hourlyInsurance,
+            excelEmploymentInsurance: r.employmentInsurance,
+            excelAccidentInsurance:   r.accidentInsurance,
+          }
         })
-      } else {
-        mergedMap.set(input.riderId, { ...input })
+
+      if (rawInputs.length === 0) {
+        if (parsedRows.length === 0) {
+          toast.error('파싱된 라이더 데이터가 없습니다. 파일을 다시 업로드해주세요.')
+        } else if (riders.length === 0) {
+          toast.error('라이더 목록을 불러오지 못했습니다. 페이지를 새로고침 후 다시 시도해주세요.')
+        } else {
+          toast.error(`${parsedRows.length}명의 라이더가 모두 미연결 상태입니다. 우측 "라이더 연결" 드롭다운에서 연결해주세요.`)
+        }
+        return
       }
+
+      // 같은 riderId가 여러 행인 경우 합산
+      const mergedMap = new Map<string, typeof rawInputs[0]>()
+      for (const input of rawInputs) {
+        const existing = mergedMap.get(input.riderId)
+        if (existing) {
+          mergedMap.set(input.riderId, {
+            ...existing,
+            deliveryCount:            existing.deliveryCount            + input.deliveryCount,
+            baseAmount:               existing.baseAmount               + input.baseAmount,
+            deliveryFee:              existing.deliveryFee              + input.deliveryFee,
+            additionalPay:            existing.additionalPay            + input.additionalPay,
+            hourlyInsurance:          existing.hourlyInsurance          + input.hourlyInsurance,
+            excelEmploymentInsurance: existing.excelEmploymentInsurance + input.excelEmploymentInsurance,
+            excelAccidentInsurance:   existing.excelAccidentInsurance   + input.excelAccidentInsurance,
+          })
+        } else {
+          mergedMap.set(input.riderId, { ...input })
+        }
+      }
+      const inputs = Array.from(mergedMap.values())
+
+      // 업로드된 파일 중 쿠팡이츠로 감지된 파일이 있으면 platform을 'coupang'으로 override
+      const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
+      const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
+
+      const calc = calculateSettlement(inputs, effectiveSettings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
+      setResults(calc)
+      setStep('confirm')
+    } catch (err) {
+      toast.error('계산 중 오류가 발생했습니다: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setCalculating(false)
     }
-    const inputs = Array.from(mergedMap.values())
-
-    // 업로드된 파일 중 쿠팡이츠로 감지된 파일이 있으면 platform을 'coupang'으로 override
-    const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
-    const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
-
-    const calc = calculateSettlement(inputs, effectiveSettings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
-    setResults(calc)
-    setStep('confirm')
   }
 
   // ── 정산 저장 ──
@@ -855,10 +865,13 @@ export default function SettlementUploadPage() {
 
             <Button
               onClick={handlePreviewConfirm}
-              disabled={parsedRows.length === 0}
+              disabled={parsedRows.length === 0 || calculating}
               className="bg-blue-600 hover:bg-blue-700 ml-auto disabled:opacity-50"
             >
-              정산 계산하기 →
+              {calculating
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />계산 중...</>
+                : '정산 계산하기 →'
+              }
             </Button>
           </div>
         </div>

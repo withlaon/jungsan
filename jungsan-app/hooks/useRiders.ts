@@ -14,15 +14,22 @@ async function loadRiders(): Promise<Rider[]> {
   // 이미 진행 중인 요청이 있으면 공유
   if (_promise) return _promise
 
-  _promise = fetch('/api/admin/riders')
-    .then(r => r.json())
-    .then(d => {
-      const data = Array.isArray(d) ? d : []
-      _cache = data
-      _lastFetched = Date.now()
-      return data
-    })
-    .finally(() => { _promise = null })
+  _promise = (async () => {
+    // proxy.ts가 /api/ 경로에서 토큰 갱신을 건너뛰므로
+    // 클라이언트 세션 토큰을 Bearer 헤더로 직접 전달
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const headers: Record<string, string> = {}
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
+    const res = await fetch('/api/admin/riders', { headers })
+    const d = await res.json()
+    const data = Array.isArray(d) ? d : []
+    _cache = data
+    _lastFetched = Date.now()
+    return data
+  })().finally(() => { _promise = null })
 
   return _promise
 }
