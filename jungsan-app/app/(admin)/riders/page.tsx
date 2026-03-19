@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
-import { useRiders } from '@/hooks/useRiders'
+import { useRiders, applyOptimisticRider } from '@/hooks/useRiders'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -179,6 +179,12 @@ export default function RidersPage() {
       toast.success(editingRider ? '라이더 정보가 수정되었습니다.' : '라이더가 등록되었습니다.')
       setDialogOpen(false)
       setSearch('')
+
+      // 서버 응답에 라이더 데이터가 있으면 즉시 낙관적 업데이트 (네트워크 대기 없음)
+      if (data?.rider) {
+        applyOptimisticRider(data.rider, editingRider ? 'update' : 'add')
+      }
+      // 백그라운드에서 서버 최신 데이터 확인 (브라우저 캐시 우회)
       refreshRiders(true)
     } catch (e) {
       toast.error('저장 실패: 네트워크 오류가 발생했습니다.')
@@ -189,6 +195,8 @@ export default function RidersPage() {
 
   const toggleStatus = async (rider: Rider) => {
     const newStatus = rider.status === 'active' ? 'inactive' : 'active'
+    // 즉시 낙관적 업데이트 — 버튼 클릭과 동시에 UI 반영
+    applyOptimisticRider({ ...rider, status: newStatus }, 'update')
     try {
       const res = await fetch('/api/admin/rider', {
         method: 'PATCH',
@@ -206,26 +214,42 @@ export default function RidersPage() {
           status: newStatus,
         }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('상태 변경 실패: ' + (d?.error ?? '')); return }
+      if (!res.ok) {
+        // 실패 시 롤백
+        applyOptimisticRider(rider, 'update')
+        const d = await res.json().catch(() => ({}))
+        toast.error('상태 변경 실패: ' + (d?.error ?? ''))
+        return
+      }
       toast.success(`${rider.name} 라이더를 ${newStatus === 'active' ? '활성화' : '비활성화'}했습니다.`)
       refreshRiders(true)
     } catch {
+      applyOptimisticRider(rider, 'update')
       toast.error('상태 변경 실패: 네트워크 오류')
     }
   }
 
   const deleteRider = async (rider: Rider) => {
+    // 즉시 낙관적 삭제
+    applyOptimisticRider(rider, 'remove')
+    setDeleteConfirmId(null)
     try {
       const res = await fetch('/api/admin/rider', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: rider.id }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast.error('삭제 실패: ' + (d?.error ?? '')); return }
+      if (!res.ok) {
+        // 실패 시 롤백
+        applyOptimisticRider(rider, 'add')
+        const d = await res.json().catch(() => ({}))
+        toast.error('삭제 실패: ' + (d?.error ?? ''))
+        return
+      }
       toast.success(`${rider.name} 라이더가 삭제되었습니다.`)
-      setDeleteConfirmId(null)
       refreshRiders(true)
     } catch {
+      applyOptimisticRider(rider, 'add')
       toast.error('삭제 실패: 네트워크 오류')
     }
   }
@@ -420,7 +444,9 @@ export default function RidersPage() {
   const handleBulkDeactivate = async () => {
     setBulkProcessing(true)
     const targets = filtered.filter(r => selectedIds.has(r.id) && r.status === 'active')
-    await Promise.all(targets.map(r =>
+    // 즉시 낙관적 업데이트
+    targets.forEach(r => applyOptimisticRider({ ...r, status: 'inactive' }, 'update'))
+    const results = await Promise.all(targets.map(r =>
       fetch('/api/admin/rider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -438,30 +464,34 @@ export default function RidersPage() {
         }),
       })
     ))
-    toast.success(`${targets.length}명을 비활성화했습니다.`)
+    const failCount = results.filter(r => !r.ok).length
+    if (failCount > 0) toast.error(`${failCount}명 비활성화 실패`)
+    else toast.success(`${targets.length}명을 비활성화했습니다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    refreshRiders()
+    refreshRiders(true)
   }
 
   const handleBulkDelete = async () => {
     setBulkProcessing(true)
-    const ids = filtered.filter(r => selectedIds.has(r.id)).map(r => r.id)
-    const results = await Promise.all(ids.map(id =>
+    const targets = filtered.filter(r => selectedIds.has(r.id))
+    // 즉시 낙관적 삭제
+    targets.forEach(r => applyOptimisticRider(r, 'remove'))
+    const results = await Promise.all(targets.map(r =>
       fetch('/api/admin/rider', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: r.id }),
       })
     ))
     const failCount = results.filter(r => !r.ok).length
     if (failCount > 0) toast.error(`${failCount}명 삭제 실패`)
-    else toast.success(`${ids.length}명을 삭제했습니다.`)
+    else toast.success(`${targets.length}명을 삭제했습니다.`)
     setSelectedIds(new Set())
     setBulkActionConfirm(null)
     setBulkProcessing(false)
-    refreshRiders()
+    refreshRiders(true)
   }
 
   return (

@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient()
-    const { error } = await admin.from('riders').insert(row)
+    const { data: inserted, error } = await admin.from('riders').insert(row).select().single()
     if (error) {
       const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : error.message
       return NextResponse.json({ error: msg }, { status: 500 })
     }
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, rider: inserted })
   } catch (err) {
     console.error('rider insert error:', err)
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Server error' }, { status: 500 })
@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest) {
   const trim = (v: unknown) => (v != null && String(v).trim()) || null
 
     const admin = createAdminClient()
-    const { error } = await admin.from('riders').update({
+    const { data: updated, error } = await admin.from('riders').update({
       join_date:       trim(join_date),
       name:            String(name).trim(),
       rider_username:  trim(rider_username),
@@ -74,13 +74,13 @@ export async function PATCH(request: NextRequest) {
       bank_account:    trim(bank_account),
       account_holder:  trim(account_holder),
       status: status === 'inactive' ? 'inactive' : 'active',
-    }).eq('id', id)
+    }).eq('id', id).select().single()
 
     if (error) {
       const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : error.message
       return NextResponse.json({ error: msg }, { status: 500 })
     }
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, rider: updated })
   } catch (err) {
     console.error('rider update error:', err)
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Server error' }, { status: 500 })
