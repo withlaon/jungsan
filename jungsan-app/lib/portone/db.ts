@@ -24,7 +24,7 @@ export async function savePayment(
   const { error } = await supabase.from("payments").upsert(
     {
       payment_id: payment.id,
-      portone_tx_id: (payment as Record<string, unknown>).txId as string ?? null,
+      portone_tx_id: payment.txId ?? null,
       user_id: options.userId ?? null,
       status: payment.status,
       order_name: payment.orderName,

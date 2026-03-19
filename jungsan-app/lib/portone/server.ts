@@ -10,6 +10,7 @@ export interface PortOnePaymentResponse {
   id: string;
   transactionType: string;
   status: string;
+  txId?: string;
   amount: {
     total: number;
     currency: string;
