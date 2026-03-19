@@ -23,6 +23,7 @@ export interface ExcelSummary {
   vatAmount: number                      // 부가세액 (갑지 C31)
   employerEmploymentInsurance: number    // 고용보험사업주 (갑지 I25)
   employerAccidentInsurance: number      // 산재보험사업주 (갑지 K25)
+  insuranceRefund?: number               // 보험금환급: 고용보험소급정산 (갑지 N열, windcall 전용)
 }
 
 export interface ParseResult {

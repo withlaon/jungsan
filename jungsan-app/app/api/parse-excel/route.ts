@@ -24,7 +24,7 @@ function findSheet(names: string[], keyword: string): string | undefined {
 // ──────────────────────────────────────────────────────────────
 // 배민 전용 파서: 갑지 + 을지 시트 구조
 // ──────────────────────────────────────────────────────────────
-function extractBaeminData(workbook: XLSX.WorkBook): {
+function extractBaeminData(workbook: XLSX.WorkBook, isWindcall = false): {
   rows: ParsedRiderRow[]
   summary: ExcelSummary
   weekStart?: string
@@ -45,6 +45,8 @@ function extractBaeminData(workbook: XLSX.WorkBook): {
       vatAmount:                      cellNum(g, 'C31'),
       employerEmploymentInsurance:    cellNum(g, 'I25'),
       employerAccidentInsurance:      cellNum(g, 'K25'),
+      // windcall 전용: 갑지 N열 고용보험소급정산 → 지사 순이익에만 표시 (정산 미적용)
+      ...(isWindcall ? { insuranceRefund: cellNum(g, 'N25') } : {}),
     }
   }
 
@@ -65,6 +67,11 @@ function extractBaeminData(workbook: XLSX.WorkBook): {
     const additionalPay     = toNum(r[5])      // F  추가지급
     const totalDeliveryFee  = toNum(r[6])      // G  총배달료
 
+    // ── windcall 전용: 을지 P(15)/Q(16)/R(17)열 소급정산 금액 → 기사별 정산에서 완전 제외 ──
+    // 소급정산 금액은 0원으로 처리(해당 셀 값을 읽지 않음).
+    // L(고용보험)·M(산재보험)에서 차감하지 않으며 어떤 계산에도 반영하지 않음.
+    // (다른 아이디의 경우 이 로직은 동작하지 않음 — isWindcall = false)
+
     rows.push({
       userId,
       name,
@@ -76,6 +83,7 @@ function extractBaeminData(workbook: XLSX.WorkBook): {
       hourlyInsurance:     toNum(r[7]),        // H  시간제보험료
       employmentInsurance: toNum(r[11]),       // L  고용보험
       accidentInsurance:   toNum(r[12]),       // M  산재보험
+      // windcall: P(15)·Q(16)·R(17) 소급정산 열은 읽지 않음 → 0원으로 계산
       settlementAmount:    toNum(r[21]),       // V  라이더별 정산금액
       withholdingTax:      toNum(r[24]),       // Y  원천징수액
       payAmount:           toNum(r[25]),       // Z  라이더별지급금액
@@ -381,7 +389,7 @@ function extractCoupangData(workbook: XLSX.WorkBook): {
 }
 
 // ── 워크북에서 데이터 추출 (배민 → 쿠팡이츠 → 범용 폴백) ──
-function extractData(workbook: XLSX.WorkBook) {
+function extractData(workbook: XLSX.WorkBook, isWindcall = false) {
   // 디버그: 모든 시트의 첫 행 헤더 수집 (어떤 파서도 감지 못할 경우 원인 파악용)
   const debugAllSheets = workbook.SheetNames.map(name => {
     const raw = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, defval: '' })
@@ -389,7 +397,7 @@ function extractData(workbook: XLSX.WorkBook) {
     return { sheet: name, headers: (firstNonEmpty ?? []).slice(0, 20).map(h => String(h ?? '').trim()) }
   })
 
-  const baemin  = extractBaeminData(workbook)
+  const baemin  = extractBaeminData(workbook, isWindcall)
   if (baemin)  return { ...baemin,  detectedPlatform: 'baemin',  debugAllSheets }
   const coupang = extractCoupangData(workbook)
   if (coupang) return { ...coupang, detectedPlatform: 'coupang', debugAllSheets }
@@ -398,10 +406,10 @@ function extractData(workbook: XLSX.WorkBook) {
 }
 
 // ── 버퍼 파싱 시도 ──
-function tryParse(buf: Buffer, password?: string) {
+function tryParse(buf: Buffer, password?: string, isWindcall = false) {
   try {
     const wb = XLSX.read(buf, { type: 'buffer', ...(password ? { password } : {}) })
-    return extractData(wb)
+    return extractData(wb, isWindcall)
   } catch {
     return null
   }
@@ -439,16 +447,18 @@ async function decryptWithXlsxPopulate(buffer: Buffer, password: string): Promis
 // ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const formData  = await request.formData()
-    const file      = formData.get('file') as File | null
-    const rawBizNum = (formData.get('bizNum') as string | null) || ''
+    const formData    = await request.formData()
+    const file        = formData.get('file') as File | null
+    const rawBizNum   = (formData.get('bizNum') as string | null) || ''
+    // windcall 아이디 전용 파싱 규칙 (갑지 N열 소급정산 + 을지 P/Q/R 소급정산 제외)
+    const isWindcall  = (formData.get('windcallMode') as string | null) === 'true'
 
     if (!file) return NextResponse.json({ success: false, error: '파일이 없습니다.' })
 
     const buffer = Buffer.from(await file.arrayBuffer())
 
     // ── 1차: 비밀번호 없이 파싱 ──
-    const plain = tryParse(buffer)
+    const plain = tryParse(buffer, undefined, isWindcall)
     if (plain) return NextResponse.json({ success: true, ...plain })
 
     // 암호화 여부 확인
@@ -475,12 +485,12 @@ export async function POST(request: NextRequest) {
       // ── 2차: xlsx-populate AES-256 복호화 ──
       const decrypted = await decryptWithXlsxPopulate(buffer, pwd)
       if (decrypted) {
-        const parsed = tryParse(decrypted)
+        const parsed = tryParse(decrypted, undefined, isWindcall)
         if (parsed) return NextResponse.json({ success: true, ...parsed })
       }
 
       // ── 3차: xlsx 내장 password 처리 ──
-      const xlsxResult = tryParse(buffer, pwd)
+      const xlsxResult = tryParse(buffer, pwd, isWindcall)
       if (xlsxResult) return NextResponse.json({ success: true, ...xlsxResult })
     }
 

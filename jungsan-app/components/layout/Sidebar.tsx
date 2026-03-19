@@ -72,6 +72,7 @@ const navItems = [
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
   { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
   { href: '/rider-site',         label: '라이더사이트',   icon: Globe      },
+  { href: '/payment-test',       label: 'KCP 결제테스트', icon: Wallet     },
 ]
 
 const bottomNavItems = [

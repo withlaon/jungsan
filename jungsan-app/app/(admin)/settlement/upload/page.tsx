@@ -69,7 +69,8 @@ const weekOptions = getWeekOptions()
 export default function SettlementUploadPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { userId, isAdmin, platform, loading: userLoading } = useUser()
+  const { userId, isAdmin, platform, username, loading: userLoading } = useUser()
+  const isWindcall = username?.toLowerCase() === 'windcall'
   const { riders: allRiders } = useRiders()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -204,6 +205,7 @@ export default function SettlementUploadPage() {
     const formData = new FormData()
     formData.append('file', file)
     if (rawBizNumRef.current) formData.append('bizNum', rawBizNumRef.current)
+    formData.append('windcallMode', isWindcall ? 'true' : 'false')
     try {
       const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
       const data = await res.json()
@@ -691,18 +693,23 @@ export default function SettlementUploadPage() {
 
           {/* 갑지 요약 */}
           {summaryData && (
-            <div className="grid grid-cols-5 gap-2">
+            <div className={`grid gap-2 ${isWindcall && (summaryData.insuranceRefund ?? 0) > 0 ? 'grid-cols-6' : 'grid-cols-5'}`}>
               {[
                 { label: '정산예정금액 (P25)', value: summaryData.settledAmount,               color: 'violet' },
                 { label: '지사관리비 (F25)',   value: summaryData.branchFee,                   color: 'blue' },
                 { label: '부가세 (C31)',        value: summaryData.vatAmount,                   color: 'amber' },
                 { label: '고용보험사업주 (I25)',value: summaryData.employerEmploymentInsurance, color: 'cyan' },
                 { label: '산재보험사업주 (K25)',value: summaryData.employerAccidentInsurance,   color: 'purple' },
+                ...(isWindcall && (summaryData.insuranceRefund ?? 0) > 0
+                  ? [{ label: '보험금환급 (N25)', value: summaryData.insuranceRefund ?? 0, color: 'emerald' }]
+                  : []),
               ].map(item => (
                 <Card key={item.label} className={`border-${item.color}-700/40 bg-${item.color}-900/10`}>
                   <CardContent className="p-3">
                     <p className={`text-${item.color}-300 text-xs mb-1`}>{item.label}</p>
-                    <p className="text-white font-bold">{formatKRW(item.value)}</p>
+                    <p className="text-white font-bold">
+                      {item.label.startsWith('보험금환급') ? '+' : ''}{formatKRW(item.value)}
+                    </p>
                   </CardContent>
                 </Card>
               ))}
@@ -923,6 +930,59 @@ export default function SettlementUploadPage() {
                       <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
                     </div>
                   </div>
+
+                  {/* windcall 전용: 지사 순이익 구성 항목 */}
+                  {isWindcall && summaryData && (summaryData.settledAmount > 0 || (summaryData.insuranceRefund ?? 0) > 0) && (() => {
+                    const totalRiderPay      = results.reduce((s, r) => s + r.finalAmount, 0)
+                    const insuranceRefund    = summaryData.insuranceRefund ?? 0
+                    const branchNetProfit    =
+                      summaryData.settledAmount
+                      - totalRiderPay
+                      - summaryData.branchFee
+                      - summaryData.employerEmploymentInsurance
+                      - summaryData.employerAccidentInsurance
+                      + insuranceRefund
+                    return (
+                      <div className="mt-4 border border-emerald-700/40 rounded-lg bg-emerald-900/5 p-4">
+                        <p className="text-emerald-300 text-sm font-semibold mb-3">지사 순이익 구성 항목</p>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">정산예정금액</span>
+                            <span className="text-white font-medium">+{formatKRW(summaryData.settledAmount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">라이더 총 지급금액</span>
+                            <span className="text-rose-400">-{formatKRW(totalRiderPay)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">지사관리비</span>
+                            <span className="text-rose-400">-{formatKRW(summaryData.branchFee)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">고용보험(사업주)</span>
+                            <span className="text-rose-400">-{formatKRW(summaryData.employerEmploymentInsurance)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">산재보험(사업주)</span>
+                            <span className="text-rose-400">-{formatKRW(summaryData.employerAccidentInsurance)}</span>
+                          </div>
+                          {insuranceRefund > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-emerald-400 font-medium">보험금환급</span>
+                              <span className="text-emerald-400 font-medium">+{formatKRW(insuranceRefund)}</span>
+                            </div>
+                          )}
+                          <div className="border-t border-slate-600 pt-2 mt-2 flex justify-between">
+                            <span className="text-white font-semibold">지사 순이익</span>
+                            <span className={`font-bold text-base ${branchNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {branchNetProfit >= 0 ? '+' : ''}{formatKRW(Math.abs(branchNetProfit))}
+                              {branchNetProfit < 0 && ' (손실)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </CardContent>
               </Card>
 

@@ -11,6 +11,7 @@ interface UserCache {
   isAdmin: boolean
   platform: Platform
   userId: string | null
+  username: string | null
 }
 
 // 모듈 수준 캐시: 페이지 간 탭 전환 시 재사용 (페이지 새로고침 시 초기화)
@@ -25,7 +26,7 @@ async function fetchUserProfile(): Promise<UserCache> {
     const { data: { user: u } } = await supabase.auth.getUser()
 
     if (!u) {
-      const result: UserCache = { user: null, isAdmin: false, platform: 'baemin', userId: null }
+      const result: UserCache = { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null }
       _cache = result
       return result
     }
@@ -41,6 +42,7 @@ async function fetchUserProfile(): Promise<UserCache> {
       userId: u.id,
       isAdmin: profile?.username?.toLowerCase() === 'admin',
       platform: (profile?.platform as Platform) ?? 'baemin',
+      username: profile?.username ?? null,
     }
     _cache = result
     return result
@@ -57,7 +59,7 @@ export function clearUserCache() {
 
 export function useUser() {
   const [state, setState] = useState<UserCache>(
-    _cache ?? { user: null, isAdmin: false, platform: 'baemin', userId: null }
+    _cache ?? { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null }
   )
   const [loading, setLoading] = useState(!_cache)
   const initializedRef = useRef(false)
@@ -92,5 +94,5 @@ export function useUser() {
     return () => subscription.unsubscribe()
   }, [])
 
-  return { user: state.user, userId: state.userId, isAdmin: state.isAdmin, platform: state.platform, loading }
+  return { user: state.user, userId: state.userId, isAdmin: state.isAdmin, platform: state.platform, username: state.username, loading }
 }
