@@ -63,6 +63,11 @@ function extractBaeminData(workbook: XLSX.WorkBook, isWindcall = false): {
     if (!name && !userId) break                // 이름·ID 둘 다 없으면 데이터 끝
     if (!name) continue                        // 이름 없는 행 건너뜀
 
+    // D열 처리건수가 0이거나 "-"(미배달)인 라이더는 정산 제외
+    const rawDeliveryCount = String(r[3] ?? '').trim()
+    const deliveryCount    = toNum(r[3])
+    if (rawDeliveryCount === '-' || deliveryCount <= 0) continue
+
     const deliveryFee       = toNum(r[4])      // E  배달료
     const additionalPay     = toNum(r[5])      // F  추가지급
     const totalDeliveryFee  = toNum(r[6])      // G  총배달료
@@ -73,7 +78,7 @@ function extractBaeminData(workbook: XLSX.WorkBook, isWindcall = false): {
     rows.push({
       userId,
       name,
-      deliveryCount:       toNum(r[3]),        // D  처리건수(=배달건수)
+      deliveryCount,                           // D  처리건수(=배달건수)
       deliveryFee,                             // E
       additionalPay,                           // F
       totalDeliveryFee,                        // G
