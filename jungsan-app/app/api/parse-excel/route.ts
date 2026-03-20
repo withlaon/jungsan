@@ -67,10 +67,21 @@ function extractBaeminData(workbook: XLSX.WorkBook, isWindcall = false): {
     const additionalPay     = toNum(r[5])      // F  추가지급
     const totalDeliveryFee  = toNum(r[6])      // G  총배달료
 
-    // ── windcall 전용: 을지 P(15)/Q(16)/R(17)열 소급정산 금액 → 기사별 정산에서 완전 제외 ──
-    // 소급정산 금액은 0원으로 처리(해당 셀 값을 읽지 않음).
-    // L(고용보험)·M(산재보험)에서 차감하지 않으며 어떤 계산에도 반영하지 않음.
-    // (다른 아이디의 경우 이 로직은 동작하지 않음 — isWindcall = false)
+    // ── windcall 전용: 을지 L(11)/M(12)에서 P(15)/Q(16)/R(17) 소급정산 차감 ──
+    // 배민 을지 파일에서 L열(고용보험)과 M열(산재보험)은 소급정산 금액을 포함한 합산값.
+    // windcall은 소급정산을 기사별 정산에서 제외해야 하므로
+    //   고용보험 = L - P(고용보험소급)
+    //   산재보험 = M - Q(산재보험소급) - R(기타소급)
+    // (다른 아이디는 소급정산 로직 미적용 — isWindcall = false)
+    let employmentInsurance = toNum(r[11])     // L  고용보험
+    let accidentInsurance   = toNum(r[12])     // M  산재보험
+    if (isWindcall) {
+      const sogeupEmployment = toNum(r[15])    // P  고용보험 소급정산
+      const sogeupAccident1  = toNum(r[16])    // Q  산재보험 소급정산
+      const sogeupAccident2  = toNum(r[17])    // R  기타 소급정산
+      employmentInsurance = Math.max(0, employmentInsurance - sogeupEmployment)
+      accidentInsurance   = Math.max(0, accidentInsurance - sogeupAccident1 - sogeupAccident2)
+    }
 
     rows.push({
       userId,
@@ -81,9 +92,8 @@ function extractBaeminData(workbook: XLSX.WorkBook, isWindcall = false): {
       totalDeliveryFee,                        // G
       baseAmount: totalDeliveryFee,            // 정산 계산 기준 = 총배달료(G)
       hourlyInsurance:     toNum(r[7]),        // H  시간제보험료
-      employmentInsurance: toNum(r[11]),       // L  고용보험
-      accidentInsurance:   toNum(r[12]),       // M  산재보험
-      // windcall: P(15)·Q(16)·R(17) 소급정산 열은 읽지 않음 → 0원으로 계산
+      employmentInsurance,                     // L - P(sogeup)  (windcall)
+      accidentInsurance,                       // M - Q - R(sogeup)  (windcall)
       settlementAmount:    toNum(r[21]),       // V  라이더별 정산금액
       withholdingTax:      toNum(r[24]),       // Y  원천징수액
       payAmount:           toNum(r[25]),       // Z  라이더별지급금액
