@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
-import { WeeklySettlement, SettlementDetail, Rider } from '@/types'
+import { useSettlements, useSettlementDetails, revalidateSettlements, invalidateSettlementDetail } from '@/hooks/useSettlements'
+import { SettlementDetail, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,45 +20,39 @@ type DetailWithRider = SettlementDetail & { riders: Rider }
 
 export default function SettlementResultPage() {
   const supabase = createClient()
-  const { userId, isAdmin, loading: userLoading } = useUser()
-  const [settlements, setSettlements] = useState<WeeklySettlement[]>([])
+  const { loading: userLoading } = useUser()
+  const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
-  const [details, setDetails] = useState<DetailWithRider[]>([])
-  const [loading, setLoading] = useState(true)
-  const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
-  const [currentSettlement, setCurrentSettlement] = useState<WeeklySettlement | null>(null)
 
+  // settlements 로드 후 첫 번째 주차 자동 선택
   useEffect(() => {
-    if (isAdmin || userId) fetchSettlements()
-  }, [userId, isAdmin])
-  useEffect(() => {
-    if (selectedId) {
-      fetchDetails(selectedId)
-      setCurrentSettlement(settlements.find(s => s.id === selectedId) ?? null)
+    if (settlements.length > 0 && !selectedId) {
+      setSelectedId(settlements[0].id)
     }
-  }, [selectedId])
+  }, [settlements, selectedId])
 
-  const fetchSettlements = async () => {
-    if (!userId && !isAdmin) return
-    setLoading(true)
-    let q = supabase.from('weekly_settlements').select('*').order('week_start', { ascending: false })
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const { data } = await q
-    if (data) {
-      setSettlements(data)
-      if (data.length > 0) setSelectedId(data[0].id)
-    }
-    setLoading(false)
-  }
+  const currentSettlement = settlements.find(s => s.id === selectedId) ?? null
 
-  const fetchDetails = async (settlementId: string) => {
-    const { data } = await supabase
-      .from('settlement_details')
-      .select('*, riders(*)')
-      .eq('settlement_id', settlementId)
-      .order('final_amount', { ascending: false })
-    if (data) setDetails(data as DetailWithRider[])
-  }
+  // 선택된 주차의 상세 데이터 쿼리 함수
+  const detailQueryFn = useCallback(
+    async (sb: ReturnType<typeof createClient>) => {
+      if (!selectedId) return []
+      const { data } = await sb
+        .from('settlement_details')
+        .select('*, riders(*)')
+        .eq('settlement_id', selectedId)
+        .order('final_amount', { ascending: false })
+      return (data ?? []) as DetailWithRider[]
+    },
+    [selectedId],
+  )
+
+  const { details } = useSettlementDetails<DetailWithRider>(
+    selectedId || null,
+    detailQueryFn,
+  )
+
+  const loading = settlementsLoading || userLoading
 
   const handleConfirm = async (id: string) => {
     const { error } = await supabase
@@ -66,7 +61,7 @@ export default function SettlementResultPage() {
       .eq('id', id)
     if (error) { toast.error('확정 실패'); return }
     toast.success('정산이 확정되었습니다.')
-    fetchSettlements()
+    await revalidateSettlements()
   }
 
   const handleDelete = async (id: string) => {
@@ -82,10 +77,9 @@ export default function SettlementResultPage() {
         return
       }
       toast.success('정산이 삭제되었습니다.')
-      setDetails([])
+      invalidateSettlementDetail(id)
       setSelectedId('')
-      setCurrentSettlement(null)
-      fetchSettlements()
+      await revalidateSettlements()
     } catch {
       toast.error('삭제 실패: 네트워크 오류')
     }
@@ -104,6 +98,8 @@ export default function SettlementResultPage() {
   }
 
   const handlePrint = () => { window.print() }
+
+  const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
   // ── 파생 계산 헬퍼 ──
   const totalEmp  = (d: DetailWithRider) => (d.excel_employment_insurance ?? 0) + (d.employment_insurance_addition ?? 0)
@@ -155,7 +151,7 @@ export default function SettlementResultPage() {
         <CalendarDays className="h-5 w-5 text-slate-400" />
         <Select value={selectedId} onValueChange={setSelectedId}>
           <SelectTrigger className="w-72 bg-slate-800 border-slate-600 text-white">
-            <SelectValue placeholder="주차 선택" />
+            <SelectValue placeholder={loading ? '불러오는 중...' : '주차 선택'} />
           </SelectTrigger>
           <SelectContent className="bg-slate-800 border-slate-600">
             {settlements.map(s => (
@@ -178,7 +174,16 @@ export default function SettlementResultPage() {
         )}
       </div>
 
-      {loading ? null : settlements.length === 0 ? (
+      {loading ? (
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-16 bg-slate-800 rounded-xl" />
+            ))}
+          </div>
+          <div className="h-64 bg-slate-800 rounded-xl" />
+        </div>
+      ) : settlements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-500">
           <FileText className="h-16 w-16 mb-4 opacity-30" />
           <p className="text-lg">저장된 정산 결과가 없습니다.</p>

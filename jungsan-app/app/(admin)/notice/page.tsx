@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/hooks/useUser'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -359,6 +360,7 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
 // ──────────────────────────────────────────────
 export default function NoticePage() {
   const supabase     = createClient()
+  const { userId }   = useUser()
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const wrapperRef   = useRef<HTMLDivElement>(null)
   const boundsRef    = useRef<Bounds>({ title: null, content: null })
@@ -404,44 +406,38 @@ export default function NoticePage() {
 
   // 회사명 자동 로드
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
-        .then(({ data }) => { if (data?.company_name) setCompanyName(data.company_name) })
-    })
-  }, [])
+    if (!userId) return
+    supabase.from('profiles').select('company_name').eq('id', userId).maybeSingle()
+      .then(({ data }) => { if (data?.company_name) setCompanyName(data.company_name) })
+  }, [userId])
 
   // 공지사항 목록 로드
   const fetchNotices = useCallback(async () => {
+    if (!userId) return
     setNoticesLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setNoticesLoading(false); return }
     const { data } = await supabase
       .from('notices')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
     setNotices((data ?? []) as Notice[])
     setNoticesLoading(false)
-  }, [])
+  }, [userId])
 
   useEffect(() => { fetchNotices() }, [fetchNotices])
 
   // 공지사항 저장 (DB)
   const saveNotice = async (thumbnail: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!userId) return
     if (editingNoticeId) {
-      // 기존 항목 수정
       await supabase.from('notices').update({
         title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
-      }).eq('id', editingNoticeId).eq('user_id', user.id)
+      }).eq('id', editingNoticeId).eq('user_id', userId)
       toast.success('공지사항이 업데이트되었습니다.')
     } else {
-      // 신규 등록
       await supabase.from('notices').insert({
-        user_id: user.id, title, content, date, company_name: companyName,
+        user_id: userId, title, content, date, company_name: companyName,
         template_id: selectedTpl, styles, thumbnail,
       })
       toast.success('공지사항이 저장되었습니다.')
@@ -452,9 +448,8 @@ export default function NoticePage() {
 
   // 공지사항 삭제
   const handleDeleteNotice = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('notices').delete().eq('id', id).eq('user_id', user.id)
+    if (!userId) return
+    await supabase.from('notices').delete().eq('id', id).eq('user_id', userId)
     setDeleteConfirmId(null)
     if (editingNoticeId === id) { setEditingNoticeId(null) }
     toast.success('공지사항이 삭제되었습니다.')
@@ -822,8 +817,8 @@ export default function NoticePage() {
             저장된 공지사항
             <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">{notices.length}</span>
           </h3>
-          <button onClick={fetchNotices} className="text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />새로고침
+          <button onClick={fetchNotices} disabled={noticesLoading} className="text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+            <RefreshCw className={`h-3 w-3 ${noticesLoading ? 'animate-spin' : ''}`} />새로고침
           </button>
         </div>
 

@@ -12,6 +12,7 @@ interface UserCache {
   platform: Platform
   userId: string | null
   username: string | null
+  logoUrl: string | null
 }
 
 // 모듈 수준 캐시: 페이지 간 탭 전환 시 재사용 (페이지 새로고침 시 초기화)
@@ -26,14 +27,14 @@ async function fetchUserProfile(): Promise<UserCache> {
     const { data: { user: u } } = await supabase.auth.getUser()
 
     if (!u) {
-      const result: UserCache = { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null }
+      const result: UserCache = { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null, logoUrl: null }
       _cache = result
       return result
     }
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('username, platform')
+      .select('username, platform, logo_url')
       .eq('id', u.id)
       .maybeSingle()
 
@@ -43,12 +44,23 @@ async function fetchUserProfile(): Promise<UserCache> {
       isAdmin: profile?.username?.toLowerCase() === 'admin',
       platform: (profile?.platform as Platform) ?? 'baemin',
       username: profile?.username ?? null,
+      logoUrl: profile?.logo_url ?? null,
     }
     _cache = result
     return result
   })()
 
   return _promise
+}
+
+/** 현재 캐시된 유저 정보 즉시 반환 (훅 없이 모듈에서 사용) */
+export function getCachedUser(): UserCache | null {
+  return _cache
+}
+
+/** 로고 URL을 캐시에 즉시 반영 (로고 업로드/삭제 후 호출) */
+export function updateCachedLogoUrl(url: string | null) {
+  if (_cache) _cache = { ..._cache, logoUrl: url }
 }
 
 // 로그아웃 시 캐시 초기화용 export
@@ -59,7 +71,7 @@ export function clearUserCache() {
 
 export function useUser() {
   const [state, setState] = useState<UserCache>(
-    _cache ?? { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null }
+    _cache ?? { user: null, isAdmin: false, platform: 'baemin', userId: null, username: null, logoUrl: null }
   )
   const [loading, setLoading] = useState(!_cache)
   const initializedRef = useRef(false)
@@ -94,5 +106,5 @@ export function useUser() {
     return () => subscription.unsubscribe()
   }, [])
 
-  return { user: state.user, userId: state.userId, isAdmin: state.isAdmin, platform: state.platform, username: state.username, loading }
+  return { user: state.user, userId: state.userId, isAdmin: state.isAdmin, platform: state.platform, username: state.username, logoUrl: state.logoUrl, loading }
 }

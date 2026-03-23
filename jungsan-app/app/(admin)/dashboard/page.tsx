@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { useSettlements, useSettlementDetails } from '@/hooks/useSettlements'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CalendarDays, TrendingUp, Building2, Percent, ShieldCheck, Gift, Phone, Users, Receipt, BarChart2, Wallet } from 'lucide-react'
-import { WeeklySettlement, SettlementDetail } from '@/types'
+import { SettlementDetail } from '@/types'
 import { formatKRW } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid,
@@ -23,43 +24,58 @@ interface AggDetail {
 }
 
 export default function DashboardPage() {
-  const supabase = createClient()
-  const { userId, isAdmin, loading: userLoading } = useUser()
-  const [settlements, setSettlements] = useState<WeeklySettlement[]>([])
+  const { loading: userLoading } = useUser()
+  const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
-  const [details, setDetails] = useState<SettlementDetail[]>([])
-  const [allAgg, setAllAgg] = useState<AggDetail[]>([])
-  const [loading, setLoading] = useState(true)
 
+  // 차트용 집계 데이터 쿼리 함수 (안정적 참조)
+  const aggQueryFn = useCallback(
+    async (sb: ReturnType<typeof createClient>) => {
+      const ids = settlements.map(s => s.id)
+      if (ids.length === 0) return []
+      const { data } = await sb
+        .from('settlement_details')
+        .select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
+        .in('settlement_id', ids)
+      return (data ?? []) as AggDetail[]
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settlements.map(s => s.id).join(',')],
+  )
+
+  // 차트용 집계 데이터 — 모든 settlement의 집계 (settlements ID 결합 키로 캐시)
+  const aggCacheKey = settlements.length > 0 ? `agg-${settlements.map(s => s.id).join(',')}` : null
+  const { details: allAgg, loading: aggLoading } = useSettlementDetails<AggDetail>(
+    aggCacheKey,
+    aggQueryFn,
+  )
+
+  // 선택 주차의 상세 쿼리 함수
+  const detailQueryFn = useCallback(
+    async (sb: ReturnType<typeof createClient>) => {
+      if (!selectedId) return []
+      const { data } = await sb
+        .from('settlement_details')
+        .select('promotion_amount, call_fee_deduction, final_amount, delivery_count, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
+        .eq('settlement_id', selectedId)
+      return (data ?? []) as SettlementDetail[]
+    },
+    [selectedId],
+  )
+
+  const { details } = useSettlementDetails<SettlementDetail>(
+    selectedId || null,
+    detailQueryFn,
+  )
+
+  const loading = settlementsLoading || aggLoading
+
+  // settlements 로드 후 첫 번째 항목 자동 선택
   useEffect(() => {
-    if (isAdmin || userId) fetchSettlements()
-  }, [userId, isAdmin])
-  useEffect(() => { if (selectedId) fetchDetails(selectedId) }, [selectedId])
-
-  const fetchSettlements = async () => {
-    if (!userId && !isAdmin) return
-    let q = supabase.from('weekly_settlements').select('*').order('week_start', { ascending: false })
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const { data } = await q
-    if (data) {
-      setSettlements(data)
-      if (data.length > 0) setSelectedId(data[0].id)
+    if (settlements.length > 0 && !selectedId) {
+      setSelectedId(settlements[0].id)
     }
-    const ids = (data ?? []).map(s => s.id)
-    let aggQ = supabase.from('settlement_details').select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
-    if (ids.length > 0) aggQ = aggQ.in('settlement_id', ids)
-    const { data: aggData } = await aggQ
-    if (aggData) setAllAgg(aggData as AggDetail[])
-    setLoading(false)
-  }
-
-  const fetchDetails = async (settlementId: string) => {
-    const { data } = await supabase
-      .from('settlement_details')
-      .select('promotion_amount, call_fee_deduction, final_amount, delivery_count, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
-      .eq('settlement_id', settlementId)
-    if (data) setDetails(data as SettlementDetail[])
-  }
+  }, [settlements, selectedId])
 
   // 차트 데이터: 최근 12주치 순이익 (오래된→최신 순)
   const chartData = useMemo(() => {

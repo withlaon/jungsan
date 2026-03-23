@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
-import { AdvancePayment, Rider } from '@/types'
+import { useAdvancePayments, revalidatePayments } from '@/hooks/useAdvancePayments'
+import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,7 +18,7 @@ import { Plus, Wallet, AlertCircle, Trash2, RotateCcw, Search, ChevronDown } fro
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
 
-type PaymentWithRider = AdvancePayment & { riders: Rider }
+type PaymentWithRider = import('@/hooks/useAdvancePayments').PaymentWithRider
 
 // 수요일~화요일 기준 주간 목록 생성 (최근 24주)
 function getWeekOptions() {
@@ -141,11 +142,10 @@ function RiderSearchSelect({
 
 export default function AdvancePaymentsPage() {
   const supabase = createClient()
-  const { userId, isAdmin, loading: userLoading } = useUser()
+  const { userId } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active')
-  const [payments, setPayments] = useState<PaymentWithRider[]>([])
-  const [loading, setLoading] = useState(true)
+  const { payments, loading } = useAdvancePayments()
 
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [recoveryOpen, setRecoveryOpen] = useState(false)
@@ -153,20 +153,6 @@ export default function AdvancePaymentsPage() {
 
   const [advanceForm, setAdvanceForm] = useState(emptyForm)
   const [recoveryForm, setRecoveryForm] = useState(emptyForm)
-
-  useEffect(() => {
-    if (isAdmin || userId) fetchData()
-  }, [userId, isAdmin])
-
-  const fetchData = async () => {
-    if (!userId && !isAdmin) return
-    setLoading(true)
-    let q = supabase.from('advance_payments').select('*, riders(*)').order('paid_date', { ascending: false })
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const [paymentsRes] = await Promise.all([q])
-    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentWithRider[])
-    setLoading(false)
-  }
 
   const handleSave = async (type: 'advance' | 'recovery') => {
     const form = type === 'advance' ? advanceForm : recoveryForm
@@ -197,7 +183,7 @@ export default function AdvancePaymentsPage() {
     setSaving(false)
     if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
     else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
-    fetchData()
+    revalidatePayments()
   }
 
   const handleDelete = async (id: string, riderName: string, type: 'advance' | 'recovery') => {
@@ -210,7 +196,7 @@ export default function AdvancePaymentsPage() {
     const { error } = await supabase.from('advance_payments').delete().eq('id', id)
     if (error) { toast.error('삭제 실패'); return }
     toast.success('삭제되었습니다.')
-    fetchData()
+    revalidatePayments()
   }
 
   const advances = payments.filter(p => p.type !== 'recovery')
@@ -297,6 +283,16 @@ export default function AdvancePaymentsPage() {
         </div>
       </div>
 
+      {loading ? (
+        <div className="animate-pulse space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-20 bg-slate-800 rounded-xl" />
+            ))}
+          </div>
+          <div className="h-48 bg-slate-800 rounded-xl" />
+        </div>
+      ) : (<>
       {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-slate-700 bg-orange-900/20">
@@ -443,6 +439,8 @@ export default function AdvancePaymentsPage() {
           </Table>
         </CardContent>
       </Card>
+
+    </>)}
 
       {/* 선지급금 등록 다이얼로그 */}
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>

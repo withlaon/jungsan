@@ -33,7 +33,7 @@ import {
   X,
 } from 'lucide-react'
 import Image from 'next/image'
-import { useUser, clearUserCache } from '@/hooks/useUser'
+import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -94,7 +94,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { platform } = useUser()
+  const { platform, logoUrl: cachedLogoUrl } = useUser()
   const config = PLATFORM_CONFIG[platform ?? 'baemin']
   const PlatformIcon = config.icon
 
@@ -112,16 +112,20 @@ export function Sidebar() {
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>('')
   const [logoUploading, setLogoUploading] = useState(false)
-  const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string>('')
+  // useUser 캐시에서 로고 URL 즉시 사용 (별도 DB 요청 없음)
+  const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string>(cachedLogoUrl ?? '')
 
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawMsg, setWithdrawMsg] = useState('')
 
-  // 초기 로드 시 사이드바 로고 가져오기
+  // cachedLogoUrl이 useUser 로딩 후 업데이트되면 반영
   useEffect(() => {
-    fetchSidebarLogo()
-  }, [])
+    if (cachedLogoUrl && !sidebarLogoUrl) {
+      setSidebarLogoUrl(cachedLogoUrl)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedLogoUrl])
 
   useEffect(() => {
     if (profileOpen) {
@@ -133,13 +137,6 @@ export function Sidebar() {
       setLogoPreview('')
     }
   }, [profileOpen])
-
-  const fetchSidebarLogo = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).maybeSingle()
-    if (data?.logo_url) setSidebarLogoUrl(data.logo_url)
-  }
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -204,6 +201,7 @@ export function Sidebar() {
     await supabase.from('profiles').update({ logo_url: null }).eq('id', user.id)
     setProfile(p => ({ ...p, logo_url: '' }))
     setSidebarLogoUrl('')
+    updateCachedLogoUrl(null)
     setLogoFile(null)
     setLogoPreview('')
     setSaveMsg('로고가 삭제되었습니다.')
@@ -236,8 +234,11 @@ export function Sidebar() {
     const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
     if (error) { setSaving(false); setSaveMsg('저장 실패: ' + error.message); return }
 
-    // 사이드바 로고 즉시 반영
-    if (newLogoUrl) setSidebarLogoUrl(newLogoUrl)
+    // 사이드바 로고 즉시 반영 + 전역 캐시 동기화
+    if (newLogoUrl) {
+      setSidebarLogoUrl(newLogoUrl)
+      updateCachedLogoUrl(newLogoUrl)
+    }
 
     if (newPassword) {
       const { error: pwError } = await supabase.auth.updateUser({ password: newPassword })
