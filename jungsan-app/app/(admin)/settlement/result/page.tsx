@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/hooks/useUser'
-import { useSettlements, useSettlementDetails, revalidateSettlements, invalidateSettlementDetail } from '@/hooks/useSettlements'
+import { useSettlements, revalidateSettlements } from '@/hooks/useSettlements'
 import { SettlementDetail, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,9 +19,10 @@ type DetailWithRider = SettlementDetail & { riders: Rider }
 
 export default function SettlementResultPage() {
   const supabase = createClient()
-  const { loading: userLoading } = useUser()
   const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
+  const [details, setDetails] = useState<DetailWithRider[]>([])
+  const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
   // settlements 로드 후 첫 번째 주차 자동 선택
   useEffect(() => {
@@ -33,26 +33,21 @@ export default function SettlementResultPage() {
 
   const currentSettlement = settlements.find(s => s.id === selectedId) ?? null
 
-  // 선택된 주차의 상세 데이터 쿼리 함수
-  const detailQueryFn = useCallback(
-    async (sb: ReturnType<typeof createClient>) => {
-      if (!selectedId) return []
-      const { data } = await sb
-        .from('settlement_details')
-        .select('*, riders(*)')
-        .eq('settlement_id', selectedId)
-        .order('final_amount', { ascending: false })
-      return (data ?? []) as DetailWithRider[]
-    },
-    [selectedId],
-  )
-
-  const { details } = useSettlementDetails<DetailWithRider>(
-    selectedId || null,
-    detailQueryFn,
-  )
-
-  const loading = settlementsLoading || userLoading
+  // 선택된 주차 상세 데이터 조회
+  useEffect(() => {
+    if (!selectedId) return
+    const sb = createClient()
+    ;(async () => {
+      try {
+        const { data, error } = await sb
+          .from('settlement_details')
+          .select('*, riders(*)')
+          .eq('settlement_id', selectedId)
+          .order('final_amount', { ascending: false })
+        if (!error && data) setDetails(data as DetailWithRider[])
+      } catch { /* ignore */ }
+    })()
+  }, [selectedId])
 
   const handleConfirm = async (id: string) => {
     const { error } = await supabase
@@ -72,12 +67,9 @@ export default function SettlementResultPage() {
         credentials: 'same-origin',
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error('삭제 실패: ' + (data?.error ?? res.statusText))
-        return
-      }
+      if (!res.ok) { toast.error('삭제 실패: ' + (data?.error ?? res.statusText)); return }
       toast.success('정산이 삭제되었습니다.')
-      invalidateSettlementDetail(id)
+      setDetails([])
       setSelectedId('')
       await revalidateSettlements()
     } catch {
@@ -98,8 +90,6 @@ export default function SettlementResultPage() {
   }
 
   const handlePrint = () => { window.print() }
-
-  const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
   // ── 파생 계산 헬퍼 ──
   const totalEmp  = (d: DetailWithRider) => (d.excel_employment_insurance ?? 0) + (d.employment_insurance_addition ?? 0)
@@ -151,7 +141,7 @@ export default function SettlementResultPage() {
         <CalendarDays className="h-5 w-5 text-slate-400" />
         <Select value={selectedId} onValueChange={setSelectedId}>
           <SelectTrigger className="w-72 bg-slate-800 border-slate-600 text-white">
-            <SelectValue placeholder={loading ? '불러오는 중...' : '주차 선택'} />
+            <SelectValue placeholder={settlementsLoading ? '불러오는 중...' : '주차 선택'} />
           </SelectTrigger>
           <SelectContent className="bg-slate-800 border-slate-600">
             {settlements.map(s => (
@@ -174,7 +164,7 @@ export default function SettlementResultPage() {
         )}
       </div>
 
-      {loading ? (
+      {settlementsLoading ? (
         <div className="animate-pulse space-y-4">
           <div className="grid grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -323,12 +313,10 @@ export default function SettlementResultPage() {
                   정산 기간: {currentSettlement.week_start} ~ {currentSettlement.week_end}
                 </div>
                 <div className="space-y-1.5">
-                  {/* 배달건수 */}
                   <div className="flex justify-between py-1.5 border-b border-slate-700/50">
                     <span className="text-slate-400 text-sm">배달건수</span>
                     <span className="font-medium text-sm text-white">{d.delivery_count}건</span>
                   </div>
-                  {/* 기본정산금액 (배달료 + 추가지급 구분) */}
                   <div className="flex justify-between py-1.5 border-b border-slate-700/50">
                     <span className="text-slate-400 text-sm">기본정산금액</span>
                     <span className="font-medium text-sm text-blue-400">{formatKRW(d.base_amount)}</span>
@@ -344,15 +332,15 @@ export default function SettlementResultPage() {
                     </div>
                   )}
                   {[
-                    { label: '시간제보험료',     value: `-${formatKRW(d.hourly_insurance ?? 0)}`, color: 'text-amber-400', skip: !d.hourly_insurance },
-                    { label: '고용보험',         value: `-${formatKRW(empTotal)}`,         color: 'text-cyan-400',   skip: empTotal === 0 },
-                    { label: '산재보험',         value: `-${formatKRW(accTotal)}`,         color: 'text-purple-400', skip: accTotal === 0 },
-                    { label: '지사프로모션',     value: `+${formatKRW(d.promotion_amount)}`,color:'text-violet-400',skip: d.promotion_amount === 0 },
-                    { label: '콜관리비',         value: `-${formatKRW(d.call_fee_deduction ?? 0)}`, color: 'text-orange-400', skip: !d.call_fee_deduction },
-                    { label: '세금신고금액',     value: formatKRW(tb),                    color: 'text-emerald-400' },
-                    { label: '소득세',            value: `-${formatKRW(it)}`,               color: 'text-rose-400' },
-                    { label: '선지급금 공제',    value: `-${formatKRW(d.advance_deduction)}`, color: 'text-amber-300', skip: d.advance_deduction === 0 },
-                    { label: '선지급금회수',     value: `+${formatKRW(rec)}`,              color: 'text-teal-400',   skip: rec === 0 },
+                    { label: '시간제보험료',  value: `-${formatKRW(d.hourly_insurance ?? 0)}`,       color: 'text-amber-400',  skip: !d.hourly_insurance },
+                    { label: '고용보험',      value: `-${formatKRW(empTotal)}`,                      color: 'text-cyan-400',   skip: empTotal === 0 },
+                    { label: '산재보험',      value: `-${formatKRW(accTotal)}`,                      color: 'text-purple-400', skip: accTotal === 0 },
+                    { label: '지사프로모션',  value: `+${formatKRW(d.promotion_amount)}`,            color: 'text-violet-400', skip: d.promotion_amount === 0 },
+                    { label: '콜관리비',      value: `-${formatKRW(d.call_fee_deduction ?? 0)}`,     color: 'text-orange-400', skip: !d.call_fee_deduction },
+                    { label: '세금신고금액',  value: formatKRW(tb),                                  color: 'text-emerald-400' },
+                    { label: '소득세',        value: `-${formatKRW(it)}`,                            color: 'text-rose-400' },
+                    { label: '선지급금 공제', value: `-${formatKRW(d.advance_deduction)}`,           color: 'text-amber-300',  skip: d.advance_deduction === 0 },
+                    { label: '선지급금회수',  value: `+${formatKRW(rec)}`,                           color: 'text-teal-400',   skip: rec === 0 },
                   ].filter(item => !item.skip).map(item => (
                     <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-700/50">
                       <span className="text-slate-400 text-sm">{item.label}</span>

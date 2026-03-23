@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useUser, getCachedUser } from '@/hooks/useUser'
 import { AdvancePayment, Rider } from '@/types'
 
 export type PaymentWithRider = AdvancePayment & { riders: Rider }
@@ -16,42 +18,45 @@ function broadcast(data: PaymentWithRider[]) {
   _listeners.forEach(fn => fn(data))
 }
 
-async function loadPayments(force = false): Promise<PaymentWithRider[]> {
+async function loadPayments(
+  userId: string | null,
+  isAdmin: boolean,
+  force = false,
+): Promise<PaymentWithRider[]> {
+  if (!userId && !isAdmin) return []
   if (force) { _cache = null; _promise = null }
   if (_promise) return _promise
 
   _promise = (async () => {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return []
+    try {
+      const supabase = createClient()
+      let q = supabase
+        .from('advance_payments')
+        .select('*, riders(*)')
+        .order('paid_date', { ascending: false })
+      if (!isAdmin && userId) q = q.eq('user_id', userId)
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .maybeSingle()
-    const isAdmin = profile?.username?.toLowerCase() === 'admin'
+      const { data, error } = await q
+      if (error) throw error
 
-    let q = supabase
-      .from('advance_payments')
-      .select('*, riders(*)')
-      .order('paid_date', { ascending: false })
-    if (!isAdmin) q = q.eq('user_id', user.id)
-
-    const { data } = await q
-    const result = (data ?? []) as PaymentWithRider[]
-    _cache = result
-    _lastFetched = Date.now()
-    broadcast(result)
-    return result
+      const result = (data ?? []) as PaymentWithRider[]
+      _cache = result
+      _lastFetched = Date.now()
+      broadcast(result)
+      return result
+    } catch (e) {
+      console.error('[useAdvancePayments] 로드 실패:', e)
+      if (_cache) broadcast(_cache)
+      return _cache ?? []
+    }
   })().finally(() => { _promise = null })
 
   return _promise
 }
 
 export async function revalidatePayments(): Promise<PaymentWithRider[]> {
-  return loadPayments(true)
+  const cached = getCachedUser()
+  return loadPayments(cached?.userId ?? null, cached?.isAdmin ?? false, true)
 }
 
 export function applyOptimisticPayment(
@@ -69,25 +74,31 @@ export function applyOptimisticPayment(
 }
 
 export function useAdvancePayments() {
+  const { userId, isAdmin, loading: userLoading } = useUser()
   const [payments, setPayments] = useState<PaymentWithRider[]>(_cache ?? [])
-  const [loading, setLoading] = useState(!_cache)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     _listeners.add(setPayments)
+    return () => { _listeners.delete(setPayments) }
+  }, [])
+
+  useEffect(() => {
+    if (userLoading) return
 
     if (_cache) {
       setPayments(_cache)
       setLoading(false)
       if (Date.now() - _lastFetched > STALE_MS) {
-        loadPayments().then(() => setLoading(false))
+        loadPayments(userId, isAdmin)
       }
     } else {
       setLoading(true)
-      loadPayments().then(() => setLoading(false))
+      loadPayments(userId, isAdmin)
+        .then(() => setLoading(false))
+        .catch(() => setLoading(false))
     }
-
-    return () => { _listeners.delete(setPayments) }
-  }, [])
+  }, [userId, isAdmin, userLoading])
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)

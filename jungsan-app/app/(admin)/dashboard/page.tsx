@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/hooks/useUser'
-import { useSettlements, useSettlementDetails } from '@/hooks/useSettlements'
+import { useSettlements } from '@/hooks/useSettlements'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,51 +23,11 @@ interface AggDetail {
 }
 
 export default function DashboardPage() {
-  const { loading: userLoading } = useUser()
   const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
-
-  // 차트용 집계 데이터 쿼리 함수 (안정적 참조)
-  const aggQueryFn = useCallback(
-    async (sb: ReturnType<typeof createClient>) => {
-      const ids = settlements.map(s => s.id)
-      if (ids.length === 0) return []
-      const { data } = await sb
-        .from('settlement_details')
-        .select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
-        .in('settlement_id', ids)
-      return (data ?? []) as AggDetail[]
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settlements.map(s => s.id).join(',')],
-  )
-
-  // 차트용 집계 데이터 — 모든 settlement의 집계 (settlements ID 결합 키로 캐시)
-  const aggCacheKey = settlements.length > 0 ? `agg-${settlements.map(s => s.id).join(',')}` : null
-  const { details: allAgg, loading: aggLoading } = useSettlementDetails<AggDetail>(
-    aggCacheKey,
-    aggQueryFn,
-  )
-
-  // 선택 주차의 상세 쿼리 함수
-  const detailQueryFn = useCallback(
-    async (sb: ReturnType<typeof createClient>) => {
-      if (!selectedId) return []
-      const { data } = await sb
-        .from('settlement_details')
-        .select('promotion_amount, call_fee_deduction, final_amount, delivery_count, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
-        .eq('settlement_id', selectedId)
-      return (data ?? []) as SettlementDetail[]
-    },
-    [selectedId],
-  )
-
-  const { details } = useSettlementDetails<SettlementDetail>(
-    selectedId || null,
-    detailQueryFn,
-  )
-
-  const loading = settlementsLoading || aggLoading
+  const [details, setDetails] = useState<SettlementDetail[]>([])
+  const [allAgg, setAllAgg] = useState<AggDetail[]>([])
+  const [aggLoading, setAggLoading] = useState(false)
 
   // settlements 로드 후 첫 번째 항목 자동 선택
   useEffect(() => {
@@ -77,20 +36,60 @@ export default function DashboardPage() {
     }
   }, [settlements, selectedId])
 
+  // 차트용 집계 데이터 — settlements IDs가 바뀔 때만 재조회
+  const settlementIds = settlements.map(s => s.id).join(',')
+  const lastAggIds = useRef('')
+
+  useEffect(() => {
+    if (settlements.length === 0) return
+    if (lastAggIds.current === settlementIds) return  // 이미 로드된 데이터
+    lastAggIds.current = settlementIds
+
+    setAggLoading(true)
+    const supabase = createClient()
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('settlement_details')
+          .select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
+          .in('settlement_id', settlements.map(s => s.id))
+        if (!error && data) setAllAgg(data as AggDetail[])
+      } catch { /* ignore */ }
+      setAggLoading(false)
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settlementIds])
+
+  // 선택된 주차 상세 데이터 조회
+  useEffect(() => {
+    if (!selectedId) return
+    const supabase = createClient()
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('settlement_details')
+          .select('promotion_amount, call_fee_deduction, final_amount, delivery_count, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
+          .eq('settlement_id', selectedId)
+        if (!error && data) setDetails(data as SettlementDetail[])
+      } catch { /* ignore */ }
+    })()
+  }, [selectedId])
+
+  const loading = settlementsLoading || aggLoading
+
   // 차트 데이터: 최근 12주치 순이익 (오래된→최신 순)
   const chartData = useMemo(() => {
     const recent = [...settlements].reverse().slice(-12)
     return recent.map(s => {
       const rows = allAgg.filter(a => a.settlement_id === s.id)
-      const promoTotal   = rows.reduce((acc, r) => acc + (r.promotion_amount ?? 0), 0)
-      const callTotal    = rows.reduce((acc, r) => acc + (r.call_fee_deduction ?? 0), 0)
-      const insAddTotal  = rows.reduce((acc, r) => acc + (r.employment_insurance_addition ?? 0) + (r.accident_insurance_addition ?? 0), 0)
+      const promoTotal  = rows.reduce((acc, r) => acc + (r.promotion_amount ?? 0), 0)
+      const callTotal   = rows.reduce((acc, r) => acc + (r.call_fee_deduction ?? 0), 0)
+      const insAddTotal = rows.reduce((acc, r) => acc + (r.employment_insurance_addition ?? 0) + (r.accident_insurance_addition ?? 0), 0)
       const profit =
         (s.branch_fee ?? 0)
         - (s.employer_employment_insurance ?? 0)
         - (s.employer_accident_insurance ?? 0)
         - promoTotal + callTotal + insAddTotal
-      // 주차 라벨: "25/02/05~02/11" 형태로 압축
       const [, mm1, dd1] = (s.week_start ?? '').split('-')
       const [, mm2, dd2] = (s.week_end   ?? '').split('-')
       const label = `${mm1}/${dd1}~${mm2}/${dd2}`
@@ -100,108 +99,35 @@ export default function DashboardPage() {
 
   const currentSettlement = settlements.find(s => s.id === selectedId)
 
-  // 갑지 요약 (weekly_settlements 저장값)
-  const settledAmount   = currentSettlement?.settled_amount                ?? 0
-  const branchFee       = currentSettlement?.branch_fee                   ?? 0
-  const vatAmount       = currentSettlement?.vat_amount                   ?? 0
-  const empInsurance    = currentSettlement?.employer_employment_insurance ?? 0
-  const accInsurance    = currentSettlement?.employer_accident_insurance   ?? 0
+  const settledAmount  = currentSettlement?.settled_amount                ?? 0
+  const branchFee      = currentSettlement?.branch_fee                   ?? 0
+  const vatAmount      = currentSettlement?.vat_amount                   ?? 0
+  const empInsurance   = currentSettlement?.employer_employment_insurance ?? 0
+  const accInsurance   = currentSettlement?.employer_accident_insurance   ?? 0
 
-  // settlement_details 집계
-  const promotionTotal  = details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0)
-  const callFeeTotal    = details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0)
-  const riderPayTotal   = details.reduce((s, d) => s + (d.final_amount ?? 0), 0)
-  const incomeTaxTotal  = details.reduce((s, d) => s + (d.income_tax_deduction ?? 0), 0)
+  const promotionTotal   = details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0)
+  const callFeeTotal     = details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0)
+  const riderPayTotal    = details.reduce((s, d) => s + (d.final_amount ?? 0), 0)
+  const incomeTaxTotal   = details.reduce((s, d) => s + (d.income_tax_deduction ?? 0), 0)
   const insAdditionTotal = details.reduce((s, d) => s + (d.employment_insurance_addition ?? 0) + (d.accident_insurance_addition ?? 0), 0)
-  const riderCount      = details.length
+  const riderCount       = details.length
 
-  // 지사순이익 = 지사관리비 - 고용보험사업주 - 산재보험사업주 - 프로모션비 + 콜관리비 + 고용산재관리비
-  const branchProfit    = branchFee - empInsurance - accInsurance - promotionTotal + callFeeTotal + insAdditionTotal
+  const branchProfit = branchFee - empInsurance - accInsurance - promotionTotal + callFeeTotal + insAdditionTotal
 
   const items = [
-    {
-      label: '정산예정금액',
-      value: settledAmount,
-      icon: TrendingUp,
-      color: 'text-violet-400',
-      bg: 'border-violet-700/40 bg-violet-900/10',
-      sign: '',
-    },
-    {
-      label: '지사관리비',
-      value: branchFee,
-      icon: Building2,
-      color: 'text-blue-400',
-      bg: 'border-blue-700/40 bg-blue-900/10',
-      sign: '+',
-    },
-    {
-      label: '부가세',
-      value: vatAmount,
-      icon: Percent,
-      color: 'text-amber-400',
-      bg: 'border-amber-700/40 bg-amber-900/10',
-      sign: '-',
-    },
-    {
-      label: '고용보험사업주',
-      value: empInsurance,
-      icon: ShieldCheck,
-      color: 'text-cyan-400',
-      bg: 'border-cyan-700/40 bg-cyan-900/10',
-      sign: '-',
-    },
-    {
-      label: '산재보험사업주',
-      value: accInsurance,
-      icon: ShieldCheck,
-      color: 'text-purple-400',
-      bg: 'border-purple-700/40 bg-purple-900/10',
-      sign: '-',
-    },
-    {
-      label: '프로모션비',
-      value: promotionTotal,
-      icon: Gift,
-      color: 'text-rose-400',
-      bg: 'border-rose-700/40 bg-rose-900/10',
-      sign: '-',
-    },
-    {
-      label: '콜관리비',
-      value: callFeeTotal,
-      icon: Phone,
-      color: 'text-orange-400',
-      bg: 'border-orange-700/40 bg-orange-900/10',
-      sign: '+',
-    },
-    {
-      label: '원천세',
-      value: incomeTaxTotal,
-      icon: Receipt,
-      color: 'text-red-400',
-      bg: 'border-red-700/40 bg-red-900/10',
-      sign: '-',
-    },
-    {
-      label: '고용산재관리비',
-      value: insAdditionTotal,
-      icon: ShieldCheck,
-      color: 'text-teal-400',
-      bg: 'border-teal-700/40 bg-teal-900/10',
-      sign: '+',
-    },
-    {
-      label: '라이더 최종정산금액',
-      value: riderPayTotal,
-      icon: Wallet,
-      color: 'text-slate-300',
-      bg: 'border-slate-600 bg-slate-800/50',
-      sign: '',
-    },
+    { label: '정산예정금액',      value: settledAmount,    icon: TrendingUp,  color: 'text-violet-400', bg: 'border-violet-700/40 bg-violet-900/10', sign: '' },
+    { label: '지사관리비',        value: branchFee,        icon: Building2,   color: 'text-blue-400',   bg: 'border-blue-700/40 bg-blue-900/10',   sign: '+' },
+    { label: '부가세',            value: vatAmount,        icon: Percent,     color: 'text-amber-400',  bg: 'border-amber-700/40 bg-amber-900/10', sign: '-' },
+    { label: '고용보험사업주',    value: empInsurance,     icon: ShieldCheck, color: 'text-cyan-400',   bg: 'border-cyan-700/40 bg-cyan-900/10',   sign: '-' },
+    { label: '산재보험사업주',    value: accInsurance,     icon: ShieldCheck, color: 'text-purple-400', bg: 'border-purple-700/40 bg-purple-900/10',sign: '-' },
+    { label: '프로모션비',        value: promotionTotal,   icon: Gift,        color: 'text-rose-400',   bg: 'border-rose-700/40 bg-rose-900/10',   sign: '-' },
+    { label: '콜관리비',          value: callFeeTotal,     icon: Phone,       color: 'text-orange-400', bg: 'border-orange-700/40 bg-orange-900/10',sign: '+' },
+    { label: '원천세',            value: incomeTaxTotal,   icon: Receipt,     color: 'text-red-400',    bg: 'border-red-700/40 bg-red-900/10',     sign: '-' },
+    { label: '고용산재관리비',    value: insAdditionTotal, icon: ShieldCheck, color: 'text-teal-400',   bg: 'border-teal-700/40 bg-teal-900/10',   sign: '+' },
+    { label: '라이더 최종정산금액', value: riderPayTotal,  icon: Wallet,      color: 'text-slate-300',  bg: 'border-slate-600 bg-slate-800/50',    sign: '' },
   ]
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="p-4 md:p-6 space-y-6 animate-pulse">
         <div className="flex items-center justify-between">
