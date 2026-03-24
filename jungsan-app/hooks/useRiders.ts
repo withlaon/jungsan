@@ -27,21 +27,28 @@ async function loadRiders(force = false): Promise<Rider[]> {
   if (_promise) return _promise
 
   _promise = (async () => {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const headers: Record<string, string> = {}
-    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = {}
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
 
-    // force 시 브라우저 캐시 완전 우회 (타임스탬프 파라미터 + no-store)
-    const url = force ? `/api/admin/riders?t=${Date.now()}` : '/api/admin/riders'
-    const res = await fetch(url, { headers, ...(force ? { cache: 'no-store' } : {}) })
-    const d = await res.json()
-    const data = Array.isArray(d) ? d : []
-    _cache = data
-    _lastFetched = Date.now()
-    broadcast(data)
-    return data
+      // force 시 브라우저 캐시 완전 우회 (타임스탬프 파라미터 + no-store)
+      const url = force ? `/api/admin/riders?t=${Date.now()}` : '/api/admin/riders'
+      const res = await fetch(url, { headers, ...(force ? { cache: 'no-store' } : {}) })
+      const d = await res.json()
+      const data = Array.isArray(d) ? d : []
+      _cache = data
+      _lastFetched = Date.now()
+      broadcast(data)
+      return data
+    } catch (e) {
+      console.error('[useRiders] 로드 실패:', e)
+      // 기존 캐시가 있으면 유지, 없으면 빈 배열 반환 (로딩 freeze 방지)
+      if (_cache) broadcast(_cache)
+      return _cache ?? []
+    }
   })().finally(() => { _promise = null })
 
   return _promise
@@ -85,11 +92,13 @@ export function useRiders() {
       setLoading(false)
       // 오래된 캐시면 백그라운드에서 갱신 (stale-while-revalidate)
       if (Date.now() - _lastFetched > STALE_MS) {
-        loadRiders().then(() => setLoading(false))
+        loadRiders().then(() => setLoading(false)).catch(() => setLoading(false))
       }
     } else {
       setLoading(true)
-      loadRiders().then(() => setLoading(false))
+      loadRiders()
+        .then(() => setLoading(false))
+        .catch(() => setLoading(false))
     }
 
     return () => {
@@ -100,8 +109,13 @@ export function useRiders() {
   /** CRUD 후 목록 강제 갱신 (silent=true: 로딩 인디케이터 없음) */
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    await revalidateRiders()
-    if (!silent) setLoading(false)
+    try {
+      await revalidateRiders()
+    } catch {
+      // 갱신 실패해도 로딩 freeze 방지
+    } finally {
+      if (!silent) setLoading(false)
+    }
   }, [])
 
   return { riders, loading, refresh }

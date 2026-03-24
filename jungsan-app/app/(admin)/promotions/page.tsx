@@ -211,11 +211,16 @@ export default function PromotionsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
-    const promoRes = await q
-    if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
-    setLoading(false)
+    try {
+      let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
+      if (!isAdmin && userId) q = q.eq('user_id', userId)
+      const promoRes = await q
+      if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
+    } catch (e) {
+      console.error('[PromotionsPage] 로드 실패:', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── 프로모션 그룹핑 ──

@@ -182,13 +182,18 @@ export default function SettingsPage() {
   const fetchData = async () => {
     if (!userId && !isAdmin) return
     setLoading(true)
-    const [feesRes, insRes] = await Promise.all([
-      (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-      (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-    ])
-    if (feesRes.data) setFees(feesRes.data as FeeWithRider[])
-    if (insRes.data) setInsuranceFees(insRes.data as InsuranceFeeWithRider[])
-    setLoading(false)
+    try {
+      const [feesRes, insRes] = await Promise.all([
+        (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+      ])
+      if (feesRes.data) setFees(feesRes.data as FeeWithRider[])
+      if (insRes.data) setInsuranceFees(insRes.data as InsuranceFeeWithRider[])
+    } catch (e) {
+      console.error('[SettingsPage] 로드 실패:', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const setGF = (patch: Partial<ReturnType<typeof initGeneral>>) => setGeneralForm(f=>({...f,...patch}))
