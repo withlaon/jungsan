@@ -76,7 +76,8 @@ export function applyOptimisticPayment(
 export function useAdvancePayments() {
   const { userId, isAdmin, loading: userLoading } = useUser()
   const [payments, setPayments] = useState<PaymentWithRider[]>(_cache ?? [])
-  const [loading, setLoading] = useState(true)
+  // 캐시가 있으면 즉시 false (탭 이동 시 로딩 스켈레톤 방지)
+  const [loading, setLoading] = useState(!_cache)
 
   useEffect(() => {
     _listeners.add(setPayments)

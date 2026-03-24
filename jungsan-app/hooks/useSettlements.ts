@@ -84,7 +84,8 @@ export function useSettlements() {
   // useUser를 통해 인증 완료 시점을 파악
   const { userId, isAdmin, loading: userLoading } = useUser()
   const [settlements, setSettlements] = useState<WeeklySettlement[]>(_listCache ?? [])
-  const [loading, setLoading] = useState(true)
+  // 캐시가 있으면 즉시 false (탭 이동 시 로딩 스켈레톤 방지)
+  const [loading, setLoading] = useState(!_listCache)
 
   useEffect(() => {
     _listListeners.add(setSettlements)
