@@ -301,13 +301,8 @@ export function Sidebar() {
   const SidebarInner = () => (
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
       <div className="p-5 flex items-center gap-3 border-b border-slate-700">
-        {/* 로고+브랜드명 클릭 시 주간정산현황으로 새로고침 이동 */}
-        <button
-          onClick={() => { window.location.href = '/dashboard' }}
-          className="flex items-center gap-3 flex-1 min-w-0 group cursor-pointer"
-          title="주간정산현황으로 이동"
-        >
-          <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden group-hover:opacity-80 transition-opacity`}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden`}
             style={{ width: 40, height: 40 }}>
             {sidebarLogoUrl ? (
               <Image
@@ -324,11 +319,11 @@ export function Sidebar() {
               </div>
             )}
           </div>
-          <div className="flex-1 min-w-0 text-left">
-            <h1 className="text-white font-bold text-sm leading-tight truncate group-hover:text-slate-200 transition-colors">{config.label}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
             <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
           </div>
-        </button>
+        </div>
         {/* 모바일 닫기 버튼 */}
         <button
           className="md:hidden text-slate-400 hover:text-white p-1"
