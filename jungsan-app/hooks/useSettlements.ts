@@ -9,6 +9,7 @@ import { WeeklySettlement } from '@/types'
 let _listCache: WeeklySettlement[] | null = null
 let _listPromise: Promise<WeeklySettlement[]> | null = null
 let _listLastFetched = 0
+let _listCachedUserId: string | null | undefined = undefined  // 캐시가 어떤 userId로 로드됐는지 추적 (undefined=초기 미로드)
 const _listListeners = new Set<(data: WeeklySettlement[]) => void>()
 
 const LIST_STALE_MS = 30_000
@@ -27,6 +28,14 @@ async function loadSettlements(
   force = false,
 ): Promise<WeeklySettlement[]> {
   if (!userId && !isAdmin) return []
+
+  // 사용자가 바뀐 경우 캐시 무효화 (다른 계정 데이터 노출 방지)
+  if (_listCachedUserId !== undefined && _listCachedUserId !== userId && !isAdmin) {
+    _listCache = null
+    _listPromise = null
+    _listLastFetched = 0
+  }
+
   if (force) { _listCache = null; _listPromise = null }
   if (_listPromise) return _listPromise
 
@@ -37,13 +46,14 @@ async function loadSettlements(
         .from('weekly_settlements')
         .select('*')
         .order('week_start', { ascending: false })
-      if (!isAdmin && userId) q = q.eq('user_id', userId)
+      if (!isAdmin && userId) q = q.eq('user_id', userId)  // admin은 전체 정산 조회 가능
 
       const { data, error } = await q
       if (error) throw error
 
       const result = data ?? []
       _listCache = result
+      _listCachedUserId = userId
       _listLastFetched = Date.now()
       broadcastList(result)
       return result
@@ -62,6 +72,15 @@ async function loadSettlements(
 export async function revalidateSettlements(): Promise<WeeklySettlement[]> {
   const cached = getCachedUser()
   return loadSettlements(cached?.userId ?? null, cached?.isAdmin ?? false, true)
+}
+
+/** 사용자 전환(로그아웃/로그인) 시 settlements 캐시 완전 초기화 */
+export function clearSettlementsCache() {
+  _listCache = null
+  _listPromise = null
+  _listLastFetched = 0
+  _listCachedUserId = undefined
+  broadcastList([])
 }
 
 /** 특정 정산 ID를 목록에서 제거 (삭제 직후 낙관적 UI) */

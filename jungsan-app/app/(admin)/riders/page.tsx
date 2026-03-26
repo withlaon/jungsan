@@ -400,8 +400,11 @@ export default function RidersPage() {
     : activeTab === 'active' ? riders.filter(r => r.status === 'active')
     : riders.filter(r => r.status === 'inactive')
 
+  const searchLower = search.toLowerCase()
   const filtered = tabFiltered.filter(r =>
-    r.name.includes(search) || (r.phone ?? '').includes(search) || (r.rider_username ?? '').includes(search)
+    r.name.toLowerCase().includes(searchLower) ||
+    (r.phone ?? '').toLowerCase().includes(searchLower) ||
+    (r.rider_username ?? '').toLowerCase().includes(searchLower)
   )
 
   // 이름순 정렬 (한국어 로케일)

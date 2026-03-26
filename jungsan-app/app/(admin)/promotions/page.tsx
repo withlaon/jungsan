@@ -213,7 +213,7 @@ export default function PromotionsPage() {
     setLoading(true)
     try {
       let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
-      if (!isAdmin && userId) q = q.eq('user_id', userId)
+      if (userId) q = q.eq('user_id', userId)
       const promoRes = await q
       if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
     } catch (e) {

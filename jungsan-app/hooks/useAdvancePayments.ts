@@ -34,7 +34,7 @@ async function loadPayments(
         .from('advance_payments')
         .select('*, riders(*)')
         .order('paid_date', { ascending: false })
-      if (!isAdmin && userId) q = q.eq('user_id', userId)
+      if (userId) q = q.eq('user_id', userId)
 
       const { data, error } = await q
       if (error) throw error

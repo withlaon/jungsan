@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Wallet, AlertCircle, Trash2, RotateCcw, Search, ChevronDown } from 'lucide-react'
+import { Plus, Wallet, AlertCircle, Trash2, RotateCcw, Search, ChevronDown, Pencil } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -76,16 +76,15 @@ function RiderSearchSelect({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
-  const filtered = useMemo(
-    () =>
-      riders.filter(
-        r =>
-          r.name.includes(search) ||
-          (r.rider_username ?? '').includes(search) ||
-          (r.phone ?? '').includes(search),
-      ),
-    [riders, search],
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return riders.filter(
+      r =>
+        r.name.toLowerCase().includes(q) ||
+        (r.rider_username ?? '').toLowerCase().includes(q) ||
+        (r.phone ?? '').toLowerCase().includes(q),
+    )
+  }, [riders, search])
 
   const selected = riders.find(r => r.id === value)
 
@@ -154,6 +153,11 @@ export default function AdvancePaymentsPage() {
   const [advanceForm, setAdvanceForm] = useState(emptyForm)
   const [recoveryForm, setRecoveryForm] = useState(emptyForm)
 
+  // 수정 관련 상태
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<PaymentWithRider | null>(null)
+  const [editForm, setEditForm] = useState(emptyForm)
+
   const handleSave = async (type: 'advance' | 'recovery') => {
     const form = type === 'advance' ? advanceForm : recoveryForm
     if (!form.rider_id || !form.amount || !form.week) {
@@ -183,6 +187,49 @@ export default function AdvancePaymentsPage() {
     setSaving(false)
     if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
     else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
+    revalidatePayments()
+  }
+
+  const openEdit = (p: PaymentWithRider) => {
+    setEditingPayment(p)
+    setEditForm({
+      rider_id: p.rider_id,
+      amount: String(p.amount),
+      week: p.paid_date,
+      memo: p.memo ?? '',
+    })
+    setEditOpen(true)
+  }
+
+  const handleUpdate = async () => {
+    if (!editingPayment) return
+    if (!editForm.rider_id || !editForm.amount || !editForm.week) {
+      toast.error('라이더, 금액, 주간을 모두 입력해주세요.')
+      return
+    }
+    const amount = parseInt(editForm.amount.replace(/,/g, ''))
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('올바른 금액을 입력해주세요.')
+      return
+    }
+
+    setSaving(true)
+    const { error } = await supabase
+      .from('advance_payments')
+      .update({
+        rider_id: editForm.rider_id,
+        amount,
+        paid_date: editForm.week,
+        memo: editForm.memo || null,
+      })
+      .eq('id', editingPayment.id)
+
+    if (error) { toast.error('수정 실패: ' + error.message); setSaving(false); return }
+
+    toast.success('수정되었습니다.')
+    setSaving(false)
+    setEditOpen(false)
+    setEditingPayment(null)
     revalidatePayments()
   }
 
@@ -359,7 +406,7 @@ export default function AdvancePaymentsPage() {
                 <TableHead className="text-slate-400">지급 주간</TableHead>
                 <TableHead className="text-slate-400">메모</TableHead>
                 <TableHead className="text-slate-400">공제 여부</TableHead>
-                <TableHead className="text-slate-400 text-right">관리</TableHead>
+                <TableHead className="text-slate-400 text-right w-28">관리</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -380,11 +427,18 @@ export default function AdvancePaymentsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost"
-                        onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
-                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost"
+                          onClick={() => openEdit(p)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 h-8 px-2">
+                          <Pencil className="h-3.5 w-3.5 mr-1" />수정
+                        </Button>
+                        <Button size="sm" variant="ghost"
+                          onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
+                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -410,7 +464,7 @@ export default function AdvancePaymentsPage() {
                 <TableHead className="text-slate-400">금액</TableHead>
                 <TableHead className="text-slate-400">회수 주간</TableHead>
                 <TableHead className="text-slate-400">메모</TableHead>
-                <TableHead className="text-slate-400 text-right">관리</TableHead>
+                <TableHead className="text-slate-400 text-right w-28">관리</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -426,11 +480,18 @@ export default function AdvancePaymentsPage() {
                     <TableCell className="text-slate-300 text-sm">{weekLabel(p.paid_date)}</TableCell>
                     <TableCell className="text-slate-400 text-sm">{p.memo ?? '-'}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost"
-                        onClick={() => handleDelete(p.id, p.riders?.name, 'recovery')}
-                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-3">
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost"
+                          onClick={() => openEdit(p)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 h-8 px-2">
+                          <Pencil className="h-3.5 w-3.5 mr-1" />수정
+                        </Button>
+                        <Button size="sm" variant="ghost"
+                          onClick={() => handleDelete(p.id, p.riders?.name, 'recovery')}
+                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -441,6 +502,29 @@ export default function AdvancePaymentsPage() {
       </Card>
 
     </>)}
+
+      {/* 수정 다이얼로그 */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-blue-400" />
+              {editingPayment?.type === 'recovery' ? '회수 내역 수정' : '선지급금 수정'}
+            </DialogTitle>
+          </DialogHeader>
+          {renderForm(
+            editingPayment?.type === 'recovery' ? 'recovery' : 'advance',
+            editForm,
+            setEditForm,
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)} className="text-slate-400 hover:text-white">취소</Button>
+            <Button onClick={handleUpdate} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+              {saving ? '저장 중...' : '수정'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 선지급금 등록 다이얼로그 */}
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
+import { clearSettlementsCache } from '@/hooks/useSettlements'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -254,6 +255,7 @@ export function Sidebar() {
   const handleLogout = () => {
     // 캐시 및 브라우저 스토리지 즉시 초기화
     clearUserCache()
+    clearSettlementsCache()
     try { localStorage.clear() } catch { /* ignore */ }
     try { sessionStorage.clear() } catch { /* ignore */ }
 

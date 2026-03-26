@@ -18,9 +18,9 @@ function broadcast(data: Rider[]) {
 }
 
 async function loadRiders(force = false): Promise<Rider[]> {
-  // force 모드: 기존 캐시·진행 중 요청 무시하고 강제 재요청
+  // force 모드: 진행 중 요청만 취소하고 새 요청 시작
+  // _cache는 null로 만들지 않음 → 탭 이동 시 기존 데이터 유지해 로딩 freeze 방지
   if (force) {
-    _cache = null
     _promise = null
   }
 

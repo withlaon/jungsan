@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko">
       <body className={geist.className}>
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" duration={2000} />
       </body>
     </html>
   )

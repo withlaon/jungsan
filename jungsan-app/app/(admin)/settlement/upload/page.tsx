@@ -149,19 +149,19 @@ export default function SettlementUploadPage() {
   }
   const fetchManagementFees = async () => {
     let q = supabase.from('management_fees').select('*')
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
+    if (userId) q = q.eq('user_id', userId)
     const { data } = await q
     if (data) setManagementFees(data as ManagementFee[])
   }
   const fetchInsuranceFees = async () => {
     let q = supabase.from('insurance_fees').select('*')
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
+    if (userId) q = q.eq('user_id', userId)
     const { data } = await q
     if (data) setInsuranceFees(data as InsuranceFee[])
   }
   const fetchPromotionsCache = async () => {
-    let q = supabase.from('promotions').select('*').or('settlement_id.is.null')
-    if (!isAdmin && userId) q = q.eq('user_id', userId)
+    let q = supabase.from('promotions').select('*').is('settlement_id', null)
+    if (userId) q = q.eq('user_id', userId)
     const { data } = await q
     if (data) setPromotionsCache(data as Promotion[])
   }
@@ -394,8 +394,8 @@ export default function SettlementUploadPage() {
       }
 
       const [promoRes, advanceRes] = await Promise.all([
-        (() => { let q = supabase.from('promotions').select('*').or('settlement_id.is.null'); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-        (() => { let q = supabase.from('advance_payments').select('*').is('deducted_settlement_id', null); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('promotions').select('*').is('settlement_id', null); if (userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('advance_payments').select('*').is('deducted_settlement_id', null); if (userId) q = q.eq('user_id', userId); return q })(),
       ])
       const promotions: Promotion[] = promoRes.data ?? []
       const advances: AdvancePayment[] = advanceRes.data ?? []

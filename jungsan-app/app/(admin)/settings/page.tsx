@@ -184,8 +184,8 @@ export default function SettingsPage() {
     setLoading(true)
     try {
       const [feesRes, insRes] = await Promise.all([
-        (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
-        (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (!isAdmin && userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
       ])
       if (feesRes.data) setFees(feesRes.data as FeeWithRider[])
       if (insRes.data) setInsuranceFees(insRes.data as InsuranceFeeWithRider[])
