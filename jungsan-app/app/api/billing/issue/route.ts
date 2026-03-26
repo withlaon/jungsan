@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // 기존 구독 조회 (없으면 생성)
     const { data: subscription } = await admin
       .from('subscriptions')
-      .select('status, trial_ends_at')
+      .select('status, trial_ends_at, next_billing_at')
       .eq('user_id', user.id)
       .single()
 
