@@ -231,7 +231,7 @@ export default function SubscriptionPage() {
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <CreditCard className="h-6 w-6 text-blue-400" />
-          구독 관리
+          구독 결제 관리
         </h1>
         <p className="text-slate-400 text-sm mt-1">정산타임 월 구독 및 결제 수단을 관리합니다.</p>
       </div>

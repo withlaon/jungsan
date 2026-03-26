@@ -72,9 +72,8 @@ const navItems = [
   { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload     },
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
   { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
-  { href: '/rider-site',         label: '라이더사이트',   icon: Globe      },
-  { href: '/subscription',       label: '구독 관리',      icon: CreditCard },
-  { href: '/payment-test',       label: 'KCP 결제테스트', icon: Wallet     },
+  { href: '/rider-site',         label: '라이더사이트',      icon: Globe      },
+  { href: '/subscription',       label: '구독 결제 관리',    icon: CreditCard },
 ]
 
 const bottomNavItems = [
