@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bike, Loader2, CheckCircle, XCircle, ArrowLeft, Package } from 'lucide-react'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken'
+type BizStatus = 'idle' | 'checking' | 'available' | 'taken'
 type Platform = 'baemin' | 'coupang'
 
 const PLATFORMS: { id: Platform; label: string; desc: string; color: string; border: string; icon: React.ReactNode }[] = [
@@ -48,6 +49,7 @@ export default function SignupPage() {
     email: '',
   })
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
+  const [bizStatus, setBizStatus] = useState<BizStatus>('idle')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -57,6 +59,22 @@ export default function SignupPage() {
       const val = e.target.value.trim().toLowerCase()
       setUsernameStatus(val === 'admin' ? 'taken' : 'idle')
     }
+    if (key === 'business_number') {
+      setBizStatus('idle')
+    }
+  }
+
+  // 사업자등록번호 자동 형식화: 숫자만 추출 후 000-00-00000 형태로 변환
+  const handleBizNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/[^0-9]/g, '')
+    let formatted = digits
+    if (digits.length > 5) {
+      formatted = digits.slice(0, 3) + '-' + digits.slice(3, 5) + '-' + digits.slice(5, 10)
+    } else if (digits.length > 3) {
+      formatted = digits.slice(0, 3) + '-' + digits.slice(3)
+    }
+    setForm(prev => ({ ...prev, business_number: formatted }))
+    setBizStatus('idle')
   }
 
   const checkUsername = async () => {
@@ -76,6 +94,20 @@ export default function SignupPage() {
     setError('')
     const { data: exists } = await supabase.rpc('check_username_exists', { p_username: username })
     setUsernameStatus(exists ? 'taken' : 'available')
+  }
+
+  const checkBusinessNumber = async () => {
+    const biz = form.business_number.trim()
+    const digits = biz.replace(/[^0-9]/g, '')
+    if (!biz) return
+    if (digits.length !== 10) {
+      setError('사업자등록번호는 10자리 숫자로 입력해주세요. (예: 000-00-00000)')
+      return
+    }
+    setBizStatus('checking')
+    setError('')
+    const { data: exists } = await supabase.rpc('check_business_number_exists', { p_business_number: biz })
+    setBizStatus(exists ? 'taken' : 'available')
   }
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -104,6 +136,15 @@ export default function SignupPage() {
     }
     if (!form.company_name.trim() || !form.manager_name.trim() || !form.business_number.trim() || !form.phone.trim() || !form.email.trim()) {
       setError('필수 항목을 모두 입력해주세요.')
+      return
+    }
+    const bizDigits = form.business_number.replace(/[^0-9]/g, '')
+    if (bizDigits.length !== 10) {
+      setError('사업자등록번호는 10자리 숫자로 입력해주세요. (예: 000-00-00000)')
+      return
+    }
+    if (bizStatus !== 'available') {
+      setError('사업자등록번호 중복 확인을 먼저 해주세요.')
       return
     }
 
@@ -137,7 +178,13 @@ export default function SignupPage() {
     })
 
     if (profileError) {
-      setError('프로필 저장 실패: ' + profileError.message)
+      const msg = profileError.message
+      if (msg.includes('이미 등록된 사업자등록번호')) {
+        setError('이미 사용 중인 사업자등록번호입니다. 확인 후 다시 시도해주세요.')
+        setBizStatus('taken')
+      } else {
+        setError('프로필 저장 실패: ' + msg)
+      }
       setLoading(false)
       return
     }
@@ -318,14 +365,40 @@ export default function SignupPage() {
                 <Label className="text-slate-300">
                   사업자등록번호 <span className="text-red-400">*</span>
                 </Label>
-                <Input
-                  type="text"
-                  placeholder="000-00-00000"
-                  value={form.business_number}
-                  onChange={setField('business_number')}
-                  required
-                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="000-00-00000"
+                    value={form.business_number}
+                    onChange={handleBizNumberChange}
+                    maxLength={12}
+                    required
+                    className={`flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-500
+                      ${bizStatus === 'available' ? 'border-emerald-500 focus:border-emerald-500' : ''}
+                      ${bizStatus === 'taken' ? 'border-red-500 focus:border-red-500' : ''}`}
+                  />
+                  <Button
+                    type="button"
+                    onClick={checkBusinessNumber}
+                    disabled={!form.business_number || bizStatus === 'checking'}
+                    variant="outline"
+                    className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white shrink-0"
+                  >
+                    {bizStatus === 'checking' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : '중복확인'}
+                  </Button>
+                </div>
+                {bizStatus === 'available' && (
+                  <p className="flex items-center gap-1 text-emerald-400 text-xs">
+                    <CheckCircle className="h-3.5 w-3.5" /> 사용 가능한 사업자등록번호입니다.
+                  </p>
+                )}
+                {bizStatus === 'taken' && (
+                  <p className="flex items-center gap-1 text-red-400 text-xs">
+                    <XCircle className="h-3.5 w-3.5" /> 이미 등록된 사업자등록번호입니다.
+                  </p>
+                )}
               </div>
 
               {/* 담당자 + 연락처 */}
