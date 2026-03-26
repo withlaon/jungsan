@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayment } from "@/lib/portone/server";
 import { savePayment, updatePaymentStatus } from "@/lib/portone/db";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const IS_TEST = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY?.startsWith(
   "channel-key-"
@@ -54,7 +55,39 @@ export async function POST(request: NextRequest) {
 
       console.log(`[웹훅] 결제 완료 - paymentId: ${paymentId}, 금액: ${payment.amount.total}원`);
 
-      // TODO: 추가 비즈니스 로직 (예: 구독 활성화, 이메일 발송 등)
+      // 구독 자동 결제(빌링키) 결제 완료 처리
+      // paymentId 패턴 "sub-{userId8}-..." 이면 구독 결제
+      if (paymentId.startsWith('sub-')) {
+        try {
+          const admin = createAdminClient();
+          const now = new Date();
+          const nextBillingAt = new Date(now);
+          nextBillingAt.setMonth(nextBillingAt.getMonth() + 1);
+
+          // payment DB에서 user_id 조회
+          const { data: paymentRow } = await admin
+            .from('payments')
+            .select('user_id')
+            .eq('payment_id', paymentId)
+            .single();
+
+          if (paymentRow?.user_id) {
+            await admin.from('subscriptions').update({
+              status: 'active',
+              failed_count: 0,
+              last_payment_id: paymentId,
+              last_payment_at: now.toISOString(),
+              current_period_start: now.toISOString(),
+              current_period_end: nextBillingAt.toISOString(),
+              next_billing_at: nextBillingAt.toISOString(),
+            }).eq('user_id', paymentRow.user_id);
+
+            console.log(`[웹훅] 구독 갱신 완료 - userId: ${paymentRow.user_id}`);
+          }
+        } catch (subErr) {
+          console.error('[웹훅] 구독 갱신 실패:', subErr);
+        }
+      }
 
       return NextResponse.json({ success: true });
     }

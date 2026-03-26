@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Menu,
   X,
+  CreditCard,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
@@ -63,15 +64,16 @@ import {
 } from '@/components/ui/dialog'
 
 const navItems = [
-  { href: '/dashboard',          label: '주간정산현황',   icon: BarChart3 },
-  { href: '/riders',             label: '라이더 관리',    icon: Users     },
-  { href: '/advance-payments',   label: '선지급금 관리',  icon: Wallet    },
-  { href: '/promotions',         label: '프로모션 설정',  icon: Gift      },
-  { href: '/settings',           label: '관리비 설정',    icon: Settings  },
+  { href: '/dashboard',          label: '주간정산현황',   icon: BarChart3  },
+  { href: '/riders',             label: '라이더 관리',    icon: Users      },
+  { href: '/advance-payments',   label: '선지급금 관리',  icon: Wallet     },
+  { href: '/promotions',         label: '프로모션 설정',  icon: Gift       },
+  { href: '/settings',           label: '관리비 설정',    icon: Settings   },
   { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload     },
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
   { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
   { href: '/rider-site',         label: '라이더사이트',   icon: Globe      },
+  { href: '/subscription',       label: '구독 관리',      icon: CreditCard },
   { href: '/payment-test',       label: 'KCP 결제테스트', icon: Wallet     },
 ]
 
