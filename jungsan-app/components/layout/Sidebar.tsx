@@ -262,8 +262,8 @@ export function Sidebar() {
     // signOut은 백그라운드에서 실행 (응답 기다리지 않고 즉시 이동)
     supabase.auth.signOut({ scope: 'global' }).catch(() => {})
 
-    // 랜딩 페이지로 완전 이동 (로그인 버튼 클릭 시 세션 재사용 방지용 logout 파라미터)
-    window.location.href = 'https://jungsan-iol8.vercel.app/?logout=1'
+    // 로그인 페이지로 이동
+    router.replace('/login')
   }
 
   const handleWithdraw = async () => {

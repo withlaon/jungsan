@@ -1,34 +1,61 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useInactivityLogout } from '@/hooks/useInactivityLogout'
+import { clearUserCache } from '@/hooks/useUser'
+import { clearSettlementsCache } from '@/hooks/useSettlements'
 import { toast } from 'sonner'
 
 /**
  * 관리자 레이아웃에 삽입되는 비활성 자동 로그아웃 감시 컴포넌트
  * - 1시간 무활동 시 Supabase 세션 삭제 + 로그인 페이지 이동
  * - 5분 전 toast 경고
- * - 클라이언트 세션이 없으면 서버 쿠키도 정리 후 로그인으로 이동
- *
- * NOTE: pagehide 기반 signout은 제거.
- * pagehide는 F5 새로고침 시에도 발생하여 쿠키가 지워지고 로그아웃되는 버그가 있었음.
- * 세션 쿠키는 브라우저 완전 종료(모든 창 닫기) 시 OS가 자동으로 삭제한다.
+ * - 탭 포커스 복귀 시 세션 유효성 자동 재검증
+ * - 세션이 없으면 로그인 페이지로 즉시 이동
  */
 export function InactivityGuard() {
   const router = useRouter()
   const supabase = createClient()
+  const redirectingRef = useRef(false)
 
-  // 세션이 없으면(브라우저 재시작 등) 쿠키도 정리하고 로그인 페이지로 이동
+  const doLogout = async (reason: string) => {
+    if (redirectingRef.current) return
+    redirectingRef.current = true
+    clearUserCache()
+    clearSettlementsCache()
+    try { localStorage.clear() } catch { /* ignore */ }
+    try { sessionStorage.clear() } catch { /* ignore */ }
+    await supabase.auth.signOut().catch(() => {})
+    toast.info(reason, { id: 'auto-logout', duration: 4000 })
+    router.replace('/login')
+  }
+
+  // 마운트 시 세션 확인 (브라우저 재시작·쿠키 만료 등)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        supabase.auth.signOut().finally(() => {
-          router.replace('/')
-        })
+        doLogout('로그인이 필요합니다.')
       }
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 탭 포커스 복귀 시 세션 재검증 (장시간 자리비움 대응)
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return
+      if (redirectingRef.current) return
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        doLogout('세션이 만료되어 자동 로그아웃되었습니다.')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -41,9 +68,7 @@ export function InactivityGuard() {
 
   const handleLogout = async () => {
     toast.dismiss('inactivity-warn')
-    await supabase.auth.signOut()
-    toast.info('장시간 미사용으로 자동 로그아웃되었습니다.')
-    router.replace('/')
+    await doLogout('장시간 미사용으로 자동 로그아웃되었습니다.')
   }
 
   useInactivityLogout(handleLogout, handleWarn)

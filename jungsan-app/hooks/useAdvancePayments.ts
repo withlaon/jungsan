@@ -12,7 +12,7 @@ let _promise: Promise<PaymentWithRider[]> | null = null
 let _lastFetched = 0
 const _listeners = new Set<(data: PaymentWithRider[]) => void>()
 
-const STALE_MS = 30_000
+const STALE_MS = 300_000  // 5분
 
 function broadcast(data: PaymentWithRider[]) {
   _listeners.forEach(fn => fn(data))

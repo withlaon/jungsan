@@ -12,7 +12,7 @@ let _listLastFetched = 0
 let _listCachedUserId: string | null | undefined = undefined  // 캐시가 어떤 userId로 로드됐는지 추적 (undefined=초기 미로드)
 const _listListeners = new Set<(data: WeeklySettlement[]) => void>()
 
-const LIST_STALE_MS = 30_000
+const LIST_STALE_MS = 300_000  // 5분
 
 function broadcastList(data: WeeklySettlement[]) {
   _listListeners.forEach(fn => fn(data))
@@ -29,14 +29,8 @@ async function loadSettlements(
 ): Promise<WeeklySettlement[]> {
   if (!userId && !isAdmin) return []
 
-  // 사용자가 바뀐 경우 캐시 무효화 (다른 계정 데이터 노출 방지)
-  if (_listCachedUserId !== undefined && _listCachedUserId !== userId && !isAdmin) {
-    _listCache = null
-    _listPromise = null
-    _listLastFetched = 0
-  }
-
-  // force: _listCache는 null로 만들지 않음 → 탭 이동 시 기존 데이터 유지해 로딩 freeze 방지
+  // force 갱신 시 _promise만 초기화 (_listCache 유지 → 탭 이동 시 기존 데이터 즉시 표시)
+  // 캐시 완전 초기화는 로그아웃 시 clearSettlementsCache()에서만 처리
   if (force) { _listPromise = null }
   if (_listPromise) return _listPromise
 

@@ -184,13 +184,16 @@ const initForm = () => ({
   description: '',
 })
 
+// 탭 재방문 시 로딩 없애기 위한 모듈 레벨 캐시
+let _promoCache: PromotionWithRider[] | null = null
+
 export default function PromotionsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active')
-  const [promotions, setPromotions] = useState<PromotionWithRider[]>([])
-  const [loading, setLoading] = useState(true)
+  const [promotions, setPromotions] = useState<PromotionWithRider[]>(_promoCache ?? [])
+  const [loading, setLoading] = useState(!_promoCache)
   const [regOpen, setRegOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(initForm)
@@ -205,21 +208,35 @@ export default function PromotionsPage() {
   const setDE = (patch: Partial<ReturnType<typeof initForm>>) => setDetailEditForm(f => ({ ...f, ...patch }))
 
   useEffect(() => {
-    if (isAdmin || userId) fetchData()
-  }, [userId, isAdmin])
+    if (userLoading) return
+    if (!isAdmin && !userId) return
+    if (_promoCache) {
+      // 캐시 존재 시 즉시 표시 후 백그라운드 갱신
+      setPromotions(_promoCache)
+      setLoading(false)
+      fetchData(true)
+    } else {
+      fetchData()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isAdmin, userLoading])
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
       if (userId) q = q.eq('user_id', userId)
       const promoRes = await q
-      if (promoRes.data) setPromotions(promoRes.data as PromotionWithRider[])
+      if (promoRes.data) {
+        const data = promoRes.data as PromotionWithRider[]
+        _promoCache = data
+        setPromotions(data)
+      }
     } catch (e) {
       console.error('[PromotionsPage] 로드 실패:', e)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -327,6 +344,7 @@ export default function PromotionsPage() {
     if (error) { toast.error('삭제 실패'); return }
     toast.success('삭제되었습니다.')
     const updated = promotions.filter(p => p.id !== id)
+    _promoCache = updated
     setPromotions(updated)
     // 상세 다이얼로그 갱신
     if (detailGroup) {

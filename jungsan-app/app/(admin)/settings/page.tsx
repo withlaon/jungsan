@@ -148,14 +148,18 @@ const initGeneral = () => ({item_name:'',rider_ids:[] as string[],amount:'',date
 const initCall    = () => ({rider_ids:[] as string[],amount_per_call:'',date_mode:'none' as 'week'|'deadline'|'none',week_start:weekOptions[0]?.value??'',deadline_date:'',memo:''})
 const initInsurance = () => ({rider_ids:[] as string[],employment_fee:'',accident_fee:'',date_mode:'none' as 'week'|'deadline'|'none',week_start:weekOptions[0]?.value??'',deadline_date:'',memo:''})
 
+// 탭 재방문 시 로딩 없애기 위한 모듈 레벨 캐시
+let _feesCache: FeeWithRider[] | null = null
+let _insCache: InsuranceFeeWithRider[] | null = null
+
 export default function SettingsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active')
-  const [fees, setFees] = useState<FeeWithRider[]>([])
-  const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>([])
-  const [loading, setLoading] = useState(true)
+  const [fees, setFees] = useState<FeeWithRider[]>(_feesCache ?? [])
+  const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>(_insCache ?? [])
+  const [loading, setLoading] = useState(!_feesCache)
   const [dialogType, setDialogType] = useState<DialogType>(null)
   const [saving, setSaving] = useState(false)
   const [generalForm, setGeneralForm] = useState(initGeneral)
@@ -176,23 +180,39 @@ export default function SettingsPage() {
   const [detailSaving, setDetailSaving] = useState(false)
 
   useEffect(()=>{
-    if (isAdmin || userId) fetchData()
-  }, [userId, isAdmin])
+    if (userLoading) return
+    if (!isAdmin && !userId) return
+    if (_feesCache && _insCache) {
+      setFees(_feesCache)
+      setInsuranceFees(_insCache)
+      setLoading(false)
+      fetchData(true)
+    } else {
+      fetchData()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isAdmin, userLoading])
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const [feesRes, insRes] = await Promise.all([
         (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
         (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
       ])
-      if (feesRes.data) setFees(feesRes.data as FeeWithRider[])
-      if (insRes.data) setInsuranceFees(insRes.data as InsuranceFeeWithRider[])
+      if (feesRes.data) {
+        _feesCache = feesRes.data as FeeWithRider[]
+        setFees(_feesCache)
+      }
+      if (insRes.data) {
+        _insCache = insRes.data as InsuranceFeeWithRider[]
+        setInsuranceFees(_insCache)
+      }
     } catch (e) {
       console.error('[SettingsPage] 로드 실패:', e)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -274,6 +294,7 @@ export default function SettingsPage() {
     if (error){toast.error('삭제 실패');return}
     toast.success('삭제되었습니다.')
     const updated=fees.filter(f=>f.id!==id)
+    _feesCache = updated
     setFees(updated)
     if (detailFee){
       const fresh=updated.filter(f=>[...detailFee.items].map(x=>x.id).includes(f.id)||feeGroupKey(f)===detailFee.key)
@@ -294,6 +315,7 @@ export default function SettingsPage() {
     if (error){toast.error('삭제 실패');return}
     toast.success('삭제되었습니다.')
     const updated=insuranceFees.filter(f=>f.id!==id)
+    _insCache = updated
     setInsuranceFees(updated)
     if (detailIns){
       const freshGroup=updated.filter(f=>insGroupKey(f)===detailIns.key)
