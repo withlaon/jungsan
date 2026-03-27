@@ -223,6 +223,15 @@ export default function PromotionsPage() {
     }
   }
 
+  // ── 프로모션 중복 라이더 ID (2개 이상 그룹에 속한 라이더) ──
+  const duplicatePromoRiderIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    promotions.forEach(p => {
+      if (p.rider_id) counts.set(p.rider_id, (counts.get(p.rider_id) ?? 0) + 1)
+    })
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([id]) => id))
+  }, [promotions])
+
   // ── 프로모션 그룹핑 ──
   const groups = useMemo<PromoGroup[]>(() => {
     const map = new Map<string, PromotionWithRider[]>()
@@ -489,7 +498,26 @@ export default function PromotionsPage() {
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-slate-500 w-10 shrink-0">대상</span>
-                    <span className="text-slate-300 truncate">{riderText(g)}</span>
+                    <span className="truncate">
+                      {(() => {
+                        const named = g.promos.filter(p => p.riders?.name)
+                        if (named.length === 0) return <span className="text-slate-300">전체 라이더</span>
+                        const shown = named.slice(0, 3)
+                        return (
+                          <>
+                            {shown.map((p, i) => (
+                              <span key={p.id}>
+                                {i > 0 && <span className="text-slate-400">, </span>}
+                                <span className={p.rider_id && duplicatePromoRiderIds.has(p.rider_id) ? 'text-red-400 font-semibold' : 'text-slate-300'}>
+                                  {p.riders!.name}
+                                </span>
+                              </span>
+                            ))}
+                            {named.length > 3 && <span className="text-slate-400"> 외 {named.length - 3}명</span>}
+                          </>
+                        )
+                      })()}
+                    </span>
                   </div>
                 </div>
 
@@ -577,19 +605,23 @@ export default function PromotionsPage() {
                       )}
                       {namedPromos.length > 0 && (
                         <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                          {namedPromos.map(p => (
-                            <div key={p.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <UserCircle className="h-4 w-4 text-slate-500" />
-                                <span className="text-white text-sm font-medium">{p.riders!.name}</span>
-                                {p.riders!.rider_username && <span className="text-slate-500 text-xs">@{p.riders!.rider_username}</span>}
+                          {namedPromos.map(p => {
+                            const isDup = !!(p.rider_id && duplicatePromoRiderIds.has(p.rider_id))
+                            return (
+                              <div key={p.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${isDup ? 'bg-red-900/10 border-red-700/40' : 'bg-slate-800/50 border-slate-700/50'}`}>
+                                <div className="flex items-center gap-2">
+                                  <UserCircle className={`h-4 w-4 ${isDup ? 'text-red-500' : 'text-slate-500'}`} />
+                                  <span className={`text-sm font-medium ${isDup ? 'text-red-400' : 'text-white'}`}>{p.riders!.name}</span>
+                                  {p.riders!.rider_username && <span className="text-slate-500 text-xs">@{p.riders!.rider_username}</span>}
+                                  {isDup && <span className="text-xs text-red-400/80 bg-red-900/30 px-1.5 py-0.5 rounded">중복</span>}
+                                </div>
+                                <button type="button" onClick={() => handleDeleteOne(p.id)}
+                                  className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-900/20">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </div>
-                              <button type="button" onClick={() => handleDeleteOne(p.id)}
-                                className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-900/20">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                       {namedPromos.length === 0 && unnamedPromos.length === 0 && (

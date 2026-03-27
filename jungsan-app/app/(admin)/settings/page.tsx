@@ -363,12 +363,42 @@ export default function SettingsPage() {
     setInsDetailTab('info'); setDetailSaving(false); setDetailIns(null); fetchData()
   }
 
-  // ── 라이더 이름 요약 ──
-  const riderSummary = (items: Array<{riders: Rider|null}>) => {
-    const named=items.filter(i=>i.riders?.name).map(i=>i.riders!.name).sort((a,b)=>a.localeCompare(b,'ko'))
-    if (named.length===0) return '전체 라이더'
-    if (named.length<=3) return named.join(', ')
-    return `${named.slice(0,3).join(', ')} 외 ${named.length-3}명`
+  // ── 관리비/보험비 중복 라이더 ID 계산 ──
+  const duplicateMgmtRiderIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    fees.forEach(f => { if (f.rider_id) counts.set(f.rider_id, (counts.get(f.rider_id) ?? 0) + 1) })
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([id]) => id))
+  }, [fees])
+
+  const duplicateInsRiderIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    insuranceFees.forEach(f => { if (f.rider_id) counts.set(f.rider_id, (counts.get(f.rider_id) ?? 0) + 1) })
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([id]) => id))
+  }, [insuranceFees])
+
+  // ── 라이더 이름 요약 (중복 라이더 빨간색) ──
+  const renderRiderSummary = (
+    items: Array<{ rider_id?: string | null; riders: Rider | null }>,
+    dupIds: Set<string>,
+  ) => {
+    const named = items
+      .filter(i => i.riders?.name)
+      .sort((a, b) => a.riders!.name.localeCompare(b.riders!.name, 'ko'))
+    if (named.length === 0) return <span className="text-slate-300">전체 라이더</span>
+    const shown = named.slice(0, 3)
+    return (
+      <>
+        {shown.map((i, idx) => (
+          <span key={i.rider_id ?? idx}>
+            {idx > 0 && <span className="text-slate-400">, </span>}
+            <span className={i.rider_id && dupIds.has(i.rider_id) ? 'text-red-400 font-semibold' : 'text-slate-300'}>
+              {i.riders!.name}
+            </span>
+          </span>
+        ))}
+        {named.length > 3 && <span className="text-slate-400"> 외 {named.length - 3}명</span>}
+      </>
+    )
   }
 
   return (
@@ -444,7 +474,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-slate-500 w-10 shrink-0">대상</span>
-                      <span className="text-slate-300 truncate">{riderSummary(g.items)}</span>
+                      <span className="truncate">{renderRiderSummary(g.items, duplicateMgmtRiderIds)}</span>
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between">
@@ -511,7 +541,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-slate-500 w-14 shrink-0">대상</span>
-                      <span className="text-slate-300 truncate">{riderSummary(g.items)}</span>
+                      <span className="truncate">{renderRiderSummary(g.items, duplicateInsRiderIds)}</span>
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between">
@@ -577,12 +607,20 @@ export default function SettingsPage() {
                       )}
                       {namedItems.length>0&&(
                         <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                          {namedItems.map(i=>(
-                            <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                              <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-slate-500"/><span className="text-white text-sm font-medium">{i.riders!.name}</span>{i.riders!.rider_username&&<span className="text-slate-500 text-xs">@{i.riders!.rider_username}</span>}</div>
-                              <button type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
-                            </div>
-                          ))}
+                          {namedItems.map(i=>{
+                            const isDup = !!(i.rider_id && duplicateMgmtRiderIds.has(i.rider_id))
+                            return (
+                              <div key={i.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${isDup ? 'bg-red-900/10 border-red-700/40' : 'bg-slate-800/50 border-slate-700/50'}`}>
+                                <div className="flex items-center gap-2">
+                                  <UserCircle className={`h-4 w-4 ${isDup ? 'text-red-500' : 'text-slate-500'}`}/>
+                                  <span className={`text-sm font-medium ${isDup ? 'text-red-400' : 'text-white'}`}>{i.riders!.name}</span>
+                                  {i.riders!.rider_username&&<span className="text-slate-500 text-xs">@{i.riders!.rider_username}</span>}
+                                  {isDup && <span className="text-xs text-red-400/80 bg-red-900/30 px-1.5 py-0.5 rounded">중복</span>}
+                                </div>
+                                <button type="button" onClick={()=>deleteFeeOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -673,12 +711,20 @@ export default function SettingsPage() {
                         <span className="text-slate-500 text-xs">{g.items.length}명</span>
                       </div>
                       <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                        {[...g.items].sort((a,b)=>(a.riders?.name??'').localeCompare(b.riders?.name??'','ko')).map(i=>(
-                          <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                            <div className="flex items-center gap-2"><UserCircle className="h-4 w-4 text-slate-500"/><span className="text-white text-sm font-medium">{i.riders?.name??'-'}</span>{i.riders?.rider_username&&<span className="text-slate-500 text-xs">@{i.riders.rider_username}</span>}</div>
-                            <button type="button" onClick={()=>deleteInsOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
-                          </div>
-                        ))}
+                        {[...g.items].sort((a,b)=>(a.riders?.name??'').localeCompare(b.riders?.name??'','ko')).map(i=>{
+                          const isDup = !!(i.rider_id && duplicateInsRiderIds.has(i.rider_id))
+                          return (
+                            <div key={i.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${isDup ? 'bg-red-900/10 border-red-700/40' : 'bg-slate-800/50 border-slate-700/50'}`}>
+                              <div className="flex items-center gap-2">
+                                <UserCircle className={`h-4 w-4 ${isDup ? 'text-red-500' : 'text-slate-500'}`}/>
+                                <span className={`text-sm font-medium ${isDup ? 'text-red-400' : 'text-white'}`}>{i.riders?.name??'-'}</span>
+                                {i.riders?.rider_username&&<span className="text-slate-500 text-xs">@{i.riders.rider_username}</span>}
+                                {isDup && <span className="text-xs text-red-400/80 bg-red-900/30 px-1.5 py-0.5 rounded">중복</span>}
+                              </div>
+                              <button type="button" onClick={()=>deleteInsOne(i.id)} className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-900/20"><Trash2 className="h-3.5 w-3.5"/></button>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   </div>

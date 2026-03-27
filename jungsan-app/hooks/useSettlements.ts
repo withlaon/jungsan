@@ -36,7 +36,8 @@ async function loadSettlements(
     _listLastFetched = 0
   }
 
-  if (force) { _listCache = null; _listPromise = null }
+  // force: _listCache는 null로 만들지 않음 → 탭 이동 시 기존 데이터 유지해 로딩 freeze 방지
+  if (force) { _listPromise = null }
   if (_listPromise) return _listPromise
 
   _listPromise = (async () => {

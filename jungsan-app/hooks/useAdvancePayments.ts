@@ -24,7 +24,8 @@ async function loadPayments(
   force = false,
 ): Promise<PaymentWithRider[]> {
   if (!userId && !isAdmin) return []
-  if (force) { _cache = null; _promise = null }
+  // force: _cache는 null로 만들지 않음 → 탭 이동 시 기존 데이터 유지해 로딩 freeze 방지
+  if (force) { _promise = null }
   if (_promise) return _promise
 
   _promise = (async () => {
