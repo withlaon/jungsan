@@ -65,16 +65,11 @@ export async function proxy(request: NextRequest) {
 
     // 미인증 상태에서 보호 경로 접근 → 로그인 페이지로 리다이렉트
     if (isProtected && !user) {
-      const redirectUrl = new URL('/', request.url)
+      const loginUrl = new URL('/login', request.url)
       const from = pathname + request.nextUrl.search
-      if (from && from !== '/') redirectUrl.searchParams.set('redirect', from)
-      return NextResponse.redirect(redirectUrl)
+      if (from && from !== '/') loginUrl.searchParams.set('redirect', from)
+      return NextResponse.redirect(loginUrl)
     }
-
-    // ※ 루트(/)와 /login은 서버에서 리다이렉트하지 않음
-    // 이유: Supabase 쿠키는 브라우저 종료 후에도 남을 수 있어 서버에서 /dashboard로
-    //       리다이렉트하면 세션이 끊겼음에도 대시보드로 이동하는 문제가 발생함.
-    //       클라이언트(sessionStorage)가 세션 유무를 판단해 리다이렉트를 담당함.
 
     return supabaseResponse
   } catch {
