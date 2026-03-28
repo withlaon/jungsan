@@ -37,6 +37,8 @@ async function loadSettlements(
   _listPromise = (async () => {
     try {
       const supabase = createClient()
+      // 쿼리 전 토큰 유효성 검증 및 만료 시 갱신 (장시간 비활동 후 첫 요청 보호)
+      await supabase.auth.getUser().catch(() => {})
       let q = supabase
         .from('weekly_settlements')
         .select('*')
@@ -54,9 +56,10 @@ async function loadSettlements(
       return result
     } catch (e) {
       console.error('[useSettlements] 로드 실패:', e)
-      // 기존 캐시가 있으면 유지, 없으면 빈 배열
-      if (_listCache) broadcastList(_listCache)
-      return _listCache ?? []
+      // 캐시가 있으면 캐시 유지, 없으면 빈 배열로 broadcast (로딩 영구 freeze 방지)
+      const fallback = _listCache ?? []
+      broadcastList(fallback)
+      return fallback
     }
   })().finally(() => { _listPromise = null })
 
