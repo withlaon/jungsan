@@ -15,7 +15,28 @@ export async function POST(req: NextRequest) {
       ?? 'unknown'
     const ipHash = crypto.createHash('sha256').update(ip + 'jungsan-salt').digest('hex').slice(0, 16)
 
+    // KST(UTC+9) 기준 오늘 날짜 범위 계산
+    const KST_OFFSET = 9 * 60 * 60 * 1000
+    const nowKST = new Date(Date.now() + KST_OFFSET)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const todayKST = `${nowKST.getUTCFullYear()}-${pad(nowKST.getUTCMonth() + 1)}-${pad(nowKST.getUTCDate())}`
+    const tomorrowKST = new Date(nowKST.getTime() + 24 * 60 * 60 * 1000)
+    const tomorrowStr = `${tomorrowKST.getUTCFullYear()}-${pad(tomorrowKST.getUTCMonth() + 1)}-${pad(tomorrowKST.getUTCDate())}`
+
     const supabase = createAdminClient()
+
+    // 동일 IP가 오늘(KST 0시 기준) 이미 방문한 경우 카운팅 제외
+    const { count: existing } = await supabase
+      .from('site_visits')
+      .select('*', { count: 'exact', head: true })
+      .eq('ip_hash', ipHash)
+      .gte('visited_at', `${todayKST}T00:00:00+09:00`)
+      .lt('visited_at', `${tomorrowStr}T00:00:00+09:00`)
+
+    if ((existing ?? 0) > 0) {
+      return NextResponse.json({ ok: true })
+    }
+
     await supabase.from('site_visits').insert({ path, referrer, user_agent: userAgent, ip_hash: ipHash })
 
     return NextResponse.json({ ok: true })

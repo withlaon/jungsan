@@ -30,6 +30,8 @@ async function loadRiders(force = false): Promise<Rider[]> {
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
+      // getUser()로 서버 검증 + 토큰 갱신 처리 후 세션에서 액세스 토큰 추출
+      await supabase.auth.getUser()
       const { data: { session } } = await supabase.auth.getSession()
       const headers: Record<string, string> = {}
       if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
@@ -37,6 +39,13 @@ async function loadRiders(force = false): Promise<Rider[]> {
       // force 시 브라우저 캐시 완전 우회 (타임스탬프 파라미터 + no-store)
       const url = force ? `/api/admin/riders?t=${Date.now()}` : '/api/admin/riders'
       const res = await fetch(url, { headers, ...(force ? { cache: 'no-store' } : {}) })
+
+      // API 오류(401 등) 시 기존 캐시 유지 — 오류 응답으로 캐시를 [] 로 덮지 않음
+      if (!res.ok) {
+        if (_cache) broadcast(_cache)
+        return _cache ?? []
+      }
+
       const d = await res.json()
       const data = Array.isArray(d) ? d : []
       _cache = data

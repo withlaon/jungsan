@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useInactivityLogout } from '@/hooks/useInactivityLogout'
 import { Rider, SettlementDetail, WeeklySettlement } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -106,9 +105,6 @@ export default function RiderPortalPage() {
     setSelectedId('')
     setLoginError('')
   }
-
-  // 포털 진입 후 1시간 무활동 시 자동 로그아웃
-  useInactivityLogout(handleLogout, undefined, step === 'portal')
 
   const selectedDetail = details.find(d => d.id === selectedId)
   const currentSettlement = selectedDetail?.weekly_settlements
