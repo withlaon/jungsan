@@ -209,7 +209,7 @@ export default function PromotionsPage() {
 
   useEffect(() => {
     if (userLoading) return
-    if (!isAdmin && !userId) return
+    if (!isAdmin && !userId) { setLoading(false); return }
     if (_promoCache) {
       // 캐시 존재 시 즉시 표시 후 백그라운드 갱신
       setPromotions(_promoCache)

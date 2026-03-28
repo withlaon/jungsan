@@ -15,7 +15,7 @@ const REFETCH_AFTER_MS = 5 * 60 * 1000
 /**
  * 관리자 레이아웃에 삽입되는 세션 감시 컴포넌트
  * - 탭 포커스 복귀 시 세션 유효성 자동 재검증 + 토큰 갱신
- * - 5분 이상 자리비운 후 복귀 시 모든 데이터 캐시 강제 갱신 (만료 토큰으로 실패한 데이터 복구)
+ * - 5분 이상 자리비운 후 복귀 시 모든 데이터 캐시 강제 갱신
  * - 세션이 없으면 로그인 페이지로 즉시 이동
  * - 자동 로그아웃 타이머 없음: 창 닫기/컴퓨터 끄기 시 세션 쿠키 삭제로 자동 로그아웃
  */
@@ -35,10 +35,10 @@ export function InactivityGuard() {
     router.replace('/login')
   }
 
-  // 마운트 시 세션 확인 (브라우저 재시작·쿠키 만료 등)
+  // 마운트 시 세션 확인 — getSession()은 로컬 쿠키를 읽어 네트워크 없이 즉시 반환
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         doLogout('로그인이 필요합니다.')
       }
     })
@@ -55,15 +55,24 @@ export function InactivityGuard() {
       if (document.visibilityState !== 'visible') return
       if (redirectingRef.current) return
 
-      // getUser()로 서버 검증 + 만료된 토큰 갱신 처리
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      // getSession()으로 로컬 쿠키 즉시 확인 (네트워크 없음, 락 없음)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         doLogout('세션이 만료되어 자동 로그아웃되었습니다.')
         return
       }
 
-      // 5분 이상 자리비운 경우: 모든 데이터 강제 갱신
-      // getUser()가 토큰을 갱신한 직후이므로 새 토큰으로 안전하게 재요청 가능
+      // 토큰이 만료됐거나 1분 이내 만료 예정인 경우 서버에서 갱신
+      const expiresAt = session.expires_at ? session.expires_at * 1000 : 0
+      if (expiresAt > 0 && expiresAt <= Date.now() + 60_000) {
+        const { error } = await supabase.auth.refreshSession()
+        if (error) {
+          doLogout('세션이 만료되어 자동 로그아웃되었습니다.')
+          return
+        }
+      }
+
+      // 5분 이상 자리비운 경우: 갱신된 토큰으로 모든 데이터 강제 재로드
       const awayMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0
       if (awayMs >= REFETCH_AFTER_MS) {
         revalidateRiders().catch(() => {})

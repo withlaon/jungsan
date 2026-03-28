@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
   useEffect(()=>{
     if (userLoading) return
-    if (!isAdmin && !userId) return
+    if (!isAdmin && !userId) { setLoading(false); return }
     if (_feesCache && _insCache) {
       setFees(_feesCache)
       setInsuranceFees(_insCache)

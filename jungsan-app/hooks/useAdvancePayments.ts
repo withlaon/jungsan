@@ -31,8 +31,6 @@ async function loadPayments(
   _promise = (async () => {
     try {
       const supabase = createClient()
-      // 쿼리 전 토큰 유효성 검증 및 만료 시 갱신 (장시간 비활동 후 첫 요청 보호)
-      await supabase.auth.getUser().catch(() => {})
       let q = supabase
         .from('advance_payments')
         .select('*, riders(*)')

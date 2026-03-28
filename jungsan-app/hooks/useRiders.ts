@@ -30,8 +30,6 @@ async function loadRiders(force = false): Promise<Rider[]> {
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
-      // getUser()로 서버 검증 + 토큰 갱신 처리 후 세션에서 액세스 토큰 추출
-      await supabase.auth.getUser()
       const { data: { session } } = await supabase.auth.getSession()
       const headers: Record<string, string> = {}
       if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
@@ -40,10 +38,32 @@ async function loadRiders(force = false): Promise<Rider[]> {
       const url = force ? `/api/admin/riders?t=${Date.now()}` : '/api/admin/riders'
       const res = await fetch(url, { headers, ...(force ? { cache: 'no-store' } : {}) })
 
-      // API 오류(401 등) 시 기존 캐시 유지 — 오류 응답으로 캐시를 [] 로 덮지 않음
+      // 401: 토큰 만료 가능성 → 세션 갱신 후 1회 재시도
+      if (res.status === 401) {
+        const { data: { session: newSession }, error: refreshErr } = await supabase.auth.refreshSession()
+        if (!refreshErr && newSession?.access_token) {
+          const retryHeaders = { 'Authorization': `Bearer ${newSession.access_token}` }
+          const retryRes = await fetch(`/api/admin/riders?t=${Date.now()}`, { headers: retryHeaders, cache: 'no-store' })
+          if (retryRes.ok) {
+            const d = await retryRes.json()
+            const data = Array.isArray(d) ? d : []
+            _cache = data
+            _lastFetched = Date.now()
+            broadcast(data)
+            return data
+          }
+        }
+        // 갱신 또는 재시도 실패 — 기존 캐시 유지
+        const fallback = _cache ?? []
+        broadcast(fallback)
+        return fallback
+      }
+
+      // API 오류 시 기존 캐시 유지 — 오류 응답으로 캐시를 [] 로 덮지 않음
       if (!res.ok) {
-        if (_cache) broadcast(_cache)
-        return _cache ?? []
+        const fallback = _cache ?? []
+        broadcast(fallback)
+        return fallback
       }
 
       const d = await res.json()
@@ -55,8 +75,9 @@ async function loadRiders(force = false): Promise<Rider[]> {
     } catch (e) {
       console.error('[useRiders] 로드 실패:', e)
       // 기존 캐시가 있으면 유지, 없으면 빈 배열 반환 (로딩 freeze 방지)
-      if (_cache) broadcast(_cache)
-      return _cache ?? []
+      const fallback = _cache ?? []
+      broadcast(fallback)
+      return fallback
     }
   })().finally(() => { _promise = null })
 
