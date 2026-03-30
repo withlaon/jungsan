@@ -6,8 +6,9 @@ import { Toaster } from '@/components/ui/sonner'
 const geist = Geist({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '라이더 정산 시스템',
-  description: '라이더 주간 정산 관리 시스템',
+  title: '정산타임',
+  description:
+    '배달 라이더 전용 정산 시스템입니다. 배달 건별 내역과 주간 정산을 한곳에서 기록·관리할 수 있습니다.',
   verification: {
     google: 'oDFX7OQ4liPpHpxOYZAzdlayNIDbL53xA1MVLOlpJz4',
     other: {
