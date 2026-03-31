@@ -107,40 +107,44 @@ export default function ManualPage() {
     // ──────────────────────────────────────────────────────────────
 
     try {
-      const html2pdf = (await import('html2pdf.js')).default
+      // 번들/환경에 따라 default export 형태가 다를 수 있음
+      const mod = await import('html2pdf.js')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const html2pdf = (mod as any).default ?? mod
+      if (typeof html2pdf !== 'function') {
+        throw new Error('html2pdf 로드 실패')
+      }
+
       const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}_v${MANUAL_VERSION}.pdf`
 
-      const pdfOpts = {
-        margin: [12, 10, 12, 10],
-        filename,
-        image: { type: 'jpeg', quality: 0.97 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#0f172a',
-          logging: false,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any
+      // allowTaint: true 는 캔버스가 taint 되어 toDataURL 단계에서 반드시 실패함 — 넣지 않음
+      const buildOpts = (scale: number) =>
+        ({
+          margin: [12, 10, 12, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.92 },
+          html2canvas: {
+            scale,
+            useCORS: true,
+            backgroundColor: '#0f172a',
+            logging: false,
+            foreignObjectRendering: false,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
 
-      const blob: Blob = await html2pdf()
-        .set(pdfOpts)
-        .from(printRef.current)
-        .outputPdf('blob')
+      const runSave = (scale: number) =>
+        html2pdf().set(buildOpts(scale)).from(printRef.current!).save()
 
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.rel = 'noopener'
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+      try {
+        await runSave(1.5)
+      } catch (firstErr) {
+        console.warn('PDF 1차 생성 실패, scale 낮춰 재시도:', firstErr)
+        await runSave(1)
+      }
     } catch (err) {
       console.error('PDF 생성 실패:', err)
       alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
