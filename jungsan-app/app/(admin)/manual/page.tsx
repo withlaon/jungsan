@@ -17,6 +17,81 @@ import {
 const MANUAL_VERSION = '3.0'
 const MANUAL_REVISION_DATE = '2026-03-31'
 
+/** html2canvas가 ::before 등으로 삽입한 노드 (원본 트리와 순서가 어긋남) */
+function isHtml2CanvasPseudoNode(el: Element): boolean {
+  const c = el.className
+  return typeof c === 'string' && c.includes('___html2canvas___pseudoelement')
+}
+
+/** 깊이 우선·전위 순서로 방문 (원본/클론 매칭용) */
+function listMirrorTargets(root: HTMLElement, skipHtml2Pseudo: boolean): HTMLElement[] {
+  const out: HTMLElement[] = []
+  const walk = (el: HTMLElement) => {
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return
+    if (skipHtml2Pseudo && isHtml2CanvasPseudoNode(el)) return
+    out.push(el)
+    for (const ch of el.children) walk(ch as HTMLElement)
+  }
+  walk(root)
+  return out
+}
+
+/**
+ * Tailwind 등의 lab()/oklch() 색은 html2canvas 파서가 지원하지 않음.
+ * 클론 iframe에는 동일 CSS가 들어가므로, 계산된 값만 인라인으로 복사하고 시트·class를 제거한다.
+ */
+function neutralizeModernColorsOnClone(
+  clonedDoc: Document,
+  cloneHtml2pdfContainer: HTMLElement,
+  originalPrintRoot: HTMLElement,
+) {
+  const inner = cloneHtml2pdfContainer.firstElementChild as HTMLElement | null
+  if (!inner) return
+
+  const origEls = listMirrorTargets(originalPrintRoot, false)
+  const cloneEls = listMirrorTargets(inner, true)
+  const pairCount = Math.min(origEls.length, cloneEls.length)
+
+  const skipProps = new Set([
+    'transition',
+    'transition-property',
+    'transition-duration',
+    'transition-delay',
+    'transition-timing-function',
+    'animation',
+    'animation-name',
+    'animation-duration',
+    'animation-delay',
+    'animation-timing-function',
+  ])
+
+  for (let i = 0; i < pairCount; i++) {
+    const o = origEls[i]
+    const c = cloneEls[i]
+    const computed = window.getComputedStyle(o)
+    for (let j = 0; j < computed.length; j++) {
+      const name = computed.item(j)
+      if (!name || skipProps.has(name)) continue
+      const value = computed.getPropertyValue(name)
+      if (!value) continue
+      try {
+        c.style.setProperty(name, value, 'important')
+      } catch {
+        /* 인라인에 허용되지 않는 속성 */
+      }
+    }
+  }
+
+  const stripClass = (el: HTMLElement) => {
+    if (!isHtml2CanvasPseudoNode(el)) el.removeAttribute('class')
+    for (const ch of el.children) stripClass(ch as HTMLElement)
+  }
+  stripClass(inner)
+
+  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((e) => e.remove())
+  clonedDoc.querySelectorAll('head style').forEach((e) => e.remove())
+}
+
 export default function ManualPage() {
   const printRef = useRef<HTMLDivElement>(null)
   const { platform, userId } = useUser()
@@ -63,49 +138,6 @@ export default function ManualPage() {
     const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
     noPrintEls.forEach(el => { el.style.display = 'none' })
 
-    // ─── html2canvas 미지원 색상 함수(lab, oklch, lch) 사전 변환 ───
-    // canvas fillStyle을 이용하면 브라우저가 자동으로 안전한 sRGB 값으로 변환해 준다.
-    const fixedStyles: Array<{ el: HTMLElement; prop: string; prev: string }> = []
-
-    const tempCanvas = document.createElement('canvas')
-    tempCanvas.width = 1; tempCanvas.height = 1
-    const ctx2d = tempCanvas.getContext('2d')
-
-    const toSafeColor = (color: string): string | null => {
-      // lab(), oklch(), lch() 포함된 값만 변환
-      if (!color || !/\blab\(|\boklch\(|\blch\(/.test(color)) return null
-      if (!ctx2d) return null
-      try {
-        ctx2d.fillStyle = color
-        return ctx2d.fillStyle // 브라우저가 rgb() / #rrggbb 형태로 변환해 반환
-      } catch {
-        return null
-      }
-    }
-
-    const CSS_PROPS: [string, string][] = [
-      ['color',              'color'],
-      ['background-color',   'backgroundColor'],
-      ['border-top-color',   'borderTopColor'],
-      ['border-right-color', 'borderRightColor'],
-      ['border-bottom-color','borderBottomColor'],
-      ['border-left-color',  'borderLeftColor'],
-    ]
-
-    const allEls = [printRef.current, ...printRef.current.querySelectorAll<HTMLElement>('*')]
-    allEls.forEach(el => {
-      const computed = window.getComputedStyle(el)
-      CSS_PROPS.forEach(([cssProp, jsProp]) => {
-        const val = computed[jsProp as keyof CSSStyleDeclaration] as string
-        const safe = toSafeColor(val)
-        if (safe) {
-          fixedStyles.push({ el, prop: cssProp, prev: el.style.getPropertyValue(cssProp) })
-          el.style.setProperty(cssProp, safe, 'important')
-        }
-      })
-    })
-    // ──────────────────────────────────────────────────────────────
-
     try {
       // 번들/환경에 따라 default export 형태가 다를 수 있음
       const mod = await import('html2pdf.js')
@@ -118,6 +150,7 @@ export default function ManualPage() {
       const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}_v${MANUAL_VERSION}.pdf`
 
       // allowTaint: true 는 캔버스가 taint 되어 toDataURL 단계에서 반드시 실패함 — 넣지 않음
+      const printRoot = printRef.current
       const buildOpts = (scale: number) =>
         ({
           margin: [12, 10, 12, 10],
@@ -129,6 +162,9 @@ export default function ManualPage() {
             backgroundColor: '#0f172a',
             logging: false,
             foreignObjectRendering: false,
+            onclone: (clonedDoc: Document, cloneContainer: HTMLElement) => {
+              if (printRoot) neutralizeModernColorsOnClone(clonedDoc, cloneContainer, printRoot)
+            },
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] },
@@ -149,11 +185,6 @@ export default function ManualPage() {
       console.error('PDF 생성 실패:', err)
       alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
     } finally {
-      // 변환했던 스타일 복원
-      fixedStyles.forEach(({ el, prop, prev }) => {
-        if (prev) el.style.setProperty(prop, prev)
-        else el.style.removeProperty(prop)
-      })
       noPrintEls.forEach(el => { el.style.display = '' })
       setPdfLoading(false)
     }
