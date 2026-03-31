@@ -10,7 +10,12 @@ import {
   BookOpen, Download, BarChart3, Users, Wallet, Gift, Settings,
   Upload, FileText, Globe, ChevronRight, Info, AlertTriangle,
   CheckCircle, Megaphone, MessageSquare, LogOut, ImagePlus, Loader2,
+  CreditCard,
 } from 'lucide-react'
+
+/** 사용자 메뉴얼 개정일(내용 변경 시 함께 수정) */
+const MANUAL_VERSION = '3.0'
+const MANUAL_REVISION_DATE = '2026-03-31'
 
 export default function ManualPage() {
   const printRef = useRef<HTMLDivElement>(null)
@@ -103,25 +108,39 @@ export default function ManualPage() {
 
     try {
       const html2pdf = (await import('html2pdf.js')).default
-      const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}.pdf`
+      const filename = `라이더정산시스템_사용자메뉴얼_${platformLabel}_v${MANUAL_VERSION}.pdf`
 
-      await html2pdf()
-        .set({
-          margin: [12, 10, 12, 10],
-          filename,
-          image: { type: 'jpeg', quality: 0.97 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#0f172a',
-            logging: false,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'] },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
+      const pdfOpts = {
+        margin: [12, 10, 12, 10],
+        filename,
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#0f172a',
+          logging: false,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+
+      const blob: Blob = await html2pdf()
+        .set(pdfOpts)
         .from(printRef.current)
-        .save()
+        .outputPdf('blob')
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.rel = 'noopener'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('PDF 생성 실패:', err)
       alert('PDF 생성에 실패했습니다. 다시 시도해주세요.')
@@ -192,7 +211,8 @@ export default function ManualPage() {
                 '선지급금 등록·공제·회수 처리',
                 '라이더별 개인 정산서 링크 발행 (계정별 전용 URL)',
                 '공지사항 이미지 생성 · 저장 · 관리',
-                '전체관리자에게 문의하기 (실시간 답변)',
+                '구독 결제 관리(무료 체험 · 카드 등록 · 월 자동결제 · 해지)',
+                '전체관리자에게 문의하기 (채팅 형태 답변)',
                 '주간 지사 순이익 대시보드',
               ].map((t, i) => (
                 <li key={i} className="flex items-start gap-2">
@@ -625,7 +645,61 @@ export default function ManualPage() {
     },
 
     /* ══════════════════════════════════════════
-       12. 문의하기
+       12. 구독 결제 관리
+    ══════════════════════════════════════════ */
+    {
+      id: 'subscription', title: '구독 결제 관리', icon: CreditCard,
+      badge: '결제 · 이용권', badgeColor: 'bg-indigo-700',
+      content: (
+        <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+          <p>
+            <strong className="text-white">정산타임</strong>은 월 구독 형태로 제공됩니다. 사이드바 메뉴{' '}
+            <strong className="text-white">구독 결제 관리</strong>에서 무료 체험 기간, 결제 수단, 결제 내역을 확인할 수 있습니다.
+          </p>
+
+          <div className="space-y-2">
+            <p className="text-white font-medium">무료 체험</p>
+            <ul className="space-y-1 ml-2 text-xs">
+              <li>신규 계정은 제한된 기간 동안 무료로 기능을 이용할 수 있습니다.</li>
+              <li>화면에 <strong className="text-white">남은 체험 일수</strong>와 종료 예정일이 표시됩니다.</li>
+              <li>체험이 끝나기 전에 <strong className="text-white">카드를 등록</strong>하면 체험 종료 후 자동으로 월 구독 결제가 진행됩니다.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-white font-medium">카드 등록</p>
+            <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
+              <li><strong className="text-white">카드 등록</strong> 버튼을 누르면 결제창(포트원 등)에서 카드 정보를 입력합니다.</li>
+              <li>등록이 완료되면 마스킹된 카드번호·카드사가 화면에 표시됩니다.</li>
+              <li>빌링키는 서버에 안전하게 저장되며, 매월 동일 수단으로 자동 청구됩니다.</li>
+            </ol>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-white font-medium">구독 상태</p>
+            <div className="flex flex-col gap-2 ml-2 text-xs">
+              <span className="flex items-center gap-1.5"><Badge className="bg-blue-800 text-blue-300 text-xs">무료 체험</Badge> 체험 기간 중</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">구독 중</Badge> 정상 결제·이용 중 (다음 결제일·금액 표시)</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-red-800 text-red-300 text-xs">결제 실패</Badge> 카드 한도·정보 확인 후 재등록 필요 (자동 재시도될 수 있음)</span>
+              <span className="flex items-center gap-1.5"><Badge className="bg-slate-700 text-slate-400 text-xs">해지됨</Badge> 구독 해지 후 — 다시 이용하려면 카드 등록부터 진행</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-white font-medium">구독 해지 및 결제 내역</p>
+            <ul className="space-y-1 ml-2 text-xs">
+              <li>화면 안내에 따라 <strong className="text-white">구독 해지</strong>를 요청할 수 있습니다.</li>
+              <li>하단 <strong className="text-white">결제 내역</strong>에서 최근 결제 건별 금액·상태·일시를 확인할 수 있습니다.</li>
+            </ul>
+          </div>
+
+          {warn('무료 체험이 종료된 뒤 카드가 없으면 서비스 이용이 제한될 수 있습니다. 종료 일정을 미리 확인하세요.')}
+        </div>
+      ),
+    },
+
+    /* ══════════════════════════════════════════
+       13. 문의하기
     ══════════════════════════════════════════ */
     {
       id: 'inquiry', title: '문의하기', icon: MessageSquare,
@@ -653,13 +727,13 @@ export default function ManualPage() {
             </ul>
           </div>
 
-          {tip('답변 수신 시 별도 알림은 없으므로, 주기적으로 문의하기 탭을 확인해 주세요.')}
+          {tip('화면을 켜 둔 상태에서는 답변이 스레드에 바로 반영됩니다. 이후에 확인하려면 문의하기 목록을 열어보면 됩니다.')}
         </div>
       ),
     },
 
     /* ══════════════════════════════════════════
-       13. 자동 로그아웃
+       14. 자동 로그아웃
     ══════════════════════════════════════════ */
     {
       id: 'security', title: '자동 로그아웃 & 보안', icon: LogOut,
@@ -685,7 +759,7 @@ export default function ManualPage() {
     },
 
     /* ══════════════════════════════════════════
-       14. 자주 묻는 질문
+       15. 자주 묻는 질문
     ══════════════════════════════════════════ */
     {
       id: 'faq', title: '자주 묻는 질문', icon: AlertTriangle,
@@ -724,6 +798,14 @@ export default function ManualPage() {
               q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',
               a: '네. 보안을 위해 브라우저·탭을 닫으면 자동 로그아웃됩니다. 재접속 시 아이디·비밀번호를 다시 입력해야 합니다.',
             },
+            {
+              q: '무료 체험이 끝났는데 어떻게 계속 쓰나요?',
+              a: '구독 결제 관리 메뉴에서 결제 수단(카드)을 등록하면 체험 종료 후 월 구독으로 전환됩니다. 이미 등록했다면 다음 결제일과 상태를 같은 화면에서 확인할 수 있습니다.',
+            },
+            {
+              q: '구독을 해지하면 바로 못 쓰나요?',
+              a: '해지 절차와 이용 종료 시점은 시스템 정책에 따릅니다. 해지 후에도 일정 기간 이용이 이어질 수 있으니, 구독 결제 관리 화면의 안내와 결제 내역을 참고하세요.',
+            },
           ].map(({ q, a }, i) => (
             <div key={i} className="border border-slate-700 rounded-lg p-4 space-y-2">
               <p className="text-white font-medium flex items-start gap-2">
@@ -751,23 +833,27 @@ export default function ManualPage() {
       `}</style>
 
       <div className="p-6 space-y-6 print-content" ref={printRef}>
-        {/* 헤더 */}
-        <div className="flex items-start justify-between no-print">
-          <div>
+        {/* 헤더(제목은 PDF에 포함, 버튼만 화면 전용) */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-blue-400" />
+              <BookOpen className="h-6 w-6 shrink-0 text-blue-400" />
               사용자 메뉴얼
             </h2>
             <p className="text-slate-400 text-sm mt-1">
               {platformLabel} 라이더 정산 시스템 · 관리자 사용 가이드
-              <span className="ml-2 text-slate-600 text-xs">v2.0</span>
+              <span className="ml-2 text-slate-500 text-xs">
+                문서 v{MANUAL_VERSION} · 개정 {MANUAL_REVISION_DATE}
+              </span>
             </p>
           </div>
-          <Button onClick={handleDownloadPDF} disabled={pdfLoading}
-            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
-            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
-          </Button>
+          <div className="no-print shrink-0">
+            <Button onClick={handleDownloadPDF} disabled={pdfLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+              {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
+            </Button>
+          </div>
         </div>
 
         {/* 목차 */}
