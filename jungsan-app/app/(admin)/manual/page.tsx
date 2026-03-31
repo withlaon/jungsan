@@ -36,9 +36,50 @@ function listMirrorTargets(root: HTMLElement, skipHtml2Pseudo: boolean): HTMLEle
   return out
 }
 
+/** html2canvas 내부 색 파서가 지원하지 않는 CSS Color 4+ 문법 */
+const UNSUPPORTED_COLOR_FUNC = /\b(lab|oklch|lch)\(|color\(/i
+
+function coerceValueForHtml2Canvas(
+  propName: string,
+  value: string,
+  ctx: CanvasRenderingContext2D,
+): string {
+  if (!value || !UNSUPPORTED_COLOR_FUNC.test(value)) return value
+  try {
+    ctx.fillStyle = '#000'
+    ctx.fillStyle = value
+    const resolved = String(ctx.fillStyle)
+    if (!UNSUPPORTED_COLOR_FUNC.test(resolved)) return resolved
+  } catch {
+    /* fall through */
+  }
+  if (/shadow/i.test(propName)) return 'none'
+  if (/^(filter|backdrop-filter)$/i.test(propName)) return 'none'
+  return 'transparent'
+}
+
+/** 인라인 style 객체에 남은 lab/oklch 제거·치환 (HTML·SVG) */
+function scrubElementInlineColorFunctions(el: Element, ctx: CanvasRenderingContext2D) {
+  if (el instanceof HTMLElement && isHtml2CanvasPseudoNode(el)) {
+    el.removeAttribute('style')
+    return
+  }
+  if (!('style' in el) || !(el as HTMLElement | SVGElement).style) return
+  const s = (el as HTMLElement | SVGElement).style
+  for (let i = s.length - 1; i >= 0; i--) {
+    const name = s.item(i)
+    if (!name) continue
+    const v = s.getPropertyValue(name)
+    if (!UNSUPPORTED_COLOR_FUNC.test(v)) continue
+    const safe = coerceValueForHtml2Canvas(name, v, ctx)
+    if (UNSUPPORTED_COLOR_FUNC.test(safe)) s.removeProperty(name)
+    else s.setProperty(name, safe, 'important')
+  }
+}
+
 /**
  * Tailwind 등의 lab()/oklch() 색은 html2canvas 파서가 지원하지 않음.
- * 클론 iframe에는 동일 CSS가 들어가므로, 계산된 값만 인라인으로 복사하고 시트·class를 제거한다.
+ * 클론 문서에서 모든 스타일시트를 제거하고, 계산값을 브라우저가 이해하는 sRGB 문자열로만 인라인 복사한다.
  */
 function neutralizeModernColorsOnClone(
   clonedDoc: Document,
@@ -47,6 +88,19 @@ function neutralizeModernColorsOnClone(
 ) {
   const inner = cloneHtml2pdfContainer.firstElementChild as HTMLElement | null
   if (!inner) return
+
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  // iframe 안에 복사된 전역 CSS에 lab()이 있으면 파싱 단계에서 바로 터짐 → 전부 제거
+  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((e) => e.remove())
+  clonedDoc.querySelectorAll('style').forEach((e) => e.remove())
+
+  clonedDoc.documentElement.style.setProperty('background-color', '#0f172a', 'important')
+  clonedDoc.body.style.setProperty('background-color', '#0f172a', 'important')
 
   const origEls = listMirrorTargets(originalPrintRoot, false)
   const cloneEls = listMirrorTargets(inner, true)
@@ -74,8 +128,10 @@ function neutralizeModernColorsOnClone(
       if (!name || skipProps.has(name)) continue
       const value = computed.getPropertyValue(name)
       if (!value) continue
+      const safe = coerceValueForHtml2Canvas(name, value, ctx)
+      if (!safe) continue
       try {
-        c.style.setProperty(name, value, 'important')
+        c.style.setProperty(name, safe, 'important')
       } catch {
         /* 인라인에 허용되지 않는 속성 */
       }
@@ -88,8 +144,19 @@ function neutralizeModernColorsOnClone(
   }
   stripClass(inner)
 
-  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((e) => e.remove())
-  clonedDoc.querySelectorAll('head style').forEach((e) => e.remove())
+  scrubElementInlineColorFunctions(cloneHtml2pdfContainer, ctx)
+  cloneHtml2pdfContainer.querySelectorAll('*').forEach((el) => {
+    scrubElementInlineColorFunctions(el, ctx)
+  })
+
+  inner.querySelectorAll<SVGElement>('[fill], [stroke]').forEach((svgEl) => {
+    for (const attr of ['fill', 'stroke'] as const) {
+      const v = svgEl.getAttribute(attr)
+      if (v && UNSUPPORTED_COLOR_FUNC.test(v)) {
+        svgEl.setAttribute(attr, coerceValueForHtml2Canvas(attr, v, ctx))
+      }
+    }
+  })
 }
 
 export default function ManualPage() {
