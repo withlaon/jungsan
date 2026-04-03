@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser, getCachedUser } from '@/hooks/useUser'
+import { invalidateAllSettlementViewCaches } from '@/hooks/settlementViewCache'
 import { WeeklySettlement } from '@/types'
 
 // ─── 정산 목록 모듈 캐시 ──────────────────────────────────────────────────
@@ -31,7 +32,10 @@ async function loadSettlements(
 
   // force 갱신 시 _promise만 초기화 (_listCache 유지 → 탭 이동 시 기존 데이터 즉시 표시)
   // 캐시 완전 초기화는 로그아웃 시 clearSettlementsCache()에서만 처리
-  if (force) { _listPromise = null }
+  if (force) {
+    _listPromise = null
+    invalidateAllSettlementViewCaches()
+  }
   if (_listPromise) return _listPromise
 
   _listPromise = (async () => {
@@ -76,6 +80,7 @@ export function clearSettlementsCache() {
   _listPromise = null
   _listLastFetched = 0
   _listCachedUserId = undefined
+  invalidateAllSettlementViewCaches()
   broadcastList([])
 }
 

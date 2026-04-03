@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useSettlements } from '@/hooks/useSettlements'
+import { readAggCache, writeAggCache, readDetailsCache, writeDetailsCache, type AggDetailRow } from '@/hooks/settlementViewCache'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,20 +14,11 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid,
 } from 'recharts'
 
-interface AggDetail {
-  settlement_id: string
-  promotion_amount: number
-  call_fee_deduction: number
-  income_tax_deduction: number
-  employment_insurance_addition: number
-  accident_insurance_addition: number
-}
-
 export default function DashboardPage() {
   const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
   const [details, setDetails] = useState<SettlementDetail[]>([])
-  const [allAgg, setAllAgg] = useState<AggDetail[]>([])
+  const [allAgg, setAllAgg] = useState<AggDetailRow[]>([])
   const [aggLoading, setAggLoading] = useState(false)
 
   // settlements 로드 후 첫 번째 항목 자동 선택
@@ -36,15 +28,23 @@ export default function DashboardPage() {
     }
   }, [settlements, selectedId])
 
-  // 차트용 집계 데이터 — settlements IDs가 바뀔 때만 재조회
-  const settlementIds = settlements.map(s => s.id).join(',')
-  const lastAggIds = useRef('')
+  // 차트용 집계 데이터 — 동일 ID 집합이면 모듈 캐시 재사용(탭 이동 시 즉시 표시)
+  const idsSortedKey = useMemo(
+    () => [...settlements.map((s) => s.id)].sort().join(','),
+    [settlements],
+  )
 
   useEffect(() => {
-    if (settlements.length === 0) return
-    if (lastAggIds.current === settlementIds) return  // 이미 로드된 데이터
-    lastAggIds.current = settlementIds
-
+    if (settlements.length === 0) {
+      setAllAgg([])
+      return
+    }
+    const cached = readAggCache(idsSortedKey)
+    if (cached) {
+      setAllAgg(cached)
+      setAggLoading(false)
+      return
+    }
     setAggLoading(true)
     const supabase = createClient()
     ;(async () => {
@@ -52,17 +52,25 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from('settlement_details')
           .select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
-          .in('settlement_id', settlements.map(s => s.id))
-        if (!error && data) setAllAgg(data as AggDetail[])
+          .in('settlement_id', settlements.map((s) => s.id))
+        if (!error && data) {
+          const rows = data as AggDetailRow[]
+          writeAggCache(idsSortedKey, rows)
+          setAllAgg(rows)
+        }
       } catch { /* ignore */ }
       setAggLoading(false)
     })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settlementIds])
+  }, [idsSortedKey, settlements.length])
 
-  // 선택된 주차 상세 데이터 조회
+  // 선택된 주차 상세 데이터 조회 (캐시 우선)
   useEffect(() => {
     if (!selectedId) return
+    const cached = readDetailsCache<SettlementDetail>(selectedId, 'dash')
+    if (cached) {
+      setDetails(cached)
+      return
+    }
     const supabase = createClient()
     ;(async () => {
       try {
@@ -70,7 +78,11 @@ export default function DashboardPage() {
           .from('settlement_details')
           .select('promotion_amount, call_fee_deduction, final_amount, delivery_count, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
           .eq('settlement_id', selectedId)
-        if (!error && data) setDetails(data as SettlementDetail[])
+        if (!error && data) {
+          const rows = data as SettlementDetail[]
+          writeDetailsCache(selectedId, 'dash', rows)
+          setDetails(rows)
+        }
       } catch { /* ignore */ }
     })()
   }, [selectedId])

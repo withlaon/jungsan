@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useSettlements, revalidateSettlements } from '@/hooks/useSettlements'
+import { useSettlements, revalidateSettlements, removeSettlementFromCache } from '@/hooks/useSettlements'
+import { readDetailsCache, writeDetailsCache, deleteDetailsCacheEntry } from '@/hooks/settlementViewCache'
 import { SettlementDetail, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,9 +34,14 @@ export default function SettlementResultPage() {
 
   const currentSettlement = settlements.find(s => s.id === selectedId) ?? null
 
-  // 선택된 주차 상세 데이터 조회
+  // 선택된 주차 상세 데이터 조회 (탭 재진입 시 모듈 캐시 우선)
   useEffect(() => {
     if (!selectedId) return
+    const cached = readDetailsCache<DetailWithRider>(selectedId, 'result')
+    if (cached) {
+      setDetails(cached)
+      return
+    }
     const sb = createClient()
     ;(async () => {
       try {
@@ -44,7 +50,11 @@ export default function SettlementResultPage() {
           .select('*, riders(*)')
           .eq('settlement_id', selectedId)
           .order('final_amount', { ascending: false })
-        if (!error && data) setDetails(data as DetailWithRider[])
+        if (!error && data) {
+          const rows = data as DetailWithRider[]
+          writeDetailsCache(selectedId, 'result', rows)
+          setDetails(rows)
+        }
       } catch { /* ignore */ }
     })()
   }, [selectedId])
@@ -69,6 +79,8 @@ export default function SettlementResultPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { toast.error('삭제 실패: ' + (data?.error ?? res.statusText)); return }
       toast.success('정산이 삭제되었습니다.')
+      deleteDetailsCacheEntry(id)
+      removeSettlementFromCache(id)
       setDetails([])
       setSelectedId('')
       await revalidateSettlements()
