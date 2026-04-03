@@ -17,6 +17,7 @@ const PROTECTED_PREFIXES = [
   '/manual',
   '/notice',
   '/inquiry',
+  '/subscription',
 ]
 
 export async function proxy(request: NextRequest) {

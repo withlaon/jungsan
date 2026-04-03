@@ -101,6 +101,7 @@ const STATUS_CONFIG = {
 export default function SubscriptionPage() {
   const [sub, setSub] = useState<SubscriptionStatus | null>(null)
   const [history, setHistory] = useState<PaymentHistory[]>([])
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -113,10 +114,22 @@ export default function SubscriptionPage() {
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/billing/status')
-      const data = await res.json()
-      if (res.ok) setSub(data)
-      else console.error('[subscription] 상태 조회 실패:', data.error)
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (res.ok) {
+        setSub(data as SubscriptionStatus)
+        setStatusError(null)
+      } else {
+        const msg =
+          typeof data.error === 'string'
+            ? data.error
+            : `구독 정보를 불러오지 못했습니다. (${res.status})`
+        setStatusError(msg)
+        setSub(null)
+        console.error('[subscription] 상태 조회 실패:', data.error ?? res.status)
+      }
     } catch (e) {
+      setStatusError('네트워크 오류로 구독 상태를 확인할 수 없습니다.')
+      setSub(null)
       console.error('[subscription] 상태 조회 오류:', e)
     }
   }, [])
@@ -138,22 +151,25 @@ export default function SubscriptionPage() {
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserId(user.id)
-        setUserEmail(user.email ?? '')
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setUserId(user.id)
+          setUserEmail(user.email ?? '')
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('manager_name, phone')
-          .eq('id', user.id)
-          .single()
-        setUserName(profile?.manager_name ?? '')
-        setUserPhone(profile?.phone ?? '')
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('manager_name, phone')
+            .eq('id', user.id)
+            .single()
+          setUserName(profile?.manager_name ?? '')
+          setUserPhone(profile?.phone ?? '')
+        }
+        await Promise.all([fetchStatus(), fetchHistory()])
+      } finally {
+        setLoading(false)
       }
-      await Promise.all([fetchStatus(), fetchHistory()])
-      setLoading(false)
     }
     init()
   }, [fetchStatus, fetchHistory])
@@ -235,6 +251,37 @@ export default function SubscriptionPage() {
         </h1>
         <p className="text-slate-400 text-sm mt-1">정산타임 월 구독 및 결제 수단을 관리합니다.</p>
       </div>
+
+      {statusError && (
+        <div
+          className="flex gap-3 p-4 rounded-lg border border-amber-700/50 bg-amber-950/30 text-amber-200 text-sm"
+          role="alert"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400" />
+          <div className="space-y-2">
+            <p className="font-medium text-amber-100">{statusError}</p>
+            <p className="text-amber-200/80 text-xs">
+              잠시 후 다시 시도하거나, 문제가 계속되면 관리자에게 문의해 주세요. (서비스 환경 설정·DB 연동을 확인해야 할 수 있습니다.)
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-amber-600 text-amber-100 hover:bg-amber-900/40"
+              onClick={async () => {
+                setLoading(true)
+                try {
+                  await fetchStatus()
+                } finally {
+                  setLoading(false)
+                }
+              }}
+            >
+              다시 시도
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 현재 상태 카드 */}
       {sub && (
