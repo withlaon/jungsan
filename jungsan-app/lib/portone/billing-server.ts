@@ -142,3 +142,39 @@ export async function deleteBillingKey(billingKey: string): Promise<void> {
     throw new Error(data.message ?? '빌링키 삭제 실패')
   }
 }
+
+/**
+ * 콘솔에서 「빌링키 발급 수동 승인」 사용 시 SDK 응답 billingIssueToken 으로 실제 빌링키 확정
+ * @see https://developers.portone.io/api/rest-v2/payment.billingKey
+ */
+export async function confirmBillingKeyIssue(billingIssueToken: string): Promise<string> {
+  const token = billingIssueToken.trim()
+  if (!token) throw new Error('billingIssueToken이 비어 있습니다.')
+
+  const res = await fetch(`${PORTONE_API_BASE}/billing-keys/confirm`, {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      storeId: PORTONE_STORE_ID,
+      billingIssueToken: token,
+    }),
+  })
+
+  const data = (await res.json().catch(() => ({}))) as {
+    message?: string
+    billingKey?: string
+    billingKeyInfo?: { billingKey?: string }
+  }
+
+  if (!res.ok) {
+    throw new Error(data.message ?? `빌링키 승인 확인 실패 (${res.status})`)
+  }
+
+  const billingKey =
+    data.billingKey ?? data.billingKeyInfo?.billingKey ?? ''
+  if (!billingKey || billingKey === 'NEEDS_CONFIRMATION') {
+    throw new Error('빌링키 승인 응답에 유효한 billingKey가 없습니다.')
+  }
+
+  return billingKey
+}

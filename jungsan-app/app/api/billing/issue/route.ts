@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getBillingKeyInfo, extractCardInfo } from '@/lib/portone/billing-server'
+import {
+  getBillingKeyInfo,
+  extractCardInfo,
+  confirmBillingKeyIssue,
+} from '@/lib/portone/billing-server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,10 +23,32 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { billingKey } = body as { billingKey?: string }
+    const { billingKey: bodyKey, billingIssueToken } = body as {
+      billingKey?: string
+      billingIssueToken?: string
+    }
+
+    let billingKey = typeof bodyKey === 'string' ? bodyKey.trim() : ''
+
+    if (
+      (!billingKey || billingKey === 'NEEDS_CONFIRMATION') &&
+      typeof billingIssueToken === 'string' &&
+      billingIssueToken.trim()
+    ) {
+      try {
+        billingKey = await confirmBillingKeyIssue(billingIssueToken.trim())
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '빌링키 승인 확인 실패'
+        console.error('[billing/issue] confirm:', e)
+        return NextResponse.json({ error: msg }, { status: 502 })
+      }
+    }
 
     if (!billingKey) {
-      return NextResponse.json({ error: 'billingKey가 필요합니다.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'billingKey 또는 billingIssueToken이 필요합니다.' },
+        { status: 400 },
+      )
     }
 
     // 포트원에서 카드 정보 조회 (카드사, 마스킹 번호)

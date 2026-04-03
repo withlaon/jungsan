@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CreditCard,
   CheckCircle,
@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { requestIssueBillingKey, SUBSCRIPTION_AMOUNT, normalizeKcpPhone } from '@/lib/portone/billing'
+import {
+  parseBillingIssueReturnFromSearchParams,
+  stripBillingIssueQueryParams,
+} from '@/lib/portone/billing-redirect'
 
 interface SubscriptionStatus {
   status: 'trial' | 'active' | 'past_due' | 'cancelled'
@@ -68,14 +72,19 @@ function formatAmount(amount: number): string {
 }
 
 /** 포트원/KCP [3192] 등 — 해외전용 채널에 국내 카드 시도 시 흔함 */
-function billingRegisterErrorMessage(message?: string, code?: string): string {
-  const blob = `${message ?? ''} ${code ?? ''}`
+function billingRegisterErrorMessage(
+  message?: string,
+  code?: string,
+  pgMessage?: string
+): string {
+  const blob = `${message ?? ''} ${code ?? ''} ${pgMessage ?? ''}`
   if (blob.includes('3192') || code === '3192') {
     return (
-      '카드번호가 결제사에서 거절되었습니다. 프로필 휴대폰(숫자)·채널(수단=빌링)을 확인해 주세요. ' +
+      '카드번호가 결제사에서 거절되었습니다. 프로필 휴대폰(숫자)·채널(수단=빌링·국내 정기)을 확인해 주세요. ' +
       '결제창이 「해외카드」 전용이면 국내 카드는 불가합니다. 그래도 동일하면 포트원/KCP로 문의해 주세요.'
     )
   }
+  if (pgMessage && !message) return pgMessage
   return message ?? '카드 등록에 실패했습니다.'
 }
 
@@ -122,6 +131,7 @@ export default function SubscriptionPage() {
   const [userName, setUserName] = useState<string>('')
   const [userEmail, setUserEmail] = useState<string>('')
   const [userPhone, setUserPhone] = useState<string>('')
+  const billingRedirectHandledRef = useRef(false)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -145,6 +155,25 @@ export default function SubscriptionPage() {
       console.error('[subscription] 상태 조회 오류:', e)
     }
   }, [])
+
+  const saveBillingKeyToServer = useCallback(
+    async (payload: { billingKey?: string; billingIssueToken?: string }) => {
+      const saveRes = await fetch('/api/billing/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const saveData = (await saveRes.json().catch(() => ({}))) as { error?: string }
+      if (!saveRes.ok) {
+        toast.error(saveData.error ?? '카드 저장 중 오류가 발생했습니다.')
+        return false
+      }
+      toast.success('카드가 등록되었습니다. 무료 체험 종료 후 자동 결제됩니다.')
+      await fetchStatus()
+      return true
+    },
+    [fetchStatus]
+  )
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -186,6 +215,49 @@ export default function SubscriptionPage() {
     init()
   }, [fetchStatus, fetchHistory])
 
+  /** PG 리디렉션 복귀(모바일 KCP 등): URL 쿼리로 빌링키·오류 전달 */
+  useEffect(() => {
+    if (loading || !userId || billingRedirectHandledRef.current) return
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const parsed = parseBillingIssueReturnFromSearchParams(url.searchParams)
+    if (!parsed) return
+
+    billingRedirectHandledRef.current = true
+
+    const clearQuery = () => {
+      const nextPath = stripBillingIssueQueryParams(url)
+      window.history.replaceState({}, '', nextPath)
+    }
+
+    void (async () => {
+      if (parsed.status === 'error') {
+        toast.error(
+          billingRegisterErrorMessage(parsed.message, parsed.code, parsed.pgMessage),
+        )
+        clearQuery()
+        return
+      }
+
+      if (!normalizeKcpPhone(userPhone)) {
+        toast.error(
+          '카드 등록을 마무리하려면 프로필에 휴대폰 번호를 저장한 뒤 다시 시도해 주세요. (정보수정)',
+        )
+        clearQuery()
+        return
+      }
+
+      const body =
+        parsed.billingKey === 'NEEDS_CONFIRMATION' && parsed.billingIssueToken
+          ? { billingIssueToken: parsed.billingIssueToken }
+          : { billingKey: parsed.billingKey }
+
+      await saveBillingKeyToServer(body)
+      clearQuery()
+    })()
+  }, [loading, userId, userPhone, saveBillingKeyToServer])
+
   const handleRegisterCard = async () => {
     if (!userId) {
       toast.error('로그인 정보를 불러올 수 없습니다.')
@@ -207,28 +279,30 @@ export default function SubscriptionPage() {
         customerPhone: userPhone,
       })
 
-      if (!result.success || !result.billingKey) {
+      if (!result.success) {
         toast.error(
-          billingRegisterErrorMessage(result.error?.message, result.error?.code)
+          billingRegisterErrorMessage(
+            result.error?.message,
+            result.error?.code,
+            result.error?.pgMessage,
+          ),
         )
         return
       }
 
-      // ② 서버(DB)에 빌링키만 저장 — 월 구독 청구는 cron 등에서 chargeBillingKey로 수행
-      const saveRes = await fetch('/api/billing/issue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ billingKey: result.billingKey }),
-      })
-      const saveData = await saveRes.json()
-
-      if (!saveRes.ok) {
-        toast.error(saveData.error ?? '카드 저장 중 오류가 발생했습니다.')
+      // ② 수동 승인 채널 → 서버에서 confirm 후 저장
+      if (result.needsServerConfirm && result.billingIssueToken) {
+        await saveBillingKeyToServer({ billingIssueToken: result.billingIssueToken })
         return
       }
 
-      toast.success('카드가 등록되었습니다. 무료 체험 종료 후 자동 결제됩니다.')
-      await fetchStatus()
+      if (!result.billingKey) {
+        toast.error('빌링키를 받지 못했습니다. 잠시 후 다시 시도해 주세요.')
+        return
+      }
+
+      // ③ 서버(DB)에 빌링키만 저장 — 월 구독 청구는 cron 등에서 chargeBillingKey로 수행
+      await saveBillingKeyToServer({ billingKey: result.billingKey })
     } finally {
       setIsRegistering(false)
     }
@@ -436,10 +510,19 @@ export default function SubscriptionPage() {
             </p>
             <p className="mt-1.5 text-amber-200/85">
               국내 카드는 포트원에서{' '}
-              <strong className="text-amber-50">국내 정기결제·빌링키</strong> 채널을 만든 뒤, 서버 환경변수{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">PORTONE_BILLING_CHANNEL_KEY_DOMESTIC</code>에
-              그 채널 키를 넣으세요(일반 결제용 해외 채널과 같으면 [3192]가 계속 납니다). 로컬은{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">.env.local</code>.
+              <strong className="text-amber-50">국내 정기결제·빌링키</strong> 채널(결제수단: 빌링)을 만든 뒤,{' '}
+              <code className="rounded bg-amber-900/50 px-1 text-[11px]">
+                PORTONE_BILLING_CHANNEL_KEY_DOMESTIC
+              </code>{' '}
+              또는{' '}
+              <code className="rounded bg-amber-900/50 px-1 text-[11px]">
+                NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC
+              </code>
+              에 그 채널 키를 넣으세요. 일반 결제(해외 전용) 채널 키와 같게 두면 [3192]가 계속 납니다. 로컬은{' '}
+              <code className="rounded bg-amber-900/50 px-1 text-[11px]">.env.local</code>, 배포는 Vercel과 동일하게 맞추세요.
+            </p>
+            <p className="mt-1.5 text-amber-200/80">
+              휴대폰에서 KCP로 넘어갔다가 이 페이지로 돌아오면 등록이 자동으로 완료됩니다. 돌아온 뒤에도 반영이 없으면 새로고침해 보세요.
             </p>
           </div>
           {sub?.has_card ? (

@@ -24,7 +24,13 @@
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
  */
 
-import PortOne, { BillingKeyMethod, Currency, type Customer } from '@portone/browser-sdk/v2'
+import PortOne, {
+  BillingKeyMethod,
+  Currency,
+  Locale,
+  WindowType,
+  type Customer,
+} from '@portone/browser-sdk/v2'
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원)
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -38,8 +44,11 @@ export interface IssueBillingKeyRequest {
 
 export interface IssueBillingKeyResult {
   success: boolean
+  /** 수동 승인 채널일 때 서버에서 confirm 후 저장 */
+  billingIssueToken?: string
+  needsServerConfirm?: boolean
   billingKey?: string
-  error?: { code?: string; message?: string }
+  error?: { code?: string; message?: string; pgMessage?: string }
 }
 
 /** KCP/PG: phoneNumber는 숫자만 (포트원 개발자 문서 권장) */
@@ -122,6 +131,15 @@ export async function requestIssueBillingKey(
     }
   }
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/subscription'
+  /**
+   * 모바일 KCP 등 리디렉션 필수. `billing_issue=1`으로 구독 빌링 복귀만 처리(타 기능 code 쿼리와 분리).
+   */
+  const redirectUrl = origin
+    ? `${origin}${pathname}?billing_issue=1`
+    : undefined
+
   try {
     const response = await PortOne.requestIssueBillingKey({
       storeId,
@@ -131,24 +149,52 @@ export async function requestIssueBillingKey(
       issueId: newBillingIssueId(request.customerId),
       displayAmount: SUBSCRIPTION_AMOUNT,
       currency: Currency.KRW,
+      /** KCP 빌링키: SDK 문서상 빌링키 발급 시 interval 만 지원 */
+      offerPeriod: { interval: '1m' },
+      locale: Locale.KO_KR,
+      /** PC: iframe(팝업 미지원 PG 대비), 모바일: 리디렉션(redirectUrl 필수) */
+      windowType: {
+        pc: WindowType.IFRAME,
+        mobile: WindowType.REDIRECTION,
+      },
+      ...(redirectUrl ? { redirectUrl } : {}),
       // productType 미지정: 일부 KCP 빌링 채널에서 REAL/DIGITAL 분류로 창 검증이 어긋나는 경우 방지
       customer: buildBillingCustomer(request),
     })
 
     if (!response || 'code' in response) {
-      const errResp = response as { code?: string; message?: string } | null
+      const errResp = response as {
+        code?: string
+        message?: string
+        pgMessage?: string
+      } | null
       return {
         success: false,
         error: {
           code: errResp?.code,
           message: errResp?.message ?? '카드 등록에 실패했습니다.',
+          pgMessage: errResp?.pgMessage,
         },
+      }
+    }
+
+    const raw = response as {
+      billingKey?: string
+      billingIssueToken?: string
+    }
+
+    if (raw.billingKey === 'NEEDS_CONFIRMATION' && raw.billingIssueToken) {
+      return {
+        success: true,
+        needsServerConfirm: true,
+        billingIssueToken: raw.billingIssueToken,
+        billingKey: raw.billingKey,
       }
     }
 
     return {
       success: true,
-      billingKey: (response as { billingKey?: string }).billingKey,
+      billingKey: raw.billingKey,
     }
   } catch (error) {
     const err = error as Error
