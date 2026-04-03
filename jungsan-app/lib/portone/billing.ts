@@ -15,7 +15,6 @@
 import PortOne, {
   BillingKeyMethod,
   Currency,
-  WindowType,
   type Customer,
 } from '@portone/browser-sdk/v2'
 
@@ -103,8 +102,7 @@ export async function requestIssueBillingKey(
       displayAmount: SUBSCRIPTION_AMOUNT,
       currency: Currency.KRW,
       customer: buildBillingCustomer(request),
-      // PC iframe 방식에서 카드번호 분할 입력 시 조기 검증/포커스 이슈가 나는 경우가 있어 팝업 권장
-      windowType: { pc: WindowType.POPUP },
+      // NHN KCP 빌링키 PC는 POPUP 미지원 → windowType 미지정 시 PG 기본(IFRAME 등) 사용
     })
 
     if (!response || 'code' in response) {
