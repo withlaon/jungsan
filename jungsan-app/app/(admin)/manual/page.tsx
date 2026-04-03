@@ -39,22 +39,82 @@ function listMirrorTargets(root: HTMLElement, skipHtml2Pseudo: boolean): HTMLEle
 /** html2canvas 내부 색 파서가 지원하지 않는 CSS Color 4+ 문법 */
 const UNSUPPORTED_COLOR_FUNC = /\b(lab|oklch|lch)\(|color\(/i
 
+/** lab()/oklch()/lch()/color(...) 시작 위치 (균형 괄호로 전체 토큰 추출용) */
+const COLOR_FUNC_START_RE = /\b(?:lab|oklch|lch)\(|color\(/gi
+
+function findMatchingCloseParen(s: string, openIdx: number): number {
+  let depth = 0
+  for (let i = openIdx; i < s.length; i++) {
+    const ch = s[i]
+    if (ch === '(') depth++
+    else if (ch === ')') {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
+}
+
+function findNextColorFuncStart(s: string, from: number): { start: number; openParen: number } | null {
+  const sub = s.slice(from)
+  COLOR_FUNC_START_RE.lastIndex = 0
+  const m = COLOR_FUNC_START_RE.exec(sub)
+  if (!m) return null
+  const start = from + m.index
+  const openParen = start + m[0].length - 1
+  return { start, openParen }
+}
+
+/** 단일 색 함수 토큰을 캔버스 fillStyle로 sRGB 문자열로 치환 */
+function coerceSingleColorToken(token: string, ctx: CanvasRenderingContext2D): string {
+  try {
+    ctx.fillStyle = '#000'
+    ctx.fillStyle = token
+    const resolved = String(ctx.fillStyle)
+    if (!UNSUPPORTED_COLOR_FUNC.test(resolved)) return resolved
+  } catch {
+    /* fall through */
+  }
+  return 'transparent'
+}
+
+/**
+ * 값 문자열 안의 lab()/oklch()/lch()/color(...) 부분 문자열만 균형 괄호로 잘라 각각 fillStyle로 치환
+ * (그라데이션·box-shadow 등 복합 값에도 동작)
+ */
+function replaceColorFuncsInValue(value: string, ctx: CanvasRenderingContext2D): string {
+  let out = ''
+  let i = 0
+  while (i < value.length) {
+    const next = findNextColorFuncStart(value, i)
+    if (!next) {
+      out += value.slice(i)
+      break
+    }
+    out += value.slice(i, next.start)
+    const close = findMatchingCloseParen(value, next.openParen)
+    if (close < 0) {
+      out += value.slice(next.start)
+      break
+    }
+    const token = value.slice(next.start, close + 1)
+    out += coerceSingleColorToken(token, ctx)
+    i = close + 1
+  }
+  return out
+}
+
 function coerceValueForHtml2Canvas(
   propName: string,
   value: string,
   ctx: CanvasRenderingContext2D,
 ): string {
   if (!value || !UNSUPPORTED_COLOR_FUNC.test(value)) return value
-  try {
-    ctx.fillStyle = '#000'
-    ctx.fillStyle = value
-    const resolved = String(ctx.fillStyle)
-    if (!UNSUPPORTED_COLOR_FUNC.test(resolved)) return resolved
-  } catch {
-    /* fall through */
-  }
+  const replaced = replaceColorFuncsInValue(value, ctx)
+  if (!UNSUPPORTED_COLOR_FUNC.test(replaced)) return replaced
   if (/shadow/i.test(propName)) return 'none'
   if (/^(filter|backdrop-filter)$/i.test(propName)) return 'none'
+  if (/^(background|background-image)$/i.test(propName) && /gradient/i.test(value)) return 'none'
   return 'transparent'
 }
 
@@ -119,6 +179,13 @@ function neutralizeModernColorsOnClone(
     'animation-timing-function',
   ])
 
+  /** html2canvas가 클론에 남긴 인라인 style의 lab() 등이 setProperty 실패 시 그대로 남지 않도록 선제 제거 */
+  const clearInlineStylesRec = (el: HTMLElement) => {
+    el.removeAttribute('style')
+    for (const ch of el.children) clearInlineStylesRec(ch as HTMLElement)
+  }
+  clearInlineStylesRec(inner)
+
   for (let i = 0; i < pairCount; i++) {
     const o = origEls[i]
     const c = cloneEls[i]
@@ -133,7 +200,11 @@ function neutralizeModernColorsOnClone(
       try {
         c.style.setProperty(name, safe, 'important')
       } catch {
-        /* 인라인에 허용되지 않는 속성 */
+        try {
+          c.style.removeProperty(name)
+        } catch {
+          /* 인라인에 허용되지 않는 속성 */
+        }
       }
     }
   }
