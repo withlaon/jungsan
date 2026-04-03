@@ -193,6 +193,7 @@ export default function SubscriptionPage() {
     }
     setIsRegistering(true)
     try {
+      // ① 포트원 SDK: PG 결제창에서 카드 입력 → 빌링키 발급 (PortOne.requestIssueBillingKey)
       const result = await requestIssueBillingKey({
         customerId: userId,
         customerName: userName || '구독자',
@@ -207,7 +208,7 @@ export default function SubscriptionPage() {
         return
       }
 
-      // 서버에 빌링키 저장
+      // ② 서버(DB)에 빌링키만 저장 — 월 구독 청구는 cron 등에서 chargeBillingKey로 수행
       const saveRes = await fetch('/api/billing/issue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,7 +1,16 @@
 'use client'
 
 /**
- * 포트원 V2 빌링키 발급 (클라이언트 전용)
+ * 포트원 V2 — 구독형 정기결제용 빌링키 (결제창 방식)
+ *
+ * [빌링키란] 카드 원번호를 저장하지 않고 PG가 발급한 빌링키만 보관한 뒤, 원하는 시점에 그 키로 결제 요청.
+ *
+ * [구현 단계]
+ * 1) 빌링키 발급 (본 모듈) — PG 결제창에서 고객이 카드 입력 → PortOne.requestIssueBillingKey()
+ * 2) 발급된 billingKey 저장 — POST /api/billing/issue
+ * 3) 월 청구 등 결제 요청 — lib/portone/billing-server.ts 의 chargeBillingKey() · Vercel cron /api/cron/billing
+ *
+ * 다른 방식(API로 카드번호 직접 전달 등)은 사용하지 않습니다.
  *
  * 사전 준비:
  * 1. 포트원 관리자콘솔 > [연동 관리] > [채널 관리] > [테스트 채널 추가]
