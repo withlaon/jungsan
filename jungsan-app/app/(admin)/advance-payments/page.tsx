@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
-import { useAdvancePayments, revalidatePayments } from '@/hooks/useAdvancePayments'
+import { useAdvancePayments, revalidatePayments, applyOptimisticPayment } from '@/hooks/useAdvancePayments'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -233,17 +233,29 @@ export default function AdvancePaymentsPage() {
     revalidatePayments()
   }
 
-  const handleDelete = async (id: string, riderName: string, type: 'advance' | 'recovery') => {
-    const target = payments.find(p => p.id === id)
-    const label = type === 'advance' ? '선지급금' : '회수 내역'
-    const extraWarning = target?.deducted_settlement_id
+  const handleDelete = async (p: PaymentWithRider) => {
+    const label = p.type === 'recovery' ? '회수 내역' : '선지급금'
+    const riderName = p.riders?.name ?? '라이더'
+    const extraWarning = p.deducted_settlement_id
       ? '\n※ 이미 정산에 공제된 항목입니다. 삭제해도 기존 정산 결과는 변경되지 않습니다.'
       : ''
     if (!confirm(`${riderName}의 ${label}을 삭제하시겠습니까?${extraWarning}`)) return
-    const { error } = await supabase.from('advance_payments').delete().eq('id', id)
-    if (error) { toast.error('삭제 실패'); return }
-    toast.success('삭제되었습니다.')
-    revalidatePayments()
+    try {
+      const res = await fetch(`/api/admin/advance-payment?id=${encodeURIComponent(p.id)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('삭제 실패: ' + (data?.error ?? res.statusText))
+        return
+      }
+      applyOptimisticPayment(p, 'remove')
+      toast.success('삭제되었습니다.')
+      await revalidatePayments()
+    } catch {
+      toast.error('삭제 실패: 네트워크 오류')
+    }
   }
 
   const advances = payments.filter(p => p.type !== 'recovery')
@@ -434,7 +446,7 @@ export default function AdvancePaymentsPage() {
                           <Pencil className="h-3.5 w-3.5 mr-1" />수정
                         </Button>
                         <Button size="sm" variant="ghost"
-                          onClick={() => handleDelete(p.id, p.riders?.name, 'advance')}
+                          onClick={() => handleDelete(p)}
                           className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
                           <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
                         </Button>
@@ -487,7 +499,7 @@ export default function AdvancePaymentsPage() {
                           <Pencil className="h-3.5 w-3.5 mr-1" />수정
                         </Button>
                         <Button size="sm" variant="ghost"
-                          onClick={() => handleDelete(p.id, p.riders?.name, 'recovery')}
+                          onClick={() => handleDelete(p)}
                           className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8 px-2">
                           <Trash2 className="h-3.5 w-3.5 mr-1" />삭제
                         </Button>
