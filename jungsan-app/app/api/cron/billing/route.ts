@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       // 프로필 정보 조회 (고객명, 이메일)
       const { data: profile } = await admin
         .from('profiles')
-        .select('manager_name, email')
+        .select('manager_name, email, phone')
         .eq('id', sub.user_id)
         .single()
 
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
           customerId: sub.user_id,
           customerName: profile?.manager_name ?? '구독자',
           customerEmail: profile?.email,
+          customerPhone: profile?.phone ?? undefined,
         })
 
         if (chargeResult.status === 'PAID') {

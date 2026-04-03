@@ -1,14 +1,36 @@
+function pickFirstChannelKey(candidates: (string | undefined)[]): string {
+  for (const v of candidates) {
+    const t = v?.trim()
+    if (t) return t
+  }
+  return ''
+}
+
 /**
- * 빌링키 발급·정기 청구에 쓰는 포트원 채널 키.
+ * 서버 전용(API·cron·빌링 서버). `PORTONE_*`(비공개) env를 읽을 수 있음.
  *
- * 권장: `NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC` 만 설정(국내 카드 정기·빌링 전용 채널 키).
- * 레거시: `NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY` 는 DOMESTIC 이 비어 있을 때만 사용.
- *
- * 해외카드 전용 채널을 넣으면 국내 카드가 [3192] 등으로 거절될 수 있습니다.
- * Vercel 등 배포 환경에도 DOMESTIC 을 동일 이름으로 넣어야 합니다(.env.local 은 커밋되지 않음).
+ * 우선순위 — **맨 위가 가장 우선**(국내 정기·빌링키 채널만 넣을 것):
+ * 1. PORTONE_BILLING_CHANNEL_KEY_DOMESTIC  ← Vercel Secrets 권장(해외 결제용 NEXT_PUBLIC과 분리)
+ * 2. NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC
+ * 3. PORTONE_BILLING_CHANNEL_KEY
+ * 4. NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY
+ */
+export function getBillingChannelKeyServer(): string {
+  return pickFirstChannelKey([
+    process.env.PORTONE_BILLING_CHANNEL_KEY_DOMESTIC,
+    process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC,
+    process.env.PORTONE_BILLING_CHANNEL_KEY,
+    process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY,
+  ])
+}
+
+/**
+ * 클라이언트 번들에는 비공개 PORTONE_* 가 없음. 폴백·테스트용만 사용.
+ * 실제 빌링키 호출은 GET /api/billing/issue-config 가 서버 우선순위를 반환함.
  */
 export function getBillingChannelKey(): string {
-  const domestic = process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC?.trim()
-  if (domestic) return domestic
-  return process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY?.trim() ?? ''
+  return pickFirstChannelKey([
+    process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC,
+    process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY,
+  ])
 }

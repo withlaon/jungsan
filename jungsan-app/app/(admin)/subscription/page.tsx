@@ -25,7 +25,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
-import { requestIssueBillingKey, SUBSCRIPTION_AMOUNT } from '@/lib/portone/billing'
+import { requestIssueBillingKey, SUBSCRIPTION_AMOUNT, normalizeKcpPhone } from '@/lib/portone/billing'
 
 interface SubscriptionStatus {
   status: 'trial' | 'active' | 'past_due' | 'cancelled'
@@ -189,6 +189,12 @@ export default function SubscriptionPage() {
   const handleRegisterCard = async () => {
     if (!userId) {
       toast.error('로그인 정보를 불러올 수 없습니다.')
+      return
+    }
+    if (!normalizeKcpPhone(userPhone)) {
+      toast.error(
+        'KCP 카드 등록을 위해 프로필에 휴대폰 번호를 저장해 주세요. (사이드바 정보수정 — 01012345678 또는 010-0000-0000 형식)',
+      )
       return
     }
     setIsRegistering(true)
@@ -429,10 +435,11 @@ export default function SubscriptionPage() {
               <strong className="text-amber-50">국내 은행 카드</strong>는 등록할 수 없습니다. (VISA·Master·JCB·Diners만 가능)
             </p>
             <p className="mt-1.5 text-amber-200/85">
-              국내 카드로 월 구독을 쓰려면 포트원 콘솔에{' '}
-              <strong className="text-amber-50">국내 카드 정기결제·빌링키</strong> 채널을 추가하고, 배포 환경의{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC</code>에
-              해당 채널 키를 넣어야 합니다.
+              국내 카드는 포트원에서{' '}
+              <strong className="text-amber-50">국내 정기결제·빌링키</strong> 채널을 만든 뒤, 서버 환경변수{' '}
+              <code className="rounded bg-amber-900/50 px-1 text-[11px]">PORTONE_BILLING_CHANNEL_KEY_DOMESTIC</code>에
+              그 채널 키를 넣으세요(일반 결제용 해외 채널과 같으면 [3192]가 계속 납니다). 로컬은{' '}
+              <code className="rounded bg-amber-900/50 px-1 text-[11px]">.env.local</code>.
             </p>
           </div>
           {sub?.has_card ? (

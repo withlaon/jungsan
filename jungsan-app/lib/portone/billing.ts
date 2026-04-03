@@ -15,10 +15,10 @@
  * 사전 준비:
  * 1. 포트원 관리자콘솔 > [연동 관리] > [채널 관리] > [테스트 채널 추가]
  *    → PG사: NHN KCP, 결제 유형: "빌링키" 또는 "KCP 결제창 정기결제"에 맞는 사이트코드 선택 후 저장
- * 2. 채널 키 (.env.local)
- *    - 국내 카드 구독: NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC (권장) 또는
- *      NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 에 **국내 정기결제·빌링키** 채널만 넣기
- *    - 「해외카드_정기결제」 채널만 연결하면 국내 카드는 [3192]로 거절됩니다 (VISA 등 해외만 가능).
+ * 2. 채널 키 (발급·청구 공통, 서버 우선순위는 lib/portone/billing-channel-key.ts 참고)
+ *    - 권장: PORTONE_BILLING_CHANNEL_KEY_DOMESTIC (서버/Vercel Secrets) = 포트원「국내 정기·빌링키」채널만
+ *    - GET /api/billing/issue-config 가 클라이언트에 storeId·channelKey 전달
+ *    - 일반 결제·해외 전용 채널 키를 그대로 쓰면 국내 카드 [3192]가 계속됩니다.
  *
  * KCP 연동 시 buyer 연락처는 숫자만 허용됩니다. 하이픈 포함(010-0000-0000)이면 PG가 검증 단계에서
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
@@ -27,11 +27,9 @@
 import PortOne, {
   BillingKeyMethod,
   Currency,
+  ProductType,
   type Customer,
 } from '@portone/browser-sdk/v2'
-import { getBillingChannelKey } from '@/lib/portone/billing-channel-key'
-
-export const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? ''
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원)
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -50,7 +48,7 @@ export interface IssueBillingKeyResult {
 }
 
 /** KCP/PG: phoneNumber는 숫자만 (포트원 개발자 문서 권장) */
-function normalizeKcpPhone(phone?: string): string | undefined {
+export function normalizeKcpPhone(phone?: string): string | undefined {
   const trimmed = phone?.trim()
   if (!trimmed) return undefined
   const digits = trimmed.replace(/\D/g, '')
@@ -86,34 +84,58 @@ function newBillingIssueId(customerId: string): string {
 export async function requestIssueBillingKey(
   request: IssueBillingKeyRequest
 ): Promise<IssueBillingKeyResult> {
-  if (!PORTONE_STORE_ID) {
-    return {
-      success: false,
-      error: { message: 'NEXT_PUBLIC_PORTONE_STORE_ID 가 설정되지 않았습니다.' },
+  let storeId = ''
+  let channelKey = ''
+  try {
+    const cfgRes = await fetch('/api/billing/issue-config', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    const cfgJson = (await cfgRes.json().catch(() => ({}))) as {
+      storeId?: string
+      channelKey?: string
+      error?: string
     }
-  }
-  const channelKey = getBillingChannelKey()
-  if (!channelKey) {
+
+    if (!cfgRes.ok) {
+      return {
+        success: false,
+        error: {
+          message:
+            typeof cfgJson.error === 'string'
+              ? cfgJson.error
+              : `빌링 설정을 불러오지 못했습니다. (${cfgRes.status})`,
+        },
+      }
+    }
+
+    storeId = cfgJson.storeId?.trim() ?? ''
+    channelKey = cfgJson.channelKey?.trim() ?? ''
+    if (!storeId || !channelKey) {
+      return {
+        success: false,
+        error: { message: '포트원 상점 또는 빌링 채널 정보가 비어 있습니다.' },
+      }
+    }
+  } catch {
     return {
       success: false,
       error: {
-        message:
-          '빌링 채널 키가 설정되지 않았습니다. ' +
-          'NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC 또는 NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 에 ' +
-          '포트원 NHN KCP 국내 정기결제(빌링키) 채널 키를 넣어주세요.',
+        message: '빌링 채널 설정 조회 중 네트워크 오류가 발생했습니다.',
       },
     }
   }
 
   try {
     const response = await PortOne.requestIssueBillingKey({
-      storeId: PORTONE_STORE_ID,
+      storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
       issueName: '정산타임 구독 카드 등록',
       issueId: newBillingIssueId(request.customerId),
       displayAmount: SUBSCRIPTION_AMOUNT,
       currency: Currency.KRW,
+      productType: ProductType.DIGITAL,
       customer: buildBillingCustomer(request),
       // NHN KCP 빌링키 PC는 POPUP 미지원 → windowType 미지정 시 PG 기본(IFRAME 등) 사용
     })
