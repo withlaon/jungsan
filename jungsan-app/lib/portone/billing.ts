@@ -24,12 +24,7 @@
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
  */
 
-import PortOne, {
-  BillingKeyMethod,
-  Currency,
-  ProductType,
-  type Customer,
-} from '@portone/browser-sdk/v2'
+import PortOne, { BillingKeyMethod, Currency, type Customer } from '@portone/browser-sdk/v2'
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원)
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -57,9 +52,10 @@ export function normalizeKcpPhone(phone?: string): string | undefined {
 }
 
 function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
+  const rawName = request.customerName?.trim() ?? ''
   const customer: Customer = {
     customerId: request.customerId,
-    fullName: request.customerName,
+    fullName: rawName.length > 0 ? rawName : '구독자',
   }
   const email = request.customerEmail?.trim()
   if (email) customer.email = email
@@ -135,9 +131,8 @@ export async function requestIssueBillingKey(
       issueId: newBillingIssueId(request.customerId),
       displayAmount: SUBSCRIPTION_AMOUNT,
       currency: Currency.KRW,
-      productType: ProductType.DIGITAL,
+      // productType 미지정: 일부 KCP 빌링 채널에서 REAL/DIGITAL 분류로 창 검증이 어긋나는 경우 방지
       customer: buildBillingCustomer(request),
-      // NHN KCP 빌링키 PC는 POPUP 미지원 → windowType 미지정 시 PG 기본(IFRAME 등) 사용
     })
 
     if (!response || 'code' in response) {

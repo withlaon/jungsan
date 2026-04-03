@@ -72,8 +72,8 @@ function billingRegisterErrorMessage(message?: string, code?: string): string {
   const blob = `${message ?? ''} ${code ?? ''}`
   if (blob.includes('3192') || code === '3192') {
     return (
-      '카드번호가 결제사에서 거절되었습니다. 결제창에 「해외카드」가 보이면 국내 은행 카드는 쓸 수 없고 ' +
-      'VISA·Master·JCB·Diners만 가능합니다. 국내 카드로 등록하려면 포트원에 국내 정기결제(빌링키) 채널을 연결해 주세요.'
+      '카드번호가 결제사에서 거절되었습니다. 프로필 휴대폰(숫자)·채널(수단=빌링)을 확인해 주세요. ' +
+      '결제창이 「해외카드」 전용이면 국내 카드는 불가합니다. 그래도 동일하면 포트원/KCP로 문의해 주세요.'
     )
   }
   return message ?? '카드 등록에 실패했습니다.'

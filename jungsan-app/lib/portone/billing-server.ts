@@ -112,8 +112,19 @@ export async function chargeBillingKey(
       }),
     }
   )
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.message ?? '빌링키 결제 실패')
+  const data = (await res.json().catch(() => ({}))) as {
+    message?: string
+    pgMessage?: string
+    failure?: { message?: string }
+  } & BillingChargeResponse
+  if (!res.ok) {
+    const msg =
+      data.message ??
+      data.pgMessage ??
+      data.failure?.message ??
+      `빌링키 결제 실패 (HTTP ${res.status})`
+    throw new Error(msg)
+  }
   return data as BillingChargeResponse
 }
 
