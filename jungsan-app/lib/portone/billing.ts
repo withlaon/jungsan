@@ -6,7 +6,10 @@
  * 사전 준비:
  * 1. 포트원 관리자콘솔 > [연동 관리] > [채널 관리] > [테스트 채널 추가]
  *    → PG사: NHN KCP, 결제 유형: "빌링키" 또는 "KCP 결제창 정기결제"에 맞는 사이트코드 선택 후 저장
- * 2. 생성된 채널 키를 .env.local 의 NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 에 입력
+ * 2. 채널 키 (.env.local)
+ *    - 국내 카드 구독: NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC (권장) 또는
+ *      NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 에 **국내 정기결제·빌링키** 채널만 넣기
+ *    - 「해외카드_정기결제」 채널만 연결하면 국내 카드는 [3192]로 거절됩니다 (VISA 등 해외만 가능).
  *
  * KCP 연동 시 buyer 연락처는 숫자만 허용됩니다. 하이픈 포함(010-0000-0000)이면 PG가 검증 단계에서
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
@@ -17,10 +20,9 @@ import PortOne, {
   Currency,
   type Customer,
 } from '@portone/browser-sdk/v2'
+import { getBillingChannelKey } from '@/lib/portone/billing-channel-key'
 
 export const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? ''
-export const PORTONE_BILLING_CHANNEL_KEY =
-  process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY ?? ''
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원)
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -81,13 +83,15 @@ export async function requestIssueBillingKey(
       error: { message: 'NEXT_PUBLIC_PORTONE_STORE_ID 가 설정되지 않았습니다.' },
     }
   }
-  if (!PORTONE_BILLING_CHANNEL_KEY) {
+  const channelKey = getBillingChannelKey()
+  if (!channelKey) {
     return {
       success: false,
       error: {
         message:
-          'NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 가 설정되지 않았습니다. ' +
-          '포트원 콘솔에서 NHN KCP 빌링 채널을 추가하고 환경변수를 설정해주세요.',
+          '빌링 채널 키가 설정되지 않았습니다. ' +
+          'NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC 또는 NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY 에 ' +
+          '포트원 NHN KCP 국내 정기결제(빌링키) 채널 키를 넣어주세요.',
       },
     }
   }
@@ -95,7 +99,7 @@ export async function requestIssueBillingKey(
   try {
     const response = await PortOne.requestIssueBillingKey({
       storeId: PORTONE_STORE_ID,
-      channelKey: PORTONE_BILLING_CHANNEL_KEY,
+      channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
       issueName: '정산타임 구독 카드 등록',
       issueId: newBillingIssueId(request.customerId),

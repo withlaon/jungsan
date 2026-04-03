@@ -3,11 +3,11 @@
  * 빌링키로 결제 청구, 빌링키 조회/삭제 등을 처리합니다.
  */
 
+import { getBillingChannelKey } from '@/lib/portone/billing-channel-key'
+
 const PORTONE_API_BASE = 'https://api.portone.io'
 const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET ?? ''
 const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? ''
-const PORTONE_BILLING_CHANNEL_KEY =
-  process.env.NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY ?? ''
 
 function authHeader() {
   if (!PORTONE_API_SECRET) {
@@ -93,7 +93,7 @@ export async function chargeBillingKey(
       body: JSON.stringify({
         storeId: PORTONE_STORE_ID,
         billingKey: request.billingKey,
-        channelKey: PORTONE_BILLING_CHANNEL_KEY || undefined,
+        channelKey: getBillingChannelKey() || undefined,
         orderName: request.orderName,
         amount: { total: request.amount },
         currency: 'KRW',
