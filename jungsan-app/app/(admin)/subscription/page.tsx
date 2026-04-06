@@ -523,32 +523,6 @@ export default function SubscriptionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2.5 text-xs text-amber-100/90 leading-relaxed">
-            <p className="font-medium text-amber-100 mb-1 flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              카드 등록이 안 될 때
-            </p>
-            <p>
-              결제창 제목에 <strong className="text-amber-50">해외카드</strong>가 보이면{' '}
-              <strong className="text-amber-50">국내 은행 카드</strong>는 등록할 수 없습니다. (VISA·Master·JCB·Diners만 가능)
-            </p>
-            <p className="mt-1.5 text-amber-200/85">
-              국내 카드는 포트원에서{' '}
-              <strong className="text-amber-50">국내 정기결제·빌링키</strong> 채널(결제수단: 빌링)을 만든 뒤,{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">
-                PORTONE_BILLING_CHANNEL_KEY_DOMESTIC
-              </code>{' '}
-              또는{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">
-                NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC
-              </code>
-              에 그 채널 키를 넣으세요. 일반 결제(해외 전용) 채널 키와 같게 두면 [3192]가 계속 납니다. 로컬은{' '}
-              <code className="rounded bg-amber-900/50 px-1 text-[11px]">.env.local</code>, 배포는 Vercel과 동일하게 맞추세요.
-            </p>
-            <p className="mt-1.5 text-amber-200/80">
-              휴대폰에서 KCP로 넘어갔다가 이 페이지로 돌아오면 등록이 자동으로 완료됩니다. 돌아온 뒤에도 반영이 없으면 새로고침해 보세요.
-            </p>
-          </div>
           {sub?.has_card ? (
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
               <div className="flex items-center gap-3">
