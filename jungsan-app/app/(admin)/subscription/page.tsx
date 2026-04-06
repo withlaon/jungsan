@@ -25,7 +25,12 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
-import { requestIssueBillingKey, SUBSCRIPTION_AMOUNT, normalizeKcpPhone } from '@/lib/portone/billing'
+import {
+  requestIssueBillingKey,
+  SUBSCRIPTION_AMOUNT,
+  normalizeKcpPhone,
+  getKcpBillingCustomerGaps,
+} from '@/lib/portone/billing'
 import {
   parseBillingIssueReturnFromSearchParams,
   stripBillingIssueQueryParams,
@@ -197,15 +202,16 @@ export default function SubscriptionPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           setUserId(user.id)
-          setUserEmail(user.email ?? '')
 
           const { data: profile } = await supabase
             .from('profiles')
-            .select('manager_name, phone')
+            .select('manager_name, phone, email')
             .eq('id', user.id)
             .single()
           setUserName(profile?.manager_name ?? '')
           setUserPhone(profile?.phone ?? '')
+          /** KCP customer.email: 로그인 이메일 우선, 없으면 프로필 email */
+          setUserEmail((user.email ?? profile?.email ?? '').trim())
         }
         await Promise.all([fetchStatus(), fetchHistory()])
       } finally {
@@ -263,9 +269,27 @@ export default function SubscriptionPage() {
       toast.error('로그인 정보를 불러올 수 없습니다.')
       return
     }
-    if (!normalizeKcpPhone(userPhone)) {
+    const kcpGaps = getKcpBillingCustomerGaps({
+      customerId: userId,
+      customerName: userName,
+      customerEmail: userEmail,
+      customerPhone: userPhone,
+    })
+    if (kcpGaps.includes('phone')) {
       toast.error(
         'KCP 카드 등록을 위해 프로필에 휴대폰 번호를 저장해 주세요. (사이드바 정보수정 — 01012345678 또는 010-0000-0000 형식)',
+      )
+      return
+    }
+    if (kcpGaps.includes('email')) {
+      toast.error(
+        'KCP 결제창 연동을 위해 이메일이 필요합니다. 로그인 계정 또는 프로필(정보수정)에 이메일을 입력해 주세요.',
+      )
+      return
+    }
+    if (kcpGaps.includes('realName')) {
+      toast.error(
+        '프로필에 담당자명(실명)을 입력해 주세요. 카드 명의와 다르면 KCP에서 거절될 수 있습니다.',
       )
       return
     }

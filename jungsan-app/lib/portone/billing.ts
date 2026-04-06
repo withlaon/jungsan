@@ -37,7 +37,9 @@ export const TRIAL_DAYS = 30               // 무료 체험 기간
 
 export interface IssueBillingKeyRequest {
   customerId: string
+  /** 프로필 담당자명 — 비어 있으면 SDK에 `구독자`로만 전달되어 KCP·국내 카드 검증에서 불리할 수 있음 */
   customerName: string
+  /** 로그인 이메일 또는 profiles.email 등 — KCP 예시는 email 포함. 누락 시 customer에서 제외됨 */
   customerEmail?: string
   customerPhone?: string
 }
@@ -71,6 +73,22 @@ function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
   const phoneNumber = normalizeKcpPhone(request.customerPhone)
   if (phoneNumber) customer.phoneNumber = phoneNumber
   return customer
+}
+
+/**
+ * 포트원 KCP 빌링키 문서 예시는 fullName·phoneNumber·email을 모두 포함.
+ * 스키마상 optional이나, 국내 개인 카드 시 누락 시 결제창/검증 오류가 날 수 있어 UI에서 선행 검증 권장.
+ *
+ * @returns 누락 권장 필드 키 (실제 SDK 전달값과 다를 수 있음 — 예: 이름은 비어 있어도 `구독자`로 전송됨)
+ */
+export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Array<
+  'realName' | 'phone' | 'email'
+> {
+  const gaps: Array<'realName' | 'phone' | 'email'> = []
+  if (!request.customerName?.trim()) gaps.push('realName')
+  if (!normalizeKcpPhone(request.customerPhone)) gaps.push('phone')
+  if (!request.customerEmail?.trim()) gaps.push('email')
+  return gaps
 }
 
 function newBillingIssueId(customerId: string): string {
