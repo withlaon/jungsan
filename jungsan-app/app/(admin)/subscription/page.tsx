@@ -28,9 +28,11 @@ import {
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import {
-  requestIssueBillingKey,
+  loadBillingIssueConfig,
+  requestIssueBillingKeyWithConfig,
   SUBSCRIPTION_AMOUNT,
-  normalizeKcpPhone,
+  isValidKrMobileForBilling,
+  type BillingIssueConfig,
 } from '@/lib/portone/billing'
 import {
   parseBillingIssueReturnFromSearchParams,
@@ -174,6 +176,12 @@ export default function SubscriptionPage() {
     phone?: string
     email?: string
   }>({})
+  const [preparedBillingConfig, setPreparedBillingConfig] =
+    useState<BillingIssueConfig | null>(null)
+  const [billingConfigStatus, setBillingConfigStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle')
+  const [billingConfigMessage, setBillingConfigMessage] = useState<string | null>(null)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -293,6 +301,20 @@ export default function SubscriptionPage() {
     })()
   }, [loading, userId, saveBillingKeyToServer])
 
+  const loadBillingConfigForDialog = useCallback(async () => {
+    setBillingConfigStatus('loading')
+    setBillingConfigMessage(null)
+    const r = await loadBillingIssueConfig()
+    if (r.ok) {
+      setPreparedBillingConfig(r.config)
+      setBillingConfigStatus('ready')
+    } else {
+      setPreparedBillingConfig(null)
+      setBillingConfigStatus('error')
+      setBillingConfigMessage(r.error?.message ?? '설정을 불러오지 못했습니다.')
+    }
+  }, [])
+
   const openRegisterCardDialog = useCallback(() => {
     if (!userId) {
       toast.error('로그인 정보를 불러올 수 없습니다.')
@@ -302,8 +324,12 @@ export default function SubscriptionPage() {
     setBillingPhone(userPhone.trim())
     setBillingEmail(userEmail.trim())
     setBillingFormErrors({})
+    setPreparedBillingConfig(null)
+    setBillingConfigMessage(null)
+    setBillingConfigStatus('loading')
     setRegisterCardOpen(true)
-  }, [userId, userName, userPhone, userEmail])
+    void loadBillingConfigForDialog()
+  }, [userId, userName, userPhone, userEmail, loadBillingConfigForDialog])
 
   const handleConfirmBillingRegister = async () => {
     if (!userId) {
@@ -319,8 +345,9 @@ export default function SubscriptionPage() {
     if (name.length < 2) {
       nextErrors.realName = '담당자 실명을 2자 이상 입력해 주세요. (카드 명의와 같으면 처리에 유리합니다)'
     }
-    if (!normalizeKcpPhone(phone)) {
-      nextErrors.phone = '휴대폰 번호를 확인해 주세요. (숫자 10~15자리, 하이픈 있어도 됩니다)'
+    if (!isValidKrMobileForBilling(phone)) {
+      nextErrors.phone =
+        '휴대폰 번호를 확인해 주세요. 010 번호는 11자리(예: 01012345678)여야 합니다.'
     }
     if (!isValidBillingEmail(email)) {
       nextErrors.email = '유효한 이메일 주소를 입력해 주세요.'
@@ -331,37 +358,52 @@ export default function SubscriptionPage() {
     }
     setBillingFormErrors({})
 
+    if (billingConfigStatus !== 'ready' || !preparedBillingConfig) {
+      toast.error(
+        billingConfigMessage ??
+          '결제 연동 설정을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.',
+      )
+      return
+    }
+
+    const cfg = preparedBillingConfig
+    const billingPayload = {
+      customerId: userId,
+      customerName: name,
+      customerEmail: email,
+      customerPhone: phone,
+    }
+
+    setRegisterCardOpen(false)
     setIsRegistering(true)
-    try {
-      const supabase = createClient()
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .update({
-          manager_name: name,
-          phone,
-          email,
-        })
-        .eq('id', userId)
 
-      if (profileErr) {
-        console.error('[subscription] profile update:', profileErr)
-        toast.error(
-          '고객 정보를 저장하지 못했습니다. 설정 > 프로필에서 권한을 확인하거나 잠시 후 다시 시도해 주세요.',
-        )
-        return
-      }
+    toast.info('결제 창이 열립니다. 팝업·새 창 차단을 해제해 주세요.')
 
-      setUserName(name)
-      setUserPhone(phone)
-      setUserEmail(email)
-      setRegisterCardOpen(false)
-
-      const result = await requestIssueBillingKey({
-        customerId: userId,
-        customerName: name,
-        customerEmail: email,
-        customerPhone: phone,
+    const supabase = createClient()
+    const profilePromise = supabase
+      .from('profiles')
+      .update({
+        manager_name: name,
+        phone,
+        email,
       })
+      .eq('id', userId)
+
+    const billingPromise = requestIssueBillingKeyWithConfig(cfg, billingPayload)
+
+    try {
+      const [profileRes, result] = await Promise.all([profilePromise, billingPromise])
+
+      if (profileRes.error) {
+        console.error('[subscription] profile update:', profileRes.error)
+        toast.error(
+          `프로필 저장 실패: ${profileRes.error.message}. 결제는 진행되었을 수 있으니 결과를 확인해 주세요.`,
+        )
+      } else {
+        setUserName(name)
+        setUserPhone(phone)
+        setUserEmail(email)
+      }
 
       if (!result.success) {
         toast.error(
@@ -770,6 +812,31 @@ export default function SubscriptionPage() {
               </span>
             </DialogDescription>
           </DialogHeader>
+
+          {billingConfigStatus === 'loading' && (
+            <div className="flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-300">
+              <RefreshCw className="h-4 w-4 animate-spin shrink-0 text-blue-400" />
+              결제 연동 정보를 불러오는 중입니다…
+            </div>
+          )}
+          {billingConfigStatus === 'error' && billingConfigMessage && (
+            <div
+              className="rounded-md border border-amber-600/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200 space-y-2"
+              role="alert"
+            >
+              <p>{billingConfigMessage}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-amber-700 text-amber-100 hover:bg-amber-900/40"
+                onClick={() => void loadBillingConfigForDialog()}
+              >
+                다시 불러오기
+              </Button>
+            </div>
+          )}
+
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
               <Label htmlFor="billing-name" className="text-slate-200">
@@ -828,7 +895,6 @@ export default function SubscriptionPage() {
               variant="outline"
               className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
               onClick={() => setRegisterCardOpen(false)}
-              disabled={isRegistering}
             >
               취소
             </Button>
@@ -836,16 +902,9 @@ export default function SubscriptionPage() {
               type="button"
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => void handleConfirmBillingRegister()}
-              disabled={isRegistering}
+              disabled={billingConfigStatus !== 'ready'}
             >
-              {isRegistering ? (
-                <span className="flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  진행 중…
-                </span>
-              ) : (
-                '다음: 카드 입력 화면'
-              )}
+              다음: 카드 입력 화면
             </Button>
           </div>
         </DialogContent>

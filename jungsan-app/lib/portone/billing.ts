@@ -6,13 +6,11 @@
  * 올바른 함수명은 **`PortOne.requestIssueBillingKey`** 입니다.
  * (`requestBillingKey` 는 @portone/browser-sdk/v2 에 존재하지 않습니다.)
  *
+ * **팝업/결제창**: 클릭 후 `await fetch` 등으로 마이크로태스크가 끊기면 user activation이 만료되어
+ * 결제창이 안 열리고 무한 대기처럼 보일 수 있습니다. 구독 UI에서는 `loadBillingIssueConfig`로
+ * 설정을 미리 받은 뒤 `requestIssueBillingKeyWithConfig`를 클릭 핸들러에서 곧바로 호출하세요.
+ *
  * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
- * @see IssueBillingKeyRequestBase — storeId, channelKey?, billingKeyMethod, issueName?, issueId?, customer?, …
- *
- * NHN KCP 정기·빌링 채널: env의 channelKey는 일반 결제가 아닌 정기용이어야 합니다.
- * @see https://help.portone.io/content/kcp_channel
- *
- * storeId / channelKey → `/api/billing/issue-config` (NEXT_PUBLIC_PORTONE_STORE_ID + getBillingChannelKeyServer)
  */
 
 import PortOne, {
@@ -39,6 +37,78 @@ export interface IssueBillingKeyResult {
   error?: { code?: string; message?: string; pgMessage?: string }
 }
 
+/** `/api/billing/issue-config` 성공 시 그대로 사용 */
+export type BillingIssueConfig = {
+  storeId: string
+  channelKey: string
+  apiSecretConfigured: boolean
+}
+
+export type LoadBillingIssueConfigResult =
+  | { ok: true; config: BillingIssueConfig }
+  | { ok: false; error: NonNullable<IssueBillingKeyResult['error']> }
+
+/** 결제창 열기 전에 미리 호출 (다이얼로그 오픈 시 등) */
+export async function loadBillingIssueConfig(): Promise<LoadBillingIssueConfigResult> {
+  try {
+    const cfgRes = await fetch('/api/billing/issue-config', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    const cfgJson = (await cfgRes.json().catch(() => ({}))) as {
+      storeId?: string
+      channelKey?: string
+      apiSecretConfigured?: boolean
+      error?: string
+    }
+
+    if (!cfgRes.ok) {
+      return {
+        ok: false,
+        error: {
+          message:
+            typeof cfgJson.error === 'string'
+              ? cfgJson.error
+              : `빌링 설정을 불러오지 못했습니다. (${cfgRes.status})`,
+        },
+      }
+    }
+
+    const storeId = cfgJson.storeId?.trim() ?? ''
+    const channelKey = cfgJson.channelKey?.trim() ?? ''
+    if (!storeId || !channelKey) {
+      return {
+        ok: false,
+        error: { message: '포트원 상점 또는 빌링 채널 정보가 비어 있습니다.' },
+      }
+    }
+    if (cfgJson.apiSecretConfigured === false) {
+      return {
+        ok: false,
+        error: {
+          message:
+            '서버에 PORTONE_API_SECRET(V2 API Secret)이 없어 카드 등록 후 처리가 불완전할 수 있습니다. ' +
+            'Vercel/서버 환경변수를 설정한 뒤 다시 시도해 주세요.',
+        },
+      }
+    }
+
+    return {
+      ok: true,
+      config: {
+        storeId,
+        channelKey,
+        apiSecretConfigured: true,
+      },
+    }
+  } catch {
+    return {
+      ok: false,
+      error: { message: '빌링 채널 설정 조회 중 네트워크 오류가 발생했습니다.' },
+    }
+  }
+}
+
 /** KCP·포트원 권장: 휴대폰은 숫자만 */
 export function normalizeKcpPhone(phone?: string): string | undefined {
   const trimmed = phone?.trim()
@@ -48,12 +118,24 @@ export function normalizeKcpPhone(phone?: string): string | undefined {
   return digits
 }
 
+/**
+ * 국내 휴대폰(010 등) — KCP 정기결제에 맞게 자리수 검사
+ * 010으로 시작하면 11자리여야 합니다.
+ */
+export function isValidKrMobileForBilling(phone: string): boolean {
+  const d = normalizeKcpPhone(phone)
+  if (!d) return false
+  if (d.startsWith('010')) return d.length === 11
+  if (d.startsWith('01')) return d.length >= 10 && d.length <= 11
+  return d.length >= 10 && d.length <= 15
+}
+
 export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Array<
   'realName' | 'phone' | 'email'
 > {
   const gaps: Array<'realName' | 'phone' | 'email'> = []
   if (!request.customerName?.trim()) gaps.push('realName')
-  if (!normalizeKcpPhone(request.customerPhone)) gaps.push('phone')
+  if (!isValidKrMobileForBilling(request.customerPhone ?? '')) gaps.push('phone')
   if (!request.customerEmail?.trim()) gaps.push('email')
   return gaps
 }
@@ -72,13 +154,11 @@ function truncateUtf8Bytes(str: string, maxBytes: number): string {
   return out.trim()
 }
 
-/** 포트원: issueId는 ASCII 출력 가능 문자만 */
 function shortAsciiIssueId(): string {
-  const raw = `${ Date.now() }${ Math.floor(Math.random() * 1_000) }`
+  const raw = `${Date.now()}${Math.floor(Math.random() * 1_000)}`
   return raw.replace(/\D/g, '').slice(-12).padStart(12, '0')
 }
 
-/** customerId: UUID 등 → PG 안전한 영숫자 위주 */
 function sdkCustomerId(internalId: string): string {
   const s = internalId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)
   return s.length >= 8 ? s : `u${internalId.replace(/\W/g, '').slice(0, 20)}`
@@ -110,70 +190,96 @@ function isMobileBillingEnvironment(): boolean {
 }
 
 function sdkIssueName(): string {
-  // KCP 전문 길이 고려 — 짧은 표기
   const name = truncateUtf8Bytes('정산타임 구독 카드', 28)
   return name || 'Card registration'
 }
 
-/**
- * V2 규격: `PortOne.requestIssueBillingKey` + IssueBillingKeyRequest 타입과 동일한 필드만 사용합니다.
- */
-export async function requestIssueBillingKey(
-  request: IssueBillingKeyRequest,
-): Promise<IssueBillingKeyResult> {
-  let storeId = ''
-  let channelKey = ''
-  try {
-    const cfgRes = await fetch('/api/billing/issue-config', {
-      credentials: 'include',
-      cache: 'no-store',
-    })
-    const cfgJson = (await cfgRes.json().catch(() => ({}))) as {
-      storeId?: string
-      channelKey?: string
-      apiSecretConfigured?: boolean
-      error?: string
-    }
-
-    if (!cfgRes.ok) {
-      return {
-        success: false,
-        error: {
-          message:
-            typeof cfgJson.error === 'string'
-              ? cfgJson.error
-              : `빌링 설정을 불러오지 못했습니다. (${cfgRes.status})`,
-        },
+function interpretIssueBillingKeySdkResponse(
+  response:
+    | {
+        billingKey?: string
+        billingIssueToken?: string
+        code?: string
+        message?: string
+        pgMessage?: string
       }
-    }
-
-    storeId = cfgJson.storeId?.trim() ?? ''
-    channelKey = cfgJson.channelKey?.trim() ?? ''
-    if (!storeId || !channelKey) {
-      return {
-        success: false,
-        error: { message: '포트원 상점 또는 빌링 채널 정보가 비어 있습니다.' },
-      }
-    }
-    if (cfgJson.apiSecretConfigured === false) {
-      return {
-        success: false,
-        error: {
-          message:
-            '서버에 PORTONE_API_SECRET(V2 API Secret)이 없어 카드 등록 후 처리가 불완전할 수 있습니다. ' +
-            'Vercel/서버 환경변수를 설정한 뒤 다시 시도해 주세요.',
-        },
-      }
-    }
-  } catch {
+    | null
+    | undefined,
+): IssueBillingKeyResult {
+  if (!response) {
     return {
       success: false,
       error: {
-        message: '빌링 채널 설정 조회 중 네트워크 오류가 발생했습니다.',
+        message:
+          '카드 등록 응답이 없습니다. 모바일은 결제 창 종료 후 이 페이지로 돌아오는지 확인해 주세요.',
       },
     }
   }
 
+  const failCode =
+    typeof response.code === 'string' ? response.code.trim() : ''
+  if (failCode) {
+    return {
+      success: false,
+      error: {
+        code: response.code,
+        message: response.message ?? '카드 등록에 실패했습니다.',
+        pgMessage: response.pgMessage,
+      },
+    }
+  }
+
+  const billingKeyVal = response.billingKey
+  if (!billingKeyVal) {
+    return {
+      success: false,
+      error: {
+        message: response.message ?? '빌링키를 받지 못했습니다.',
+      },
+    }
+  }
+
+  if (billingKeyVal === 'NEEDS_CONFIRMATION' && response.billingIssueToken) {
+    return {
+      success: true,
+      needsServerConfirm: true,
+      billingIssueToken: response.billingIssueToken,
+      billingKey: billingKeyVal,
+    }
+  }
+
+  return {
+    success: true,
+    billingKey: billingKeyVal,
+  }
+}
+
+/**
+ * 이미 로드한 설정으로 빌링키 발급만 수행.
+ * **클릭 이벤트에서 `await fetch` 없이 곧바로 호출**할 수 있게 하려고 분리했습니다.
+ */
+export async function requestIssueBillingKeyWithConfig(
+  config: BillingIssueConfig,
+  request: IssueBillingKeyRequest,
+): Promise<IssueBillingKeyResult> {
+  if (!config.storeId?.trim() || !config.channelKey?.trim()) {
+    return {
+      success: false,
+      error: { message: '포트원 상점 또는 빌링 채널 정보가 비어 있습니다.' },
+    }
+  }
+  if (config.apiSecretConfigured === false) {
+    return {
+      success: false,
+      error: {
+        message:
+          '서버에 PORTONE_API_SECRET(V2 API Secret)이 없어 카드 등록 후 처리가 불완전할 수 있습니다.',
+      },
+    }
+  }
+
+  const storeId = config.storeId.trim()
+  const channelKey = config.channelKey.trim()
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const redirectUrl = origin ? `${origin}/bk` : undefined
   const mobile = isMobileBillingEnvironment()
@@ -191,7 +297,6 @@ export async function requestIssueBillingKey(
       : {}
 
   try {
-    // 실명·연락처·이메일은 구독 화면에서 검증 후 전달 (KCP 정기·빌링에 필요)
     const response = await PortOne.requestIssueBillingKey({
       storeId,
       channelKey,
@@ -201,66 +306,15 @@ export async function requestIssueBillingKey(
       customer: buildSdkCustomer(request),
       ...mobileOnly,
     })
-
-    if (!response) {
-      return {
-        success: false,
-        error: {
-          message:
-            '카드 등록 응답이 없습니다. 모바일은 결제 창 종료 후 이 페이지로 돌아오는지 확인해 주세요.',
-        },
-      }
-    }
-
-    const failCode =
-      typeof (response as { code?: unknown }).code === 'string'
-        ? (response as { code: string }).code.trim()
-        : ''
-    if (failCode) {
-      const errResp = response as {
+    return interpretIssueBillingKeySdkResponse(
+      response as {
+        billingKey?: string
+        billingIssueToken?: string
         code?: string
         message?: string
         pgMessage?: string
-      }
-      return {
-        success: false,
-        error: {
-          code: errResp.code,
-          message: errResp.message ?? '카드 등록에 실패했습니다.',
-          pgMessage: errResp.pgMessage,
-        },
-      }
-    }
-
-    const billingKeyVal = (response as { billingKey?: string }).billingKey
-    if (!billingKeyVal) {
-      const errResp = response as { message?: string }
-      return {
-        success: false,
-        error: {
-          message: errResp.message ?? '빌링키를 받지 못했습니다.',
-        },
-      }
-    }
-
-    const raw = response as {
-      billingKey?: string
-      billingIssueToken?: string
-    }
-
-    if (raw.billingKey === 'NEEDS_CONFIRMATION' && raw.billingIssueToken) {
-      return {
-        success: true,
-        needsServerConfirm: true,
-        billingIssueToken: raw.billingIssueToken,
-        billingKey: raw.billingKey,
-      }
-    }
-
-    return {
-      success: true,
-      billingKey: raw.billingKey,
-    }
+      },
+    )
   } catch (error) {
     const err = error as Error
     return {
@@ -268,4 +322,14 @@ export async function requestIssueBillingKey(
       error: { message: err.message ?? '카드 등록 처리 중 오류가 발생했습니다.' },
     }
   }
+}
+
+export async function requestIssueBillingKey(
+  request: IssueBillingKeyRequest,
+): Promise<IssueBillingKeyResult> {
+  const loaded = await loadBillingIssueConfig()
+  if (!loaded.ok) {
+    return { success: false, error: loaded.error }
+  }
+  return requestIssueBillingKeyWithConfig(loaded.config, request)
 }
