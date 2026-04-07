@@ -28,7 +28,6 @@ import { createClient } from '@/lib/supabase/client'
 import {
   requestIssueBillingKey,
   SUBSCRIPTION_AMOUNT,
-  normalizeKcpPhone,
   getKcpBillingCustomerGaps,
 } from '@/lib/portone/billing'
 import {
@@ -89,9 +88,8 @@ function billingRegisterErrorMessage(
     blob.includes('잘못된 전문')
   ) {
     return (
-      'PG에서 전문 길이 오류로 거절했습니다. ' +
-      '담당자명은 PG 요청 시 영문(ASCII)만 보내도록 했으니 이메일 길이만 짧게 조정해 보세요. '
-      + '그래도 동일하면 포트원 채널이「빌링키/정기결제」용 사이트코드인지, 일반 결제 채널과 바꿔 끼우지 않았는지 콘솔에서 확인이 필요합니다.'
+      'PG 전문 길이 오류입니다. 앱에서는 포트원 문서와 동일하게 storeId·channelKey·billingKeyMethod만 보냅니다. ' +
+      '여전히 같은 메시지면 콘솔 채널이 반드시「NHN KCP · 빌링키/정기결제」용 사이트코드인지 확인하세요. 일반 결제 채널이면 동일 오류가 반복됩니다.'
     )
   }
   if (
@@ -267,14 +265,6 @@ export default function SubscriptionPage() {
         return
       }
 
-      if (!normalizeKcpPhone(userPhone)) {
-        toast.error(
-          '카드 등록을 마무리하려면 프로필에 휴대폰 번호를 저장한 뒤 다시 시도해 주세요. (정보수정)',
-        )
-        clearQuery()
-        return
-      }
-
       const body =
         parsed.billingKey === 'NEEDS_CONFIRMATION' && parsed.billingIssueToken
           ? { billingIssueToken: parsed.billingIssueToken }
@@ -283,7 +273,7 @@ export default function SubscriptionPage() {
       await saveBillingKeyToServer(body)
       clearQuery()
     })()
-  }, [loading, userId, userPhone, saveBillingKeyToServer])
+  }, [loading, userId, saveBillingKeyToServer])
 
   const handleRegisterCard = async () => {
     if (!userId) {
@@ -296,33 +286,15 @@ export default function SubscriptionPage() {
       customerEmail: userEmail,
       customerPhone: userPhone,
     })
-    if (kcpGaps.includes('phone')) {
-      toast.error(
-        'KCP 카드 등록을 위해 프로필에 휴대폰 번호를 저장해 주세요. (사이드바 정보수정 — 01012345678 또는 010-0000-0000 형식)',
+    if (kcpGaps.length > 0) {
+      toast.info(
+        '프로필에 휴대폰·이메일·담당자명을 채우면 이후 자동 결제·CS에 도움이 됩니다. (필수 아님)',
       )
-      return
-    }
-    if (kcpGaps.includes('email')) {
-      toast.error(
-        'KCP 결제창 연동을 위해 이메일이 필요합니다. 로그인 계정 또는 프로필(정보수정)에 이메일을 입력해 주세요.',
-      )
-      return
-    }
-    if (kcpGaps.includes('realName')) {
-      toast.error(
-        '프로필에 담당자명(실명)을 입력해 주세요. 카드 명의와 다르면 KCP에서 거절될 수 있습니다.',
-      )
-      return
     }
     setIsRegistering(true)
     try {
-      // ① 포트원 SDK: PG 결제창에서 카드 입력 → 빌링키 발급 (PortOne.requestIssueBillingKey)
-      const result = await requestIssueBillingKey({
-        customerId: userId,
-        customerName: userName || '구독자',
-        customerEmail: userEmail,
-        customerPhone: userPhone,
-      })
+      // ① 포트원 SDK: 문서 최소 스펙만 전달 (https://developers.portone.io/opi/ko/integration/start/v2/billing/issue)
+      const result = await requestIssueBillingKey()
 
       if (!result.success) {
         toast.error(

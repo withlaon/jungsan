@@ -1,58 +1,40 @@
 'use client'
 
 /**
- * 포트원 V2 — 구독형 정기결제용 빌링키 (결제창 방식)
+ * 포트원 V2 — 결제창 빌링키 발급 (`PortOne.requestIssueBillingKey`)
  *
- * [빌링키란] 카드 원번호를 저장하지 않고 PG가 발급한 빌링키만 보관한 뒤, 원하는 시점에 그 키로 결제 요청.
+ * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
+ * 공식 예시는 **storeId · channelKey · billingKeyMethod** 만 전달합니다.
+ * 추가 필드(고객 정보·issueId·금액 등)가 일부 KCP 빌링 채널에서 PG 전문 길이 오류를 유발할 수 있어
+ * PC/데스크톱에서는 이 3가지만 보냅니다.
  *
- * [구현 단계]
- * 1) 빌링키 발급 (본 모듈) — PG 결제창에서 고객이 카드 입력 → PortOne.requestIssueBillingKey()
- * 2) 발급된 billingKey 저장 — POST /api/billing/issue
- * 3) 월 청구 등 결제 요청 — lib/portone/billing-server.ts 의 chargeBillingKey() · Vercel cron /api/cron/billing
+ * 모바일(리디렉션)은 포트원·KCP 요구에 따라 `windowType`·`redirectUrl`·`offerPeriod` 만 덧붙입니다.
  *
- * 다른 방식(API로 카드번호 직접 전달 등)은 사용하지 않습니다.
- *
- * 사전 준비:
- * 1. 포트원 관리자콘솔 > [연동 관리] > [채널 관리] > [테스트 채널 추가]
- *    → PG사: NHN KCP, 결제 유형: "빌링키" 또는 "KCP 결제창 정기결제"에 맞는 사이트코드 선택 후 저장
- * 2. 채널 키 (발급·청구 공통, 서버 우선순위는 lib/portone/billing-channel-key.ts 참고)
- *    - 권장: PORTONE_BILLING_CHANNEL_KEY_DOMESTIC (서버/Vercel Secrets) = 포트원「국내 정기·빌링키」채널만
- *    - GET /api/billing/issue-config 가 클라이언트에 storeId·channelKey 전달
- *    - 일반 결제·해외 전용 채널 키를 그대로 쓰면 국내 카드 [3192]가 계속됩니다.
- *
- * KCP 연동 시 buyer 연락처는 숫자만 허용됩니다. 하이픈 포함(010-0000-0000)이면 PG가 검증 단계에서
- * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
+ * [이후 단계] POST /api/billing/issue → chargeBillingKey(월 청구)
  */
 
-import PortOne, {
-  BillingKeyMethod,
-  Currency,
-  WindowType,
-  type Customer,
-} from '@portone/browser-sdk/v2'
+import PortOne, { BillingKeyMethod, WindowType } from '@portone/browser-sdk/v2'
 
-export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원) — 실제 청구는 chargeBillingKey, 카드 등록 시 금액과 별개
-export const TRIAL_DAYS = 30               // 무료 체험 기간
+export const SUBSCRIPTION_AMOUNT = 20_000
+export const TRIAL_DAYS = 30
 
+/** @deprecated 빌링키 발급 요청에 더 이상 사용하지 않음(문서 최소 스펙). 프로필 검증용으로만 유지 가능 */
 export interface IssueBillingKeyRequest {
   customerId: string
-  /** 프로필 담당자명 — 비어 있으면 SDK에 `구독자`로만 전달되어 KCP·국내 카드 검증에서 불리할 수 있음 */
   customerName: string
-  /** 로그인 이메일 또는 profiles.email 등 — KCP 예시는 email 포함. 누락 시 customer에서 제외됨 */
   customerEmail?: string
   customerPhone?: string
 }
 
 export interface IssueBillingKeyResult {
   success: boolean
-  /** 수동 승인 채널일 때 서버에서 confirm 후 저장 */
   billingIssueToken?: string
   needsServerConfirm?: boolean
   billingKey?: string
   error?: { code?: string; message?: string; pgMessage?: string }
 }
 
-/** KCP/PG: phoneNumber는 숫자만 (포트원 개발자 문서 권장) */
+/** 프로필 정리용(선택). PG로 전달하지 않습니다. */
 export function normalizeKcpPhone(phone?: string): string | undefined {
   const trimmed = phone?.trim()
   if (!trimmed) return undefined
@@ -61,48 +43,7 @@ export function normalizeKcpPhone(phone?: string): string | undefined {
   return digits
 }
 
-/**
- * KCP 등은 구매자명·이메일·주문명 필드가 정해진 바이트 길이를 넘으면 「잘못된_전문길이」로 거절하는 경우가 있습니다.
- * UTF-8 바이트 수를 넘지 않도록 앞부분만 유지합니다.
- */
-function truncateUtf8Bytes(str: string, maxBytes: number): string {
-  if (!str || maxBytes <= 0) return ''
-  const enc = new TextEncoder()
-  let used = 0
-  let out = ''
-  for (const ch of str) {
-    const b = enc.encode(ch)
-    if (used + b.length > maxBytes) break
-    used += b.length
-    out += ch
-  }
-  return out.trim()
-}
-
-/** KCP 전문은 EUC-KR/고정필드 기준이라 비ASCII(한글 등)만으로 전문 길이 오류가 나는 경우가 있음 → PG에는 ASCII만 전달 */
-function kcpAsciiFullName(raw: string): string {
-  const ascii = raw.replace(/[^\x20-\x7E]/g, '').trim()
-  const name = ascii.length >= 2 ? truncateUtf8Bytes(ascii, 18) : 'Subscriber'
-  return name || 'Subscriber'
-}
-
-function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
-  const customer: Customer = {
-    fullName: kcpAsciiFullName(request.customerName?.trim() ?? ''),
-  }
-  const email = request.customerEmail?.trim()
-  if (email) customer.email = truncateUtf8Bytes(email, 28)
-  const phoneNumber = normalizeKcpPhone(request.customerPhone)
-  if (phoneNumber) customer.phoneNumber = phoneNumber
-  return customer
-}
-
-/**
- * 포트원 KCP 빌링키 문서 예시는 fullName·phoneNumber·email을 모두 포함.
- * 스키마상 optional이나, 국내 개인 카드 시 누락 시 결제창/검증 오류가 날 수 있어 UI에서 선행 검증 권장.
- *
- * @returns 누락 권장 필드 키 (실제 SDK 전달값과 다를 수 있음 — 예: 이름은 비어 있어도 `구독자`로 전송됨)
- */
+/** 프로필 가이드용 — 카드 등록 버튼을 막지 않습니다. */
 export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Array<
   'realName' | 'phone' | 'email'
 > {
@@ -113,13 +54,23 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
   return gaps
 }
 
+function isMobileBillingEnvironment(): boolean {
+  if (typeof window === 'undefined') return false
+  if (/Android|iPhone|iPad|iPod|Mobile|IEMobile|BlackBerry/i.test(navigator.userAgent)) {
+    return true
+  }
+  try {
+    return window.matchMedia('(max-width: 767px)').matches
+  } catch {
+    return false
+  }
+}
+
 /**
- * 포트원 V2 NHN KCP 빌링키 발급 요청
- * 사용자가 카드 정보를 입력하면 PortOne이 빌링키를 발급해 반환합니다.
+ * 포트원 문서와 동일한 최소 호출 + 모바일 시 리디렉션·정기구간만 추가
+ * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
  */
-export async function requestIssueBillingKey(
-  request: IssueBillingKeyRequest
-): Promise<IssueBillingKeyResult> {
+export async function requestIssueBillingKey(): Promise<IssueBillingKeyResult> {
   let storeId = ''
   let channelKey = ''
   try {
@@ -174,35 +125,32 @@ export async function requestIssueBillingKey(
   }
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  /**
-   * 짧은 `/bk` 경로로 returnUrl 길이 최소화 → `/bk` 페이지가 `/subscription`으로 쿼리를 넘김.
-   */
   const redirectUrl = origin ? `${origin}/bk` : undefined
+  const mobile = isMobileBillingEnvironment()
 
-  /** 숫자만·최대 12자·ASCII (KCP 주문번호 필드) */
-  const shortIssueId = () => {
-    const raw = `${Date.now()}${Math.floor(Math.random() * 1_000)}`
-    return raw.replace(/\D/g, '').slice(-12).padStart(12, '0')
-  }
+  const base = {
+    storeId,
+    channelKey,
+    billingKeyMethod: BillingKeyMethod.CARD,
+  } as const
 
-  /**
-   * displayAmount 0 = 빌링키만(실결제 전문과 분리). issueName/noticeUrls 생략.
-   */
+  const mobileOnly =
+    mobile && redirectUrl
+      ? {
+          windowType: {
+            pc: WindowType.IFRAME,
+            mobile: WindowType.REDIRECTION,
+          },
+          redirectUrl,
+          /** 모바일 빌링키 발급: 문서상 offerPeriod 필수 */
+          offerPeriod: { interval: '1m' as const },
+        }
+      : {}
+
   try {
     const response = await PortOne.requestIssueBillingKey({
-      storeId,
-      channelKey,
-      billingKeyMethod: BillingKeyMethod.CARD,
-      issueId: shortIssueId(),
-      displayAmount: 0,
-      currency: Currency.KRW,
-      offerPeriod: { interval: '1m' },
-      windowType: {
-        pc: WindowType.IFRAME,
-        mobile: WindowType.REDIRECTION,
-      },
-      ...(redirectUrl ? { redirectUrl } : {}),
-      customer: buildBillingCustomer(request),
+      ...base,
+      ...mobileOnly,
     })
 
     if (!response || 'code' in response) {
