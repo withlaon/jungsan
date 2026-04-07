@@ -110,7 +110,8 @@ function isMobileBillingEnvironment(): boolean {
 }
 
 function sdkIssueName(): string {
-  const name = truncateUtf8Bytes('정산타임 정기 구독 카드 등록', 40)
+  // KCP 전문 길이 고려 — 짧은 표기
+  const name = truncateUtf8Bytes('정산타임 구독 카드', 28)
   return name || 'Card registration'
 }
 
@@ -190,19 +191,14 @@ export async function requestIssueBillingKey(
       : {}
 
   try {
-    // PC(iframe) KCP: 전문 길이 제한에 대비해 storeId·channelKey·수단만 전달.
-    // 모바일(리디렉션): issueName·issueId·customer·offerPeriod 유지.
+    // 실명·연락처·이메일은 구독 화면에서 검증 후 전달 (KCP 정기·빌링에 필요)
     const response = await PortOne.requestIssueBillingKey({
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
-      ...(mobile
-        ? {
-            issueName: sdkIssueName(),
-            issueId: shortAsciiIssueId(),
-            customer: buildSdkCustomer(request),
-          }
-        : {}),
+      issueName: sdkIssueName(),
+      issueId: shortAsciiIssueId(),
+      customer: buildSdkCustomer(request),
       ...mobileOnly,
     })
 

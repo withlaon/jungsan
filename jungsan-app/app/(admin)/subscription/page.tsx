@@ -17,6 +17,8 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -28,7 +30,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   requestIssueBillingKey,
   SUBSCRIPTION_AMOUNT,
-  getKcpBillingCustomerGaps,
+  normalizeKcpPhone,
 } from '@/lib/portone/billing'
 import {
   parseBillingIssueReturnFromSearchParams,
@@ -73,6 +75,12 @@ function formatDate(iso?: string | null): string {
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString('ko-KR') + '원'
+}
+
+function isValidBillingEmail(value: string): boolean {
+  const s = value.trim()
+  if (s.length < 5) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 }
 
 /** 포트원/KCP [3192] 등 — 해외전용 채널에 국내 카드 시도 시 흔함 */
@@ -156,6 +164,16 @@ export default function SubscriptionPage() {
   const [userEmail, setUserEmail] = useState<string>('')
   const [userPhone, setUserPhone] = useState<string>('')
   const billingRedirectHandledRef = useRef(false)
+
+  const [registerCardOpen, setRegisterCardOpen] = useState(false)
+  const [billingName, setBillingName] = useState('')
+  const [billingPhone, setBillingPhone] = useState('')
+  const [billingEmail, setBillingEmail] = useState('')
+  const [billingFormErrors, setBillingFormErrors] = useState<{
+    realName?: string
+    phone?: string
+    email?: string
+  }>({})
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -275,30 +293,74 @@ export default function SubscriptionPage() {
     })()
   }, [loading, userId, saveBillingKeyToServer])
 
-  const handleRegisterCard = async () => {
+  const openRegisterCardDialog = useCallback(() => {
     if (!userId) {
       toast.error('로그인 정보를 불러올 수 없습니다.')
       return
     }
-    const kcpGaps = getKcpBillingCustomerGaps({
-      customerId: userId,
-      customerName: userName,
-      customerEmail: userEmail,
-      customerPhone: userPhone,
-    })
-    if (kcpGaps.length > 0) {
-      toast.info(
-        '프로필에 휴대폰·이메일·담당자명을 채우면 이후 자동 결제·CS에 도움이 됩니다. (필수 아님)',
-      )
+    setBillingName(userName.trim())
+    setBillingPhone(userPhone.trim())
+    setBillingEmail(userEmail.trim())
+    setBillingFormErrors({})
+    setRegisterCardOpen(true)
+  }, [userId, userName, userPhone, userEmail])
+
+  const handleConfirmBillingRegister = async () => {
+    if (!userId) {
+      toast.error('로그인 정보를 불러올 수 없습니다.')
+      return
     }
+
+    const name = billingName.trim()
+    const phone = billingPhone.trim()
+    const email = billingEmail.trim()
+
+    const nextErrors: typeof billingFormErrors = {}
+    if (name.length < 2) {
+      nextErrors.realName = '담당자 실명을 2자 이상 입력해 주세요. (카드 명의와 같으면 처리에 유리합니다)'
+    }
+    if (!normalizeKcpPhone(phone)) {
+      nextErrors.phone = '휴대폰 번호를 확인해 주세요. (숫자 10~15자리, 하이픈 있어도 됩니다)'
+    }
+    if (!isValidBillingEmail(email)) {
+      nextErrors.email = '유효한 이메일 주소를 입력해 주세요.'
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setBillingFormErrors(nextErrors)
+      return
+    }
+    setBillingFormErrors({})
+
     setIsRegistering(true)
     try {
-      // ① 포트원 V2: requestIssueBillingKey + customer / issueName / issueId (lib/portone/billing.ts)
+      const supabase = createClient()
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({
+          manager_name: name,
+          phone,
+          email,
+        })
+        .eq('id', userId)
+
+      if (profileErr) {
+        console.error('[subscription] profile update:', profileErr)
+        toast.error(
+          '고객 정보를 저장하지 못했습니다. 설정 > 프로필에서 권한을 확인하거나 잠시 후 다시 시도해 주세요.',
+        )
+        return
+      }
+
+      setUserName(name)
+      setUserPhone(phone)
+      setUserEmail(email)
+      setRegisterCardOpen(false)
+
       const result = await requestIssueBillingKey({
         customerId: userId,
-        customerName: userName,
-        customerEmail: userEmail,
-        customerPhone: userPhone,
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
       })
 
       if (!result.success) {
@@ -312,7 +374,6 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ② 수동 승인 채널 → 서버에서 confirm 후 저장
       if (result.needsServerConfirm && result.billingIssueToken) {
         await saveBillingKeyToServer({ billingIssueToken: result.billingIssueToken })
         return
@@ -323,7 +384,6 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ③ 서버(DB)에 빌링키만 저장 — 월 구독 청구는 cron 등에서 chargeBillingKey로 수행
       await saveBillingKeyToServer({ billingKey: result.billingKey })
     } finally {
       setIsRegistering(false)
@@ -564,7 +624,7 @@ export default function SubscriptionPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRegisterCard}
+                onClick={openRegisterCardDialog}
                 disabled={isRegistering}
                 className="border-slate-600 text-slate-300 hover:bg-slate-700 text-xs"
               >
@@ -585,7 +645,7 @@ export default function SubscriptionPage() {
                 </p>
               </div>
               <Button
-                onClick={handleRegisterCard}
+                onClick={openRegisterCardDialog}
                 disabled={isRegistering || sub?.status === 'cancelled'}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -692,6 +752,104 @@ export default function SubscriptionPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* 카드 등록 — 정기결제용 고객 정보 입력 후 PG 창 */}
+      <Dialog open={registerCardOpen} onOpenChange={setRegisterCardOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-blue-400" />
+              정기 구독 카드 등록
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-sm text-left space-y-2 pt-1">
+              <span className="block">
+                NHN KCP 정기·빌링 등록 시 카드사에 전달되는 정보입니다. 빈 칸이 없도록 입력해 주세요.
+              </span>
+              <span className="block text-slate-500 text-xs">
+                이 정보는 프로필(담당자/연락처/이메일)에도 저장되어 이후 자동 결제 시에 사용됩니다.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="billing-name" className="text-slate-200">
+                담당자 실명 <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="billing-name"
+                value={billingName}
+                onChange={(e) => setBillingName(e.target.value)}
+                placeholder="신분증과 동일한 이름 권장"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                autoComplete="name"
+              />
+              {billingFormErrors.realName && (
+                <p className="text-xs text-red-400">{billingFormErrors.realName}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="billing-phone" className="text-slate-200">
+                휴대폰 번호 <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="billing-phone"
+                value={billingPhone}
+                onChange={(e) => setBillingPhone(e.target.value)}
+                placeholder="01012345678 또는 010-1234-5678"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                autoComplete="tel"
+                inputMode="tel"
+              />
+              {billingFormErrors.phone && (
+                <p className="text-xs text-red-400">{billingFormErrors.phone}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="billing-email" className="text-slate-200">
+                이메일 <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="billing-email"
+                type="email"
+                value={billingEmail}
+                onChange={(e) => setBillingEmail(e.target.value)}
+                placeholder="연락 가능한 이메일"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                autoComplete="email"
+              />
+              {billingFormErrors.email && (
+                <p className="text-xs text-red-400">{billingFormErrors.email}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+              onClick={() => setRegisterCardOpen(false)}
+              disabled={isRegistering}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => void handleConfirmBillingRegister()}
+              disabled={isRegistering}
+            >
+              {isRegistering ? (
+                <span className="flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  진행 중…
+                </span>
+              ) : (
+                '다음: 카드 입력 화면'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 구독 해지 */}
       {sub && sub.status !== 'cancelled' && sub.has_card && (
