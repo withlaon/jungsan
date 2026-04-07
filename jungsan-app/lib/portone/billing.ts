@@ -24,7 +24,12 @@
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
  */
 
-import PortOne, { BillingKeyMethod, WindowType, type Customer } from '@portone/browser-sdk/v2'
+import PortOne, {
+  BillingKeyMethod,
+  Currency,
+  WindowType,
+  type Customer,
+} from '@portone/browser-sdk/v2'
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원) — 실제 청구는 chargeBillingKey, 카드 등록 시 금액과 별개
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -73,15 +78,20 @@ function truncateUtf8Bytes(str: string, maxBytes: number): string {
   }
   return out.trim()
 }
+
+/** KCP 전문은 EUC-KR/고정필드 기준이라 비ASCII(한글 등)만으로 전문 길이 오류가 나는 경우가 있음 → PG에는 ASCII만 전달 */
+function kcpAsciiFullName(raw: string): string {
+  const ascii = raw.replace(/[^\x20-\x7E]/g, '').trim()
+  const name = ascii.length >= 2 ? truncateUtf8Bytes(ascii, 18) : 'Subscriber'
+  return name || 'Subscriber'
+}
+
 function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
-  /** KCP PAY_BATCH 등은 구매자명·이메일 전문 길이가 매우 짧은 경우가 많아 여유 있게 자름 */
-  const rawName = truncateUtf8Bytes(request.customerName?.trim() ?? '', 20)
   const customer: Customer = {
-    /** 기본값은 KCP 전문 인코딩 이슈를 줄이기 위해 짧은 ASCII */
-    fullName: rawName.length > 0 ? rawName : 'Subscriber',
+    fullName: kcpAsciiFullName(request.customerName?.trim() ?? ''),
   }
   const email = request.customerEmail?.trim()
-  if (email) customer.email = truncateUtf8Bytes(email, 40)
+  if (email) customer.email = truncateUtf8Bytes(email, 28)
   const phoneNumber = normalizeKcpPhone(request.customerPhone)
   if (phoneNumber) customer.phoneNumber = phoneNumber
   return customer
@@ -164,24 +174,28 @@ export async function requestIssueBillingKey(
   }
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/subscription'
   /**
-   * 모바일 KCP 등 리디렉션 필수. `billing_issue=1`으로 구독 빌링 복귀만 처리(타 기능 code 쿼리와 분리).
+   * 짧은 `/bk` 경로로 returnUrl 길이 최소화 → `/bk` 페이지가 `/subscription`으로 쿼리를 넘김.
    */
-  const redirectUrl = origin
-    ? `${origin}${pathname}?billing_issue=1`
-    : undefined
+  const redirectUrl = origin ? `${origin}/bk` : undefined
+
+  /** 숫자만·최대 12자·ASCII (KCP 주문번호 필드) */
+  const shortIssueId = () => {
+    const raw = `${Date.now()}${Math.floor(Math.random() * 1_000)}`
+    return raw.replace(/\D/g, '').slice(-12).padStart(12, '0')
+  }
 
   /**
-   * 포트원 공식 예시처럼 필수값 위주로만 전달합니다.
-   * issueId·issueName·displayAmount·noticeUrls·locale 등은 KCP 전문 길이/계약과 충돌할 수 있어 생략합니다.
-   * 모바일은 offerPeriod·redirectUrl 유지.
+   * displayAmount 0 = 빌링키만(실결제 전문과 분리). issueName/noticeUrls 생략.
    */
   try {
     const response = await PortOne.requestIssueBillingKey({
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
+      issueId: shortIssueId(),
+      displayAmount: 0,
+      currency: Currency.KRW,
       offerPeriod: { interval: '1m' },
       windowType: {
         pc: WindowType.IFRAME,
