@@ -32,7 +32,7 @@ import PortOne, {
   type Customer,
 } from '@portone/browser-sdk/v2'
 
-export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원)
+export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원) — 실제 청구는 chargeBillingKey, 카드 등록 시 금액과 별개
 export const TRIAL_DAYS = 30               // 무료 체험 기간
 
 export interface IssueBillingKeyRequest {
@@ -62,14 +62,31 @@ export function normalizeKcpPhone(phone?: string): string | undefined {
   return digits
 }
 
+/**
+ * KCP 등은 구매자명·이메일·주문명 필드가 정해진 바이트 길이를 넘으면 「잘못된_전문길이」로 거절하는 경우가 있습니다.
+ * UTF-8 바이트 수를 넘지 않도록 앞부분만 유지합니다.
+ */
+function truncateUtf8Bytes(str: string, maxBytes: number): string {
+  if (!str || maxBytes <= 0) return ''
+  const enc = new TextEncoder()
+  let used = 0
+  let out = ''
+  for (const ch of str) {
+    const b = enc.encode(ch)
+    if (used + b.length > maxBytes) break
+    used += b.length
+    out += ch
+  }
+  return out.trim()
+}
 function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
-  const rawName = request.customerName?.trim() ?? ''
+  /** KCP PAY_BATCH 등은 구매자명·이메일 전문 길이가 매우 짧은 경우가 많아 여유 있게 자름 */
+  const rawName = truncateUtf8Bytes(request.customerName?.trim() ?? '', 20)
   const customer: Customer = {
-    customerId: request.customerId,
-    fullName: rawName.length > 0 ? rawName : '구독자',
+    fullName: rawName.length > 0 ? rawName : truncateUtf8Bytes('구독자', 20),
   }
   const email = request.customerEmail?.trim()
-  if (email) customer.email = email
+  if (email) customer.email = truncateUtf8Bytes(email, 40)
   const phoneNumber = normalizeKcpPhone(request.customerPhone)
   if (phoneNumber) customer.phoneNumber = phoneNumber
   return customer
@@ -91,13 +108,17 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
   return gaps
 }
 
-function newBillingIssueId(customerId: string): string {
-  const suffix =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID().replace(/-/g, '')
-      : `${Date.now()}_${Math.random().toString(16).slice(2)}`
-  const raw = `bk_${customerId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24)}_${suffix}`
-  return raw.length > 64 ? raw.slice(0, 64) : raw
+/**
+ * 포트원: issueId는 ASCII만. KCP 주문번호 필드는 짧은 경우가 많아 숫자만·짧게 채번.
+ */
+function newBillingIssueId(): string {
+  const ms = Date.now().toString()
+  const rand = Math.floor(Math.random() * 10_000_000)
+    .toString()
+    .padStart(7, '0')
+  let raw = `${ms}${rand}`
+  if (raw.length > 20) raw = raw.slice(0, 20)
+  return raw
 }
 
 /**
@@ -158,15 +179,23 @@ export async function requestIssueBillingKey(
     ? `${origin}${pathname}?billing_issue=1`
     : undefined
 
+  /**
+   * 카드 등록은 「빌링키만 발급」 — displayAmount>0 이면 포트원/KCP에서 실결제+빌링키 동시 처리 전문이 나가
+   * 계약·채널이 빌링 등록 전용이면 잘못된_전문길이 등으로 거절될 수 있음. 실제 월 청구는 chargeBillingKey.
+   */
+  const issueName = truncateUtf8Bytes('구독 카드등록', 24)
+  const noticeUrl = origin ? `${origin}/api/payment/webhook` : ''
+
   try {
     const response = await PortOne.requestIssueBillingKey({
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
-      issueName: '정산타임 구독 카드 등록',
-      issueId: newBillingIssueId(request.customerId),
-      displayAmount: SUBSCRIPTION_AMOUNT,
+      issueName: issueName || 'Card reg',
+      issueId: newBillingIssueId(),
+      displayAmount: 0,
       currency: Currency.KRW,
+      /** productType 미지정 유지 — 일부 KCP 빌링 채널에서 REAL/DIGITAL 지정 시 검증이 어긋나는 사례 있음 */
       /** KCP 빌링키: SDK 문서상 빌링키 발급 시 interval 만 지원 */
       offerPeriod: { interval: '1m' },
       locale: Locale.KO_KR,
@@ -176,6 +205,8 @@ export async function requestIssueBillingKey(
         mobile: WindowType.REDIRECTION,
       },
       ...(redirectUrl ? { redirectUrl } : {}),
+      /** 빌링키 발급 완료 알림 — 콘솔 웹훅과 병행 가능 (@see 포트원 안내 noticeUrl / noticeUrls) */
+      ...(noticeUrl ? { noticeUrls: [noticeUrl] } : {}),
       // productType 미지정: 일부 KCP 빌링 채널에서 REAL/DIGITAL 분류로 창 검증이 어긋나는 경우 방지
       customer: buildBillingCustomer(request),
     })

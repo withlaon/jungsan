@@ -83,6 +83,16 @@ function billingRegisterErrorMessage(
   pgMessage?: string
 ): string {
   const blob = `${message ?? ''} ${code ?? ''} ${pgMessage ?? ''}`
+  if (
+    blob.includes('전문길이') ||
+    blob.includes('잘못된_전문') ||
+    blob.includes('잘못된 전문')
+  ) {
+    return (
+      'PG에서 요청 전문 길이 오류로 거절했습니다. 프로필 담당자명·이메일이 매우 길면 짧게 수정한 뒤 다시 시도해 주세요. ' +
+      '동일하면 포트원 관리자 콘솔 [결제] → [빌링결제 내역 조회]와 빌링키 조회 API로 발급·결제 시도 여부를 확인해 주세요.'
+    )
+  }
   if (blob.includes('3192') || code === '3192') {
     return (
       '카드번호가 결제사에서 거절되었습니다. 프로필 휴대폰(숫자)·채널(수단=빌링·국내 정기)을 확인해 주세요. ' +
