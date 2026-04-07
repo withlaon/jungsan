@@ -24,13 +24,7 @@
  * 비정상 동작·[3192] 등 카드번호 오류 메시지로 표시되는 사례가 있어 아래에서 정규화합니다.
  */
 
-import PortOne, {
-  BillingKeyMethod,
-  Currency,
-  Locale,
-  WindowType,
-  type Customer,
-} from '@portone/browser-sdk/v2'
+import PortOne, { BillingKeyMethod, WindowType, type Customer } from '@portone/browser-sdk/v2'
 
 export const SUBSCRIPTION_AMOUNT = 20_000  // 월 구독료 (원) — 실제 청구는 chargeBillingKey, 카드 등록 시 금액과 별개
 export const TRIAL_DAYS = 30               // 무료 체험 기간
@@ -83,7 +77,8 @@ function buildBillingCustomer(request: IssueBillingKeyRequest): Customer {
   /** KCP PAY_BATCH 등은 구매자명·이메일 전문 길이가 매우 짧은 경우가 많아 여유 있게 자름 */
   const rawName = truncateUtf8Bytes(request.customerName?.trim() ?? '', 20)
   const customer: Customer = {
-    fullName: rawName.length > 0 ? rawName : truncateUtf8Bytes('구독자', 20),
+    /** 기본값은 KCP 전문 인코딩 이슈를 줄이기 위해 짧은 ASCII */
+    fullName: rawName.length > 0 ? rawName : 'Subscriber',
   }
   const email = request.customerEmail?.trim()
   if (email) customer.email = truncateUtf8Bytes(email, 40)
@@ -109,19 +104,6 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
 }
 
 /**
- * 포트원: issueId는 ASCII만. KCP 주문번호 필드는 짧은 경우가 많아 숫자만·짧게 채번.
- */
-function newBillingIssueId(): string {
-  const ms = Date.now().toString()
-  const rand = Math.floor(Math.random() * 10_000_000)
-    .toString()
-    .padStart(7, '0')
-  let raw = `${ms}${rand}`
-  if (raw.length > 20) raw = raw.slice(0, 20)
-  return raw
-}
-
-/**
  * 포트원 V2 NHN KCP 빌링키 발급 요청
  * 사용자가 카드 정보를 입력하면 PortOne이 빌링키를 발급해 반환합니다.
  */
@@ -138,6 +120,7 @@ export async function requestIssueBillingKey(
     const cfgJson = (await cfgRes.json().catch(() => ({}))) as {
       storeId?: string
       channelKey?: string
+      apiSecretConfigured?: boolean
       error?: string
     }
 
@@ -161,6 +144,16 @@ export async function requestIssueBillingKey(
         error: { message: '포트원 상점 또는 빌링 채널 정보가 비어 있습니다.' },
       }
     }
+    if (cfgJson.apiSecretConfigured === false) {
+      return {
+        success: false,
+        error: {
+          message:
+            '서버에 PORTONE_API_SECRET(V2 API Secret)이 없어 카드 등록 후 처리가 불완전할 수 있습니다. ' +
+            'Vercel/서버 환경변수를 설정한 뒤 다시 시도해 주세요.',
+        },
+      }
+    }
   } catch {
     return {
       success: false,
@@ -180,34 +173,21 @@ export async function requestIssueBillingKey(
     : undefined
 
   /**
-   * 카드 등록은 「빌링키만 발급」 — displayAmount>0 이면 포트원/KCP에서 실결제+빌링키 동시 처리 전문이 나가
-   * 계약·채널이 빌링 등록 전용이면 잘못된_전문길이 등으로 거절될 수 있음. 실제 월 청구는 chargeBillingKey.
+   * 포트원 공식 예시처럼 필수값 위주로만 전달합니다.
+   * issueId·issueName·displayAmount·noticeUrls·locale 등은 KCP 전문 길이/계약과 충돌할 수 있어 생략합니다.
+   * 모바일은 offerPeriod·redirectUrl 유지.
    */
-  const issueName = truncateUtf8Bytes('구독 카드등록', 24)
-  const noticeUrl = origin ? `${origin}/api/payment/webhook` : ''
-
   try {
     const response = await PortOne.requestIssueBillingKey({
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
-      issueName: issueName || 'Card reg',
-      issueId: newBillingIssueId(),
-      displayAmount: 0,
-      currency: Currency.KRW,
-      /** productType 미지정 유지 — 일부 KCP 빌링 채널에서 REAL/DIGITAL 지정 시 검증이 어긋나는 사례 있음 */
-      /** KCP 빌링키: SDK 문서상 빌링키 발급 시 interval 만 지원 */
       offerPeriod: { interval: '1m' },
-      locale: Locale.KO_KR,
-      /** PC: iframe(팝업 미지원 PG 대비), 모바일: 리디렉션(redirectUrl 필수) */
       windowType: {
         pc: WindowType.IFRAME,
         mobile: WindowType.REDIRECTION,
       },
       ...(redirectUrl ? { redirectUrl } : {}),
-      /** 빌링키 발급 완료 알림 — 콘솔 웹훅과 병행 가능 (@see 포트원 안내 noticeUrl / noticeUrls) */
-      ...(noticeUrl ? { noticeUrls: [noticeUrl] } : {}),
-      // productType 미지정: 일부 KCP 빌링 채널에서 REAL/DIGITAL 분류로 창 검증이 어긋나는 경우 방지
       customer: buildBillingCustomer(request),
     })
 

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getBillingChannelKeyServer } from '@/lib/portone/billing-channel-key'
+import { getPortOneApiSecret } from '@/lib/portone/api-secret'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,14 @@ export async function GET() {
       )
     }
 
-    return NextResponse.json({ storeId, channelKey }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json(
+      {
+        storeId,
+        channelKey,
+        apiSecretConfigured: getPortOneApiSecret() !== '',
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
   } catch (e) {
     console.error('[billing/issue-config]', e)
     return NextResponse.json({ error: '설정 조회 중 오류가 발생했습니다.' }, { status: 500 })

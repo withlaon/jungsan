@@ -4,22 +4,81 @@
  */
 
 import { getBillingChannelKeyServer } from '@/lib/portone/billing-channel-key'
+import { requirePortOneApiSecret } from '@/lib/portone/api-secret'
 
 const PORTONE_API_BASE = 'https://api.portone.io'
-const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET ?? ''
-const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? ''
+const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID?.trim() ?? ''
 
 function authHeader() {
-  if (!PORTONE_API_SECRET) {
-    throw new Error('PORTONE_API_SECRET 환경변수가 설정되지 않았습니다.')
+  return { Authorization: `PortOne ${requirePortOneApiSecret()}` }
+}
+
+function formatPortOneFailure(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const o = data as Record<string, unknown>
+    if (o.type === 'UNAUTHORIZED' || status === 401) {
+      return (
+        '포트원 API 인증 실패(UNAUTHORIZED). 서버에 PORTONE_API_SECRET(V2 API Secret)을 설정했는지 확인하세요. ' +
+        '주소창에서 api.portone.io를 직접 열면 인증 없이 동일 응답이 나오는 것은 정상입니다.'
+      )
+    }
+    if (typeof o.message === 'string' && o.message) return o.message
   }
-  return { Authorization: `PortOne ${PORTONE_API_SECRET}` }
+  return `포트원 API 오류 (HTTP ${status})`
+}
+
+function unwrapBillingKeyResponse(
+  data: unknown,
+  pathBillingKey: string,
+): BillingKeyInfo {
+  const root = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+  const inner =
+    root.billingKeyInfo && typeof root.billingKeyInfo === 'object'
+      ? (root.billingKeyInfo as Record<string, unknown>)
+      : root
+  const bk = (inner.billingKey ?? root.billingKey ?? pathBillingKey) as string
+  const status = (inner.status ?? root.status ?? 'UNKNOWN') as string
+  const methods = (inner.methods ?? root.methods) as BillingKeyInfo['methods']
+  return { billingKey: bk, status, methods }
 }
 
 function normalizePhoneDigits(phone?: string): string | undefined {
   const digits = phone?.replace(/\D/g, '') ?? ''
   if (digits.length < 10 || digits.length > 15) return undefined
   return digits
+}
+
+function truncateUtf8Bytes(str: string, maxBytes: number): string {
+  if (!str || maxBytes <= 0) return ''
+  const enc = new TextEncoder()
+  let used = 0
+  let out = ''
+  for (const ch of str) {
+    const b = enc.encode(ch)
+    if (used + b.length > maxBytes) break
+    used += b.length
+    out += ch
+  }
+  return out.trim()
+}
+
+function truncateKcpOrderName(s: string): string {
+  const t = truncateUtf8Bytes(s.trim(), 40)
+  return t || 'Order'
+}
+
+function truncateKcpPersonName(s: string): string {
+  const t = truncateUtf8Bytes(s.trim(), 20)
+  return t || 'Subscriber'
+}
+
+function truncateKcpEmail(s: string): string {
+  return truncateUtf8Bytes(s.trim(), 40)
+}
+
+/** 포트원 customer.id — UUID 무하이픈 상한 */
+function truncateKcpId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9-]/g, '').replace(/-/g, '').slice(0, 32)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -43,11 +102,11 @@ export interface BillingKeyInfo {
 export async function getBillingKeyInfo(billingKey: string): Promise<BillingKeyInfo> {
   const res = await fetch(
     `${PORTONE_API_BASE}/billing-keys/${encodeURIComponent(billingKey)}`,
-    { headers: authHeader(), cache: 'no-store' }
+    { headers: authHeader(), cache: 'no-store' },
   )
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.message ?? '빌링키 정보 조회 실패')
-  return data as BillingKeyInfo
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(formatPortOneFailure(data, res.status))
+  return unwrapBillingKeyResponse(data, billingKey)
 }
 
 /** 빌링키에서 카드사 및 마스킹 번호 추출 */
@@ -100,25 +159,29 @@ export async function chargeBillingKey(
         storeId: PORTONE_STORE_ID,
         billingKey: request.billingKey,
         channelKey: getBillingChannelKeyServer() || undefined,
-        orderName: request.orderName,
+        orderName: truncateKcpOrderName(request.orderName),
         amount: { total: request.amount },
         currency: 'KRW',
         customer: {
-          id: request.customerId,
-          name: { full: request.customerName },
-          email: request.customerEmail,
+          id: truncateKcpId(request.customerId),
+          name: { full: truncateKcpPersonName(request.customerName) },
+          ...(request.customerEmail
+            ? { email: truncateKcpEmail(request.customerEmail) }
+            : {}),
           phoneNumber: normalizePhoneDigits(request.customerPhone),
         },
       }),
-    }
+    },
   )
   const data = (await res.json().catch(() => ({}))) as {
     message?: string
     pgMessage?: string
     failure?: { message?: string }
+    type?: string
   } & BillingChargeResponse
   if (!res.ok) {
     const msg =
+      (data.type === 'UNAUTHORIZED' ? formatPortOneFailure(data, res.status) : null) ??
       data.message ??
       data.pgMessage ??
       data.failure?.message ??
@@ -139,7 +202,7 @@ export async function deleteBillingKey(billingKey: string): Promise<void> {
   )
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.message ?? '빌링키 삭제 실패')
+    throw new Error(formatPortOneFailure(data, res.status))
   }
 }
 
@@ -167,7 +230,7 @@ export async function confirmBillingKeyIssue(billingIssueToken: string): Promise
   }
 
   if (!res.ok) {
-    throw new Error(data.message ?? `빌링키 승인 확인 실패 (${res.status})`)
+    throw new Error(formatPortOneFailure(data, res.status))
   }
 
   const billingKey =

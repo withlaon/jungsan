@@ -11,6 +11,7 @@ import {
   extractCardInfo,
   confirmBillingKeyIssue,
 } from '@/lib/portone/billing-server'
+import { getPortOneApiSecret } from '@/lib/portone/api-secret'
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +21,17 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
+    if (!getPortOneApiSecret()) {
+      return NextResponse.json(
+        {
+          error:
+            '서버에 PORTONE_API_SECRET(포트원 V2 API Secret)이 없습니다. ' +
+            '관리자 콘솔 연동 정보에서 발급받아 Vercel/서버 환경변수에 설정한 뒤 다시 시도해 주세요.',
+        },
+        { status: 503 },
+      )
     }
 
     const body = await req.json()
@@ -51,7 +63,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 포트원에서 카드 정보 조회 (카드사, 마스킹 번호)
+    // 포트원에서 카드 정보 조회 (카드사, 마스킹 번호) — API Secret 오류 시 사용자에게 바로 알림
     let cardCompany = ''
     let cardNumberMasked = ''
     try {
@@ -60,7 +72,11 @@ export async function POST(req: NextRequest) {
       cardCompany = extracted.cardCompany
       cardNumberMasked = extracted.cardNumberMasked
     } catch (e) {
-      console.warn('[billing/issue] 카드 정보 조회 실패 (무시):', e)
+      const msg = e instanceof Error ? e.message : '빌링키 정보 조회 실패'
+      console.error('[billing/issue] getBillingKeyInfo:', e)
+      if (msg.includes('인증 실패') || msg.includes('UNAUTHORIZED')) {
+        return NextResponse.json({ error: msg }, { status: 502 })
+      }
     }
 
     const admin = createAdminClient()

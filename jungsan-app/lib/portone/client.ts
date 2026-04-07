@@ -10,7 +10,7 @@
  *    NEXT_PUBLIC_PORTONE_CHANNEL_KEY에 붙여넣기
  * 6. [연동 관리] > [식별코드 및 API Keys]에서
  *    - 상점 아이디(Store ID) → NEXT_PUBLIC_PORTONE_STORE_ID
- *    - V2 API Secret → PORTONE_API_SECRET
+ *    - V2 API Secret → PORTONE_API_SECRET (또는 PORTONE_V2_API_SECRET, 서버 전용)
  */
 
 import PortOne from "@portone/browser-sdk/v2";

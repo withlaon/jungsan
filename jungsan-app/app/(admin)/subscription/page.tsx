@@ -89,8 +89,19 @@ function billingRegisterErrorMessage(
     blob.includes('잘못된 전문')
   ) {
     return (
-      'PG에서 요청 전문 길이 오류로 거절했습니다. 프로필 담당자명·이메일이 매우 길면 짧게 수정한 뒤 다시 시도해 주세요. ' +
-      '동일하면 포트원 관리자 콘솔 [결제] → [빌링결제 내역 조회]와 빌링키 조회 API로 발급·결제 시도 여부를 확인해 주세요.'
+      'PG에서 전문 길이 오류로 거절했습니다. 프로필 담당자명·이메일을 짧게 한 뒤 재시도하고, ' +
+      '포트원 채널이「빌링키/정기결제」용인지 확인하세요. ' +
+      'api.portone.io 는 브라우저에서 열면 UNAUTHORIZED가 나오는 것이 정상이며, 서버의 PORTONE_API_SECRET이 필요합니다.'
+    )
+  }
+  if (
+    blob.includes('UNAUTHORIZED') ||
+    blob.includes('인증 실패') ||
+    (message && /api\.portone\.io/i.test(message))
+  ) {
+    return (
+      '포트원 서버 API 호출이 인증되지 않았습니다. Vercel/서버에 PORTONE_API_SECRET(V2)을 넣고 재배포하세요. ' +
+      'REST 주소를 브라우저로 직접 여는 방법은 사용할 수 없습니다.'
     )
   }
   if (blob.includes('3192') || code === '3192') {

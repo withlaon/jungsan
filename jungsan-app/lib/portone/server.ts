@@ -3,8 +3,9 @@
  * 결제 완료 후 서버에서 실제 결제 금액을 검증하는 데 사용합니다.
  */
 
+import { getPortOneApiSecret } from "@/lib/portone/api-secret";
+
 const PORTONE_API_BASE = "https://api.portone.io";
-const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET ?? "";
 
 export interface PortOnePaymentResponse {
   id: string;
@@ -35,7 +36,8 @@ export interface PortOnePaymentResponse {
 export async function getPayment(
   paymentId: string
 ): Promise<PortOnePaymentResponse> {
-  if (!PORTONE_API_SECRET) {
+  const secret = getPortOneApiSecret();
+  if (!secret) {
     throw new Error(
       "PORTONE_API_SECRET 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요."
     );
@@ -45,7 +47,7 @@ export async function getPayment(
     `${PORTONE_API_BASE}/payments/${encodeURIComponent(paymentId)}`,
     {
       headers: {
-        Authorization: `PortOne ${PORTONE_API_SECRET}`,
+        Authorization: `PortOne ${secret}`,
       },
       cache: "no-store",
     }
