@@ -6,12 +6,18 @@
  *
  * - 테스트:  http://localhost:3000/api/payment/webhook  (ngrok 등 터널 필요)
  * - 실연동:  https://your-domain.com/api/payment/webhook
+ *
+ * 웹훅 시크릿 발급 후 서버 환경변수: PORTONE_WEBHOOK_SECRET (= 콘솔의 whsec_... 값)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPayment } from "@/lib/portone/server";
 import { savePayment, updatePaymentStatus } from "@/lib/portone/db";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getPortOneWebhookSecret,
+  verifyPortOneWebhookPayload,
+} from "@/lib/portone/webhook-verify";
 
 const IS_TEST = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY?.startsWith(
   "channel-key-"
@@ -21,11 +27,27 @@ const IS_TEST = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY?.startsWith(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { type, data } = body as {
+    const rawBody = await request.text();
+    const hookSecret = getPortOneWebhookSecret();
+    if (
+      hookSecret &&
+      !verifyPortOneWebhookPayload(
+        rawBody,
+        request.headers.get("webhook-id"),
+        request.headers.get("webhook-timestamp"),
+        request.headers.get("webhook-signature"),
+        hookSecret,
+      )
+    ) {
+      console.warn("[웹훅] 서명 검증 실패");
+      return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody) as {
       type: string;
       data: { paymentId: string; transactionId?: string };
     };
+    const { type, data } = body;
 
     // 결제 완료 웹훅
     if (type === "Transaction.Paid") {

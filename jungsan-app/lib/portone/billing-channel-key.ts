@@ -9,6 +9,9 @@ function pickFirstChannelKey(candidates: (string | undefined)[]): string {
 /**
  * 서버 전용(API·cron·빌링 서버). `PORTONE_*`(비공개) env를 읽을 수 있음.
  *
+ * NHN KCP: 여기 넣는 channelKey는 포트원 콘솔의 **정기결제(빌링키)용** 채널이어야 합니다. 일반 결제 채널과 혼동하면 안 됩니다.
+ * @see https://help.portone.io/content/kcp_channel
+ *
  * 우선순위 — **맨 위가 가장 우선**(국내 정기·빌링키 채널만 넣을 것):
  * 1. PORTONE_BILLING_CHANNEL_KEY_DOMESTIC  ← Vercel Secrets 권장(해외 결제용 NEXT_PUBLIC과 분리)
  * 2. NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC

@@ -173,12 +173,20 @@ export async function chargeBillingKey(
       }),
     },
   )
-  const data = (await res.json().catch(() => ({}))) as {
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
     message?: string
     pgMessage?: string
     failure?: { message?: string }
     type?: string
-  } & BillingChargeResponse
+    payment?: {
+      id?: string
+      status?: string
+      transactionId?: string
+      amount?: { total?: number; currency?: string }
+      paidAt?: string
+      failedAt?: string
+    }
+  }
   if (!res.ok) {
     const msg =
       (data.type === 'UNAUTHORIZED' ? formatPortOneFailure(data, res.status) : null) ??
@@ -188,7 +196,40 @@ export async function chargeBillingKey(
       `빌링키 결제 실패 (HTTP ${res.status})`
     throw new Error(msg)
   }
-  return data as BillingChargeResponse
+
+  // V2 PayWithBillingKey 성공 응답: { payment: PaidPayment } (최상위에 status 없음)
+  const payment =
+    data.payment && typeof data.payment === 'object'
+      ? data.payment
+      : null
+
+  if (!payment) {
+    throw new Error(
+      '빌링키 결제 응답에 payment 객체가 없습니다. 포트원 V2 API 응답 형식을 확인하세요.',
+    )
+  }
+
+  const amt = payment.amount
+  return {
+    id: String(payment.id ?? request.paymentId),
+    status: String(payment.status ?? ''),
+    txId:
+      payment.transactionId !== undefined && payment.transactionId !== null
+        ? String(payment.transactionId)
+        : undefined,
+    amount: {
+      total: typeof amt?.total === 'number' ? amt.total : request.amount,
+      currency: typeof amt?.currency === 'string' ? amt.currency : 'KRW',
+    },
+    paidAt:
+      payment.paidAt !== undefined && payment.paidAt !== null
+        ? String(payment.paidAt)
+        : undefined,
+    failedAt:
+      payment.failedAt !== undefined && payment.failedAt !== null
+        ? String(payment.failedAt)
+        : undefined,
+  } as BillingChargeResponse
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

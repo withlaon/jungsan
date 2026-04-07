@@ -1,24 +1,29 @@
 'use client'
 
 /**
- * 포트원 V2 — 결제창 빌링키 발급 (`PortOne.requestIssueBillingKey`)
+ * 포트원 V2 브라우저 SDK — 빌링키 발급
+ *
+ * 올바른 함수명은 **`PortOne.requestIssueBillingKey`** 입니다.
+ * (`requestBillingKey` 는 @portone/browser-sdk/v2 에 존재하지 않습니다.)
  *
  * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
- * 공식 예시는 **storeId · channelKey · billingKeyMethod** 만 전달합니다.
- * 추가 필드(고객 정보·issueId·금액 등)가 일부 KCP 빌링 채널에서 PG 전문 길이 오류를 유발할 수 있어
- * PC/데스크톱에서는 이 3가지만 보냅니다.
+ * @see IssueBillingKeyRequestBase — storeId, channelKey?, billingKeyMethod, issueName?, issueId?, customer?, …
  *
- * 모바일(리디렉션)은 포트원·KCP 요구에 따라 `windowType`·`redirectUrl`·`offerPeriod` 만 덧붙입니다.
+ * NHN KCP 정기·빌링 채널: env의 channelKey는 일반 결제가 아닌 정기용이어야 합니다.
+ * @see https://help.portone.io/content/kcp_channel
  *
- * [이후 단계] POST /api/billing/issue → chargeBillingKey(월 청구)
+ * storeId / channelKey → `/api/billing/issue-config` (NEXT_PUBLIC_PORTONE_STORE_ID + getBillingChannelKeyServer)
  */
 
-import PortOne, { BillingKeyMethod, WindowType } from '@portone/browser-sdk/v2'
+import PortOne, {
+  BillingKeyMethod,
+  WindowType,
+  type Customer,
+} from '@portone/browser-sdk/v2'
 
 export const SUBSCRIPTION_AMOUNT = 20_000
 export const TRIAL_DAYS = 30
 
-/** @deprecated 빌링키 발급 요청에 더 이상 사용하지 않음(문서 최소 스펙). 프로필 검증용으로만 유지 가능 */
 export interface IssueBillingKeyRequest {
   customerId: string
   customerName: string
@@ -34,7 +39,7 @@ export interface IssueBillingKeyResult {
   error?: { code?: string; message?: string; pgMessage?: string }
 }
 
-/** 프로필 정리용(선택). PG로 전달하지 않습니다. */
+/** KCP·포트원 권장: 휴대폰은 숫자만 */
 export function normalizeKcpPhone(phone?: string): string | undefined {
   const trimmed = phone?.trim()
   if (!trimmed) return undefined
@@ -43,7 +48,6 @@ export function normalizeKcpPhone(phone?: string): string | undefined {
   return digits
 }
 
-/** 프로필 가이드용 — 카드 등록 버튼을 막지 않습니다. */
 export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Array<
   'realName' | 'phone' | 'email'
 > {
@@ -52,6 +56,45 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
   if (!normalizeKcpPhone(request.customerPhone)) gaps.push('phone')
   if (!request.customerEmail?.trim()) gaps.push('email')
   return gaps
+}
+
+function truncateUtf8Bytes(str: string, maxBytes: number): string {
+  if (!str || maxBytes <= 0) return ''
+  const enc = new TextEncoder()
+  let used = 0
+  let out = ''
+  for (const ch of str) {
+    const b = enc.encode(ch)
+    if (used + b.length > maxBytes) break
+    used += b.length
+    out += ch
+  }
+  return out.trim()
+}
+
+/** 포트원: issueId는 ASCII 출력 가능 문자만 */
+function shortAsciiIssueId(): string {
+  const raw = `${ Date.now() }${ Math.floor(Math.random() * 1_000) }`
+  return raw.replace(/\D/g, '').slice(-12).padStart(12, '0')
+}
+
+/** customerId: UUID 등 → PG 안전한 영숫자 위주 */
+function sdkCustomerId(internalId: string): string {
+  const s = internalId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)
+  return s.length >= 8 ? s : `u${internalId.replace(/\W/g, '').slice(0, 20)}`
+}
+
+function buildSdkCustomer(req: IssueBillingKeyRequest): Customer {
+  const fullName = truncateUtf8Bytes(req.customerName?.trim() || '구독자', 30)
+  const customer: Customer = {
+    customerId: sdkCustomerId(req.customerId.trim()),
+    fullName: fullName || '구독자',
+  }
+  const phone = normalizeKcpPhone(req.customerPhone)
+  if (phone) customer.phoneNumber = phone
+  const em = req.customerEmail?.trim()
+  if (em) customer.email = truncateUtf8Bytes(em, 50)
+  return customer
 }
 
 function isMobileBillingEnvironment(): boolean {
@@ -66,11 +109,17 @@ function isMobileBillingEnvironment(): boolean {
   }
 }
 
+function sdkIssueName(): string {
+  const name = truncateUtf8Bytes('정산타임 정기 구독 카드 등록', 40)
+  return name || 'Card registration'
+}
+
 /**
- * 포트원 문서와 동일한 최소 호출 + 모바일 시 리디렉션·정기구간만 추가
- * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
+ * V2 규격: `PortOne.requestIssueBillingKey` + IssueBillingKeyRequest 타입과 동일한 필드만 사용합니다.
  */
-export async function requestIssueBillingKey(): Promise<IssueBillingKeyResult> {
+export async function requestIssueBillingKey(
+  request: IssueBillingKeyRequest,
+): Promise<IssueBillingKeyResult> {
   let storeId = ''
   let channelKey = ''
   try {
@@ -128,12 +177,6 @@ export async function requestIssueBillingKey(): Promise<IssueBillingKeyResult> {
   const redirectUrl = origin ? `${origin}/bk` : undefined
   const mobile = isMobileBillingEnvironment()
 
-  const base = {
-    storeId,
-    channelKey,
-    billingKeyMethod: BillingKeyMethod.CARD,
-  } as const
-
   const mobileOnly =
     mobile && redirectUrl
       ? {
@@ -142,29 +185,64 @@ export async function requestIssueBillingKey(): Promise<IssueBillingKeyResult> {
             mobile: WindowType.REDIRECTION,
           },
           redirectUrl,
-          /** 모바일 빌링키 발급: 문서상 offerPeriod 필수 */
           offerPeriod: { interval: '1m' as const },
         }
       : {}
 
   try {
+    // PC(iframe) KCP: 전문 길이 제한에 대비해 storeId·channelKey·수단만 전달.
+    // 모바일(리디렉션): issueName·issueId·customer·offerPeriod 유지.
     const response = await PortOne.requestIssueBillingKey({
-      ...base,
+      storeId,
+      channelKey,
+      billingKeyMethod: BillingKeyMethod.CARD,
+      ...(mobile
+        ? {
+            issueName: sdkIssueName(),
+            issueId: shortAsciiIssueId(),
+            customer: buildSdkCustomer(request),
+          }
+        : {}),
       ...mobileOnly,
     })
 
-    if (!response || 'code' in response) {
+    if (!response) {
+      return {
+        success: false,
+        error: {
+          message:
+            '카드 등록 응답이 없습니다. 모바일은 결제 창 종료 후 이 페이지로 돌아오는지 확인해 주세요.',
+        },
+      }
+    }
+
+    const failCode =
+      typeof (response as { code?: unknown }).code === 'string'
+        ? (response as { code: string }).code.trim()
+        : ''
+    if (failCode) {
       const errResp = response as {
         code?: string
         message?: string
         pgMessage?: string
-      } | null
+      }
       return {
         success: false,
         error: {
-          code: errResp?.code,
-          message: errResp?.message ?? '카드 등록에 실패했습니다.',
-          pgMessage: errResp?.pgMessage,
+          code: errResp.code,
+          message: errResp.message ?? '카드 등록에 실패했습니다.',
+          pgMessage: errResp.pgMessage,
+        },
+      }
+    }
+
+    const billingKeyVal = (response as { billingKey?: string }).billingKey
+    if (!billingKeyVal) {
+      const errResp = response as { message?: string }
+      return {
+        success: false,
+        error: {
+          message: errResp.message ?? '빌링키를 받지 못했습니다.',
         },
       }
     }

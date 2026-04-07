@@ -3,6 +3,9 @@
  * 로그인한 관리자에게 빌링키 발급용 storeId·channelKey 를 내려줍니다.
  * 채널 키는 서버 env 우선순위(getBillingChannelKeyServer)로 통일해
  * 해외카드 전용 NEXT_PUBLIC 키와 국내/서버 전용 키를 분리할 수 있습니다.
+ *
+ * NHN KCP: requestIssueBillingKey에는 일반 결제 채널이 아닌 정기·빌링용 채널(배치결제그룹아이디 설정)을 사용해야 합니다.
+ * @see https://help.portone.io/content/kcp_channel
  */
 
 import { NextResponse } from 'next/server'
@@ -30,8 +33,8 @@ export async function GET() {
         {
           error:
             '빌링(구독) 채널이 설정되지 않았습니다. 서버에 PORTONE_BILLING_CHANNEL_KEY_DOMESTIC ' +
-            '(포트원「국내 정기결제·빌링키」채널 키) 또는 NEXT_PUBLIC_PORTONE_BILLING_CHANNEL_KEY_DOMESTIC 을 설정하세요. ' +
-            '해외카드 전용 채널이면 국내 카드가 계속 거절됩니다.',
+            '(콘솔에서 NHN KCP 「정기·빌링」 결제모듈 + 배치결제그룹아이디가 있는 채널의 키)를 설정하세요. ' +
+            '일반 결제 채널 키는 빌링키 발급에 사용할 수 없습니다. https://help.portone.io/content/kcp_channel',
         },
         { status: 503 },
       )

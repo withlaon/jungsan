@@ -293,8 +293,13 @@ export default function SubscriptionPage() {
     }
     setIsRegistering(true)
     try {
-      // ① 포트원 SDK: 문서 최소 스펙만 전달 (https://developers.portone.io/opi/ko/integration/start/v2/billing/issue)
-      const result = await requestIssueBillingKey()
+      // ① 포트원 V2: requestIssueBillingKey + customer / issueName / issueId (lib/portone/billing.ts)
+      const result = await requestIssueBillingKey({
+        customerId: userId,
+        customerName: userName,
+        customerEmail: userEmail,
+        customerPhone: userPhone,
+      })
 
       if (!result.success) {
         toast.error(
@@ -516,6 +521,25 @@ export default function SubscriptionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div
+            className="rounded-lg border border-slate-600/80 bg-slate-800/40 px-3 py-2.5 text-xs text-slate-400 leading-relaxed"
+            role="note"
+          >
+            <p className="font-medium text-slate-300 mb-1">운영자: NHN KCP 빌링키 채널</p>
+            <p className="mb-1">
+              <code className="text-slate-300">PORTONE_BILLING_CHANNEL_KEY_DOMESTIC</code>에는 포트원
+              콘솔「정기·빌링」모듈 채널의 키만 넣어야 합니다. 일반 결제 채널과는 분리되어 있으며,
+              채널에 배치결제그룹아이디가 있어야 합니다.
+            </p>
+            <a
+              href="https://help.portone.io/content/kcp_channel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 underline hover:text-blue-300"
+            >
+              포트원 도움말 — KCP 채널 설정
+            </a>
+          </div>
           {sub?.has_card ? (
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
               <div className="flex items-center gap-3">
