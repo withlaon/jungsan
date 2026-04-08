@@ -33,7 +33,7 @@ export async function GET() {
         {
           error:
             '빌링(구독) 채널이 설정되지 않았습니다. 서버에 PORTONE_BILLING_CHANNEL_KEY_DOMESTIC ' +
-            '(콘솔에서 NHN KCP 「정기·빌링」 결제모듈 + 배치결제그룹아이디가 있는 채널의 키)를 설정하세요. ' +
+            '(콘솔에서 NHN KCP 「정기·빌링」 결제모듈 + 배치결제그룹아이디 필수 입력 채널의 키)를 설정하세요. ' +
             '일반 결제 채널 키는 빌링키 발급에 사용할 수 없습니다. https://help.portone.io/content/kcp_channel',
         },
         { status: 503 },

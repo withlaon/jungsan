@@ -20,11 +20,12 @@ const SUBSCRIPTION_AMOUNT = 20_000
 const MAX_FAIL_COUNT = 3
 const CRON_SECRET = process.env.CRON_SECRET ?? ''
 
+/** KCP merchant uid 유사 길이 제한 — 웹훅은 sub- 접두사로 구독건 식별 */
 function generatePaymentId(userId: string): string {
+  const uid = userId.replace(/-/g, '').slice(0, 8)
   const ts = Date.now().toString(36)
-  const rand = Math.random().toString(36).substring(2, 6)
-  const uid = userId.substring(0, 8)
-  return `sub-${uid}-${ts}-${rand}`
+  const rand = Math.random().toString(36).slice(2, 4)
+  return `sub-${uid}-${ts}${rand}`.slice(0, 36)
 }
 
 function addOneMonth(date: Date): Date {

@@ -11,6 +11,9 @@
  * 설정을 미리 받은 뒤 `requestIssueBillingKeyWithConfig`를 클릭 핸들러에서 곧바로 호출하세요.
  *
  * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
+ *
+ * KCP 전문 길이: issueName·issueId·buyer 필드를 최소화( lib/portone/kcp-payload-limits.ts ).
+ * 배치결제그룹아이디 등은 포트원 콘솔 채널 설정에서만 반영됩니다.
  */
 
 import PortOne, {
@@ -18,6 +21,12 @@ import PortOne, {
   WindowType,
   type Customer,
 } from '@portone/browser-sdk/v2'
+import {
+  kcpBillingIssueDisplayName,
+  kcpBillingIssueMerchantUid,
+  sanitizeKcpEmail,
+  sanitizeKcpPersonName,
+} from '@/lib/portone/kcp-payload-limits'
 
 export const SUBSCRIPTION_AMOUNT = 20_000
 export const TRIAL_DAYS = 30
@@ -140,40 +149,24 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
   return gaps
 }
 
-function truncateUtf8Bytes(str: string, maxBytes: number): string {
-  if (!str || maxBytes <= 0) return ''
-  const enc = new TextEncoder()
-  let used = 0
-  let out = ''
-  for (const ch of str) {
-    const b = enc.encode(ch)
-    if (used + b.length > maxBytes) break
-    used += b.length
-    out += ch
-  }
-  return out.trim()
-}
-
-function shortAsciiIssueId(): string {
-  const raw = `${Date.now()}${Math.floor(Math.random() * 1_000)}`
-  return raw.replace(/\D/g, '').slice(-12).padStart(12, '0')
-}
-
+/** KCP 주문/고객 키 — 짧은 16자 hex */
 function sdkCustomerId(internalId: string): string {
-  const s = internalId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)
-  return s.length >= 8 ? s : `u${internalId.replace(/\W/g, '').slice(0, 20)}`
+  const hex = internalId.replace(/[^a-fA-F0-9]/g, '').slice(0, 16)
+  if (hex.length >= 8) return hex
+  const s = internalId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16)
+  return s.length >= 8 ? s : `u${internalId.replace(/\W/g, '').slice(0, 12)}`
 }
 
 function buildSdkCustomer(req: IssueBillingKeyRequest): Customer {
-  const fullName = truncateUtf8Bytes(req.customerName?.trim() || '구독자', 30)
+  const fullName = sanitizeKcpPersonName(req.customerName?.trim() || 'User', 14)
   const customer: Customer = {
     customerId: sdkCustomerId(req.customerId.trim()),
-    fullName: fullName || '구독자',
+    fullName,
   }
   const phone = normalizeKcpPhone(req.customerPhone)
   if (phone) customer.phoneNumber = phone
   const em = req.customerEmail?.trim()
-  if (em) customer.email = truncateUtf8Bytes(em, 50)
+  if (em) customer.email = sanitizeKcpEmail(em, 32)
   return customer
 }
 
@@ -187,11 +180,6 @@ function isMobileBillingEnvironment(): boolean {
   } catch {
     return false
   }
-}
-
-function sdkIssueName(): string {
-  const name = truncateUtf8Bytes('정산타임 구독 카드', 28)
-  return name || 'Card registration'
 }
 
 function interpretIssueBillingKeySdkResponse(
@@ -301,8 +289,8 @@ export async function requestIssueBillingKeyWithConfig(
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
-      issueName: sdkIssueName(),
-      issueId: shortAsciiIssueId(),
+      issueName: kcpBillingIssueDisplayName(),
+      issueId: kcpBillingIssueMerchantUid(),
       customer: buildSdkCustomer(request),
       ...mobileOnly,
     })

@@ -5,6 +5,11 @@
 
 import { getBillingChannelKeyServer } from '@/lib/portone/billing-channel-key'
 import { requirePortOneApiSecret } from '@/lib/portone/api-secret'
+import {
+  sanitizeKcpEmail,
+  sanitizeKcpPersonName,
+  truncateKcpChargeOrderName,
+} from '@/lib/portone/kcp-payload-limits'
 
 const PORTONE_API_BASE = 'https://api.portone.io'
 const PORTONE_STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID?.trim() ?? ''
@@ -48,37 +53,9 @@ function normalizePhoneDigits(phone?: string): string | undefined {
   return digits
 }
 
-function truncateUtf8Bytes(str: string, maxBytes: number): string {
-  if (!str || maxBytes <= 0) return ''
-  const enc = new TextEncoder()
-  let used = 0
-  let out = ''
-  for (const ch of str) {
-    const b = enc.encode(ch)
-    if (used + b.length > maxBytes) break
-    used += b.length
-    out += ch
-  }
-  return out.trim()
-}
-
-function truncateKcpOrderName(s: string): string {
-  const t = truncateUtf8Bytes(s.trim(), 40)
-  return t || 'Order'
-}
-
-function truncateKcpPersonName(s: string): string {
-  const t = truncateUtf8Bytes(s.trim(), 20)
-  return t || 'Subscriber'
-}
-
-function truncateKcpEmail(s: string): string {
-  return truncateUtf8Bytes(s.trim(), 40)
-}
-
-/** 포트원 customer.id — UUID 무하이픈 상한 */
+/** 포트원 customer.id — KCP 전문 길이 */
 function truncateKcpId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9-]/g, '').replace(/-/g, '').slice(0, 32)
+  return id.replace(/[^a-zA-Z0-9-]/g, '').replace(/-/g, '').slice(0, 20)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -159,14 +136,14 @@ export async function chargeBillingKey(
         storeId: PORTONE_STORE_ID,
         billingKey: request.billingKey,
         channelKey: getBillingChannelKeyServer() || undefined,
-        orderName: truncateKcpOrderName(request.orderName),
+        orderName: truncateKcpChargeOrderName(request.orderName, 20),
         amount: { total: request.amount },
         currency: 'KRW',
         customer: {
           id: truncateKcpId(request.customerId),
-          name: { full: truncateKcpPersonName(request.customerName) },
+          name: { full: sanitizeKcpPersonName(request.customerName, 14) },
           ...(request.customerEmail
-            ? { email: truncateKcpEmail(request.customerEmail) }
+            ? { email: sanitizeKcpEmail(request.customerEmail, 32) }
             : {}),
           phoneNumber: normalizePhoneDigits(request.customerPhone),
         },
