@@ -163,6 +163,14 @@ const STATUS_CONFIG = {
     badgeClass: 'border-red-500 text-red-400',
     icon: AlertTriangle,
   },
+  /** DB는 past_due이나 실패 이력 0·카드 있음 = 첫 청구 대기/스케줄 (크론·즉시결제 전) */
+  past_due_pending: {
+    label: '결제 예정',
+    color: 'text-amber-400',
+    bgColor: 'bg-amber-500/10 border-amber-500/30',
+    badgeClass: 'border-amber-500 text-amber-400',
+    icon: CalendarDays,
+  },
   cancelled: {
     label: '해지됨',
     color: 'text-slate-400',
@@ -170,6 +178,18 @@ const STATUS_CONFIG = {
     badgeClass: 'border-slate-500 text-slate-400',
     icon: XCircle,
   },
+}
+
+function subscriptionCardUiConfig(sub: SubscriptionStatus | null) {
+  if (!sub) return STATUS_CONFIG.trial
+  if (
+    sub.status === 'past_due' &&
+    (sub.failed_count ?? 0) === 0 &&
+    sub.has_card
+  ) {
+    return STATUS_CONFIG.past_due_pending
+  }
+  return STATUS_CONFIG[sub.status]
 }
 
 export default function SubscriptionPage() {
@@ -476,7 +496,7 @@ export default function SubscriptionPage() {
     )
   }
 
-  const cfg = sub ? STATUS_CONFIG[sub.status] : STATUS_CONFIG.trial
+  const cfg = subscriptionCardUiConfig(sub)
   const StatusIcon = cfg.icon
 
   return (
@@ -693,8 +713,24 @@ export default function SubscriptionPage() {
               </div>
             )}
 
-            {/* 결제 실패 */}
-            {sub.status === 'past_due' && (
+            {/* past_due: 실제 거절/오류만 실패 안내 (실패 0회·카드 있음은 청구 대기) */}
+            {sub.status === 'past_due' && sub.has_card && (sub.failed_count ?? 0) === 0 && (
+              <div className="p-3 bg-amber-950/30 border border-amber-700/40 rounded-lg space-y-1.5">
+                <p className="text-amber-400 text-sm font-medium flex items-center gap-1.5">
+                  <CalendarDays className="h-4 w-4" />
+                  첫 구독 결제 처리 중이거나 예정입니다
+                </p>
+                {sub.next_billing_at && (
+                  <p className="text-amber-200/80 text-xs">
+                    처리 기준 시점: {formatDate(sub.next_billing_at)}
+                  </p>
+                )}
+                <p className="text-amber-300/70 text-xs">
+                  카드는 정상 등록되었습니다. 잠시 후 자동 청구되며, 완료되면 상태가「구독 중」으로 바뀝니다.
+                </p>
+              </div>
+            )}
+            {sub.status === 'past_due' && sub.has_card && (sub.failed_count ?? 0) > 0 && (
               <div className="p-3 bg-red-950/30 border border-red-700/40 rounded-lg">
                 <p className="text-red-400 text-sm font-medium flex items-center gap-1.5">
                   <AlertTriangle className="h-4 w-4" />
@@ -702,6 +738,17 @@ export default function SubscriptionPage() {
                 </p>
                 <p className="text-red-300/70 text-xs mt-1">
                   카드를 다시 등록하거나 결제 수단을 확인해주세요. 자동으로 재시도됩니다.
+                </p>
+              </div>
+            )}
+            {sub.status === 'past_due' && !sub.has_card && (
+              <div className="p-3 bg-amber-950/30 border border-amber-700/40 rounded-lg">
+                <p className="text-amber-400 text-sm font-medium flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4" />
+                  구독 결제를 위해 카드가 필요합니다
+                </p>
+                <p className="text-amber-300/70 text-xs mt-1">
+                  아래에서 결제 수단을 등록해 주세요.
                 </p>
               </div>
             )}

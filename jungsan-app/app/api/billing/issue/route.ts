@@ -12,6 +12,7 @@ import {
   confirmBillingKeyIssue,
 } from '@/lib/portone/billing-server'
 import { getPortOneApiSecret } from '@/lib/portone/api-secret'
+import { attemptSubscriptionCharge } from '@/lib/portone/subscription-charge'
 
 export async function POST(req: NextRequest) {
   try {
@@ -90,6 +91,8 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
 
+    let shouldTryImmediateCharge = false
+
     if (!subscription) {
       // 기존 가입자 - 프로필 created_at 기준 trial_ends_at 계산
       const { data: profile } = await admin
@@ -101,20 +104,24 @@ export async function POST(req: NextRequest) {
       const profileCreatedAt = profile?.created_at ? new Date(profile.created_at) : now
       const trialEndsAt = new Date(profileCreatedAt)
       trialEndsAt.setDate(trialEndsAt.getDate() + 30)
+      const insertedAsPastDue = now > trialEndsAt
 
       await admin.from('subscriptions').insert({
         user_id: user.id,
-        status: now > trialEndsAt ? 'past_due' : 'trial',
+        status: insertedAsPastDue ? 'past_due' : 'trial',
         billing_key: billingKey,
         billing_key_issued_at: now.toISOString(),
         card_company: cardCompany,
         card_number_masked: cardNumberMasked,
         trial_ends_at: trialEndsAt.toISOString(),
-        next_billing_at: now > trialEndsAt ? now.toISOString() : trialEndsAt.toISOString(),
+        failed_count: 0,
+        next_billing_at: insertedAsPastDue ? now.toISOString() : trialEndsAt.toISOString(),
       })
+      shouldTryImmediateCharge = insertedAsPastDue
     } else {
       const trialEndsAt = new Date(subscription.trial_ends_at)
       const isTrialOver = now > trialEndsAt
+      shouldTryImmediateCharge = isTrialOver && subscription.status !== 'active'
 
       await admin
         .from('subscriptions')
@@ -123,6 +130,7 @@ export async function POST(req: NextRequest) {
           billing_key_issued_at: now.toISOString(),
           card_company: cardCompany,
           card_number_masked: cardNumberMasked,
+          failed_count: 0,
           // 체험 기간이 이미 지났으면 즉시 결제 필요 상태로
           ...(isTrialOver && subscription.status !== 'active'
             ? { status: 'past_due', next_billing_at: now.toISOString() }
@@ -133,6 +141,13 @@ export async function POST(req: NextRequest) {
             : {}),
         })
         .eq('user_id', user.id)
+    }
+
+    if (shouldTryImmediateCharge) {
+      const chargeResult = await attemptSubscriptionCharge(admin, user.id, now)
+      if (!chargeResult.ok) {
+        console.error('[billing/issue] 체험 종료 후 즉시 청구 실패:', chargeResult.reason)
+      }
     }
 
     return NextResponse.json({ success: true, cardCompany, cardNumberMasked })

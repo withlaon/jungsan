@@ -13,26 +13,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { chargeBillingKey } from '@/lib/portone/billing-server'
-import { savePayment } from '@/lib/portone/db'
+import { attemptSubscriptionCharge } from '@/lib/portone/subscription-charge'
 
-const SUBSCRIPTION_AMOUNT = 20_000
-const MAX_FAIL_COUNT = 3
 const CRON_SECRET = process.env.CRON_SECRET ?? ''
-
-/** KCP merchant uid 유사 길이 제한 — 웹훅은 sub- 접두사로 구독건 식별 */
-function generatePaymentId(userId: string): string {
-  const uid = userId.replace(/-/g, '').slice(0, 8)
-  const ts = Date.now().toString(36)
-  const rand = Math.random().toString(36).slice(2, 4)
-  return `sub-${uid}-${ts}${rand}`.slice(0, 36)
-}
-
-function addOneMonth(date: Date): Date {
-  const next = new Date(date)
-  next.setMonth(next.getMonth() + 1)
-  return next
-}
 
 export async function POST(req: NextRequest) {
   // 보안 검증
@@ -66,78 +49,12 @@ export async function POST(req: NextRequest) {
     console.log(`[cron/billing] 청구 대상 ${subscriptions.length}건 처리 시작`)
 
     for (const sub of subscriptions) {
-      const paymentId = generatePaymentId(sub.user_id)
-
-      // 프로필 정보 조회 (고객명, 이메일)
-      const { data: profile } = await admin
-        .from('profiles')
-        .select('manager_name, email, phone')
-        .eq('id', sub.user_id)
-        .single()
-
-      try {
-        const chargeResult = await chargeBillingKey({
-          paymentId,
-          billingKey: sub.billing_key,
-          orderName: '정산타임 월 구독료',
-          amount: SUBSCRIPTION_AMOUNT,
-          customerId: sub.user_id,
-          customerName: profile?.manager_name ?? '구독자',
-          customerEmail: profile?.email,
-          customerPhone: profile?.phone ?? undefined,
-        })
-
-        if (chargeResult.status === 'PAID') {
-          const periodStart = now
-          const periodEnd = addOneMonth(now)
-          const nextBillingAt = addOneMonth(now)
-
-          await admin.from('subscriptions').update({
-            status: 'active',
-            failed_count: 0,
-            last_payment_id: paymentId,
-            last_payment_at: now.toISOString(),
-            current_period_start: periodStart.toISOString(),
-            current_period_end: periodEnd.toISOString(),
-            next_billing_at: nextBillingAt.toISOString(),
-          }).eq('user_id', sub.user_id)
-
-          // payments 테이블에 기록
-          await savePayment(
-            {
-              id: paymentId,
-              txId: chargeResult.txId,
-              transactionType: 'PAYMENT',
-              status: 'PAID',
-              orderName: '정산타임 월 구독료',
-              amount: { total: SUBSCRIPTION_AMOUNT, currency: 'KRW' },
-              paidAt: chargeResult.paidAt,
-            },
-            { userId: sub.user_id, isTest: process.env.NODE_ENV !== 'production' }
-          )
-
-          results.push({ userId: sub.user_id, success: true })
-          console.log(`[cron/billing] ✅ 청구 성공 - userId: ${sub.user_id}`)
-        } else {
-          throw new Error(`결제 상태 이상: ${chargeResult.status}`)
-        }
-      } catch (chargeErr) {
-        const newFailCount = (sub.failed_count ?? 0) + 1
-        const isCritical = newFailCount >= MAX_FAIL_COUNT
-
-        await admin.from('subscriptions').update({
-          status: 'past_due',
-          failed_count: newFailCount,
-          // 재시도: 3일 후
-          next_billing_at: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        }).eq('user_id', sub.user_id)
-
-        const reason = chargeErr instanceof Error ? chargeErr.message : '알 수 없는 오류'
-        results.push({ userId: sub.user_id, success: false, reason })
-        console.error(
-          `[cron/billing] ❌ 청구 실패 (${newFailCount}/${MAX_FAIL_COUNT}) - userId: ${sub.user_id}, 사유: ${reason}`,
-          isCritical ? '⚠️ 반복 실패 - 관리자 확인 필요' : ''
-        )
+      const chargeResult = await attemptSubscriptionCharge(admin, sub.user_id, now)
+      if (chargeResult.ok) {
+        results.push({ userId: sub.user_id, success: true })
+        console.log(`[cron/billing] ✅ 청구 성공 - userId: ${sub.user_id}`)
+      } else {
+        results.push({ userId: sub.user_id, success: false, reason: chargeResult.reason })
       }
     }
 
