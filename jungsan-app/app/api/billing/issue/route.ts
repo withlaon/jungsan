@@ -119,24 +119,44 @@ export async function POST(req: NextRequest) {
       const trialEndsAt = new Date(subscription.trial_ends_at)
       const isTrialOver = now > trialEndsAt
 
-      await admin
-        .from('subscriptions')
-        .update({
-          billing_key: billingKey,
-          billing_key_issued_at: now.toISOString(),
-          card_company: cardCompany,
-          card_number_masked: cardNumberMasked,
-          failed_count: 0,
-          // 체험 기간이 이미 지났으면 즉시 결제 필요 상태로
-          ...(isTrialOver && subscription.status !== 'active'
-            ? { status: 'past_due', next_billing_at: now.toISOString() }
-            : {}),
-          // 체험 중이면 체험 종료일에 첫 결제
-          ...(!isTrialOver && !subscription.next_billing_at
-            ? { next_billing_at: trialEndsAt.toISOString() }
-            : {}),
-        })
-        .eq('user_id', user.id)
+      const clears = {
+        cancelled_at: null,
+        access_until: null,
+      } as const
+
+      if (subscription.status === 'cancelled') {
+        await admin
+          .from('subscriptions')
+          .update({
+            billing_key: billingKey,
+            billing_key_issued_at: now.toISOString(),
+            card_company: cardCompany,
+            card_number_masked: cardNumberMasked,
+            failed_count: 0,
+            ...clears,
+            status: isTrialOver ? 'past_due' : 'trial',
+            next_billing_at: isTrialOver ? now.toISOString() : trialEndsAt.toISOString(),
+          })
+          .eq('user_id', user.id)
+      } else {
+        await admin
+          .from('subscriptions')
+          .update({
+            billing_key: billingKey,
+            billing_key_issued_at: now.toISOString(),
+            card_company: cardCompany,
+            card_number_masked: cardNumberMasked,
+            failed_count: 0,
+            ...clears,
+            ...(isTrialOver && subscription.status !== 'active'
+              ? { status: 'past_due', next_billing_at: now.toISOString() }
+              : {}),
+            ...(!isTrialOver && !subscription.next_billing_at
+              ? { next_billing_at: trialEndsAt.toISOString() }
+              : {}),
+          })
+          .eq('user_id', user.id)
+      }
     }
 
     const { data: subAfter } = await admin

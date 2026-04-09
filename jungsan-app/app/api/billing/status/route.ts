@@ -23,7 +23,7 @@ export async function GET() {
     let { data: subscription } = await admin
       .from('subscriptions')
       .select(
-        'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, created_at'
+        'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, access_until, created_at'
       )
       .eq('user_id', user.id)
       .single()
@@ -48,7 +48,7 @@ export async function GET() {
       const { data: newSub } = await admin
         .from('subscriptions')
         .select(
-          'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, created_at'
+          'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, access_until, created_at'
         )
         .eq('user_id', user.id)
         .single()
@@ -71,11 +71,20 @@ export async function GET() {
     // billing_key는 클라이언트에 절대 노출하지 않음
     const { billing_key, ...safeSubscription } = subscription
 
+    const accessUntil = subscription.access_until
+      ? new Date(subscription.access_until as string)
+      : null
+    const graceAccessActive =
+      subscription.status === 'cancelled' &&
+      accessUntil !== null &&
+      now.getTime() <= accessUntil.getTime()
+
     return NextResponse.json({
       ...safeSubscription,
       has_card: hasCard,
       is_trial_active: isTrialActive,
       trial_remaining_days: trialRemainingDays,
+      grace_access_active: graceAccessActive,
     })
   } catch (err) {
     console.error('[billing/status] error:', err)

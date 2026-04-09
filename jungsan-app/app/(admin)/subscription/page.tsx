@@ -53,6 +53,8 @@ interface SubscriptionStatus {
   current_period_end?: string
   failed_count?: number
   cancelled_at?: string
+  access_until?: string
+  grace_access_active?: boolean
 }
 
 interface PaymentHistory {
@@ -77,6 +79,24 @@ function formatDate(iso?: string | null): string {
 
 function formatAmount(amount: number): string {
   return amount.toLocaleString('ko-KR') + '원'
+}
+
+/** 해지 확인 다이얼로그용 — 남은 이용 종료일(대략) */
+function previewSubscriptionAccessEndLabel(sub: SubscriptionStatus | null): string | null {
+  if (!sub || sub.status === 'cancelled') return null
+  const now = Date.now()
+  if (sub.status === 'active' && sub.current_period_end) {
+    const t = new Date(sub.current_period_end).getTime()
+    if (t > now) return formatDate(sub.current_period_end)
+  }
+  if (sub.is_trial_active && sub.trial_ends_at) {
+    return formatDate(sub.trial_ends_at)
+  }
+  if (sub.current_period_end) {
+    const t = new Date(sub.current_period_end).getTime()
+    if (t > now) return formatDate(sub.current_period_end)
+  }
+  return null
 }
 
 function isValidBillingEmail(value: string): boolean {
@@ -162,10 +182,20 @@ const STATUS_CONFIG = {
     badgeClass: 'border-slate-500 text-slate-400',
     icon: XCircle,
   },
+  cancelled_grace: {
+    label: '이용 가능 (해지됨)',
+    color: 'text-sky-400',
+    bgColor: 'bg-sky-500/10 border-sky-500/30',
+    badgeClass: 'border-sky-500 text-sky-400',
+    icon: CalendarDays,
+  },
 }
 
 function subscriptionCardUiConfig(sub: SubscriptionStatus | null) {
   if (!sub) return STATUS_CONFIG.trial
+  if (sub.status === 'cancelled' && sub.grace_access_active) {
+    return STATUS_CONFIG.cancelled_grace
+  }
   if (
     sub.status === 'past_due' &&
     (sub.failed_count ?? 0) === 0 &&
@@ -461,7 +491,16 @@ export default function SubscriptionPage() {
       const res = await fetch('/api/billing/cancel', { method: 'DELETE' })
       const data = await res.json()
       if (res.ok) {
-        toast.success('구독이 해지되었습니다.')
+        const payload = data as { access_until?: string }
+        const until =
+          typeof payload.access_until === 'string'
+            ? formatDate(payload.access_until)
+            : null
+        toast.success(
+          until
+            ? `구독이 해지되었습니다. ${until}까지 서비스를 이용할 수 있습니다.`
+            : '구독이 해지되었습니다.',
+        )
         setCancelDialogOpen(false)
         await fetchStatus()
       } else {
@@ -606,11 +645,17 @@ export default function SubscriptionPage() {
                 </p>
                 {sub.next_billing_at && (
                   <p className="text-amber-200/80 text-xs">
-                    처리 기준 시점: {formatDate(sub.next_billing_at)}
+                    다음 자동 청구·스케줄 기준일: {formatDate(sub.next_billing_at)}
                   </p>
                 )}
                 <p className="text-amber-300/70 text-xs">
-                  카드는 정상 등록되었습니다. 청구가 진행 중이며, 완료되면 상태가「구독 중」으로 바뀝니다.
+                  무료 체험이 끝나기 전에는 요금이 청구되지 않습니다. 첫 결제는 보통 위 날짜가
+                  되는 시점(매일 새벽 자동 청구 배치)에 진행되며, 그 전날까지는 결제가 나가지
+                  않을 수 있습니다. 체험이 이미 끝난 뒤 카드를 등록했다면 등록 직후 바로 결제가
+                  시도됩니다.
+                </p>
+                <p className="text-amber-300/70 text-xs">
+                  카드는 정상 등록된 상태입니다. 결제가 끝나면 상태가「구독 중」으로 바뀝니다.
                 </p>
               </div>
             )}
@@ -663,13 +708,28 @@ export default function SubscriptionPage() {
             )}
 
             {/* 해지됨 */}
-            {sub.status === 'cancelled' && (
+            {sub.status === 'cancelled' && sub.grace_access_active && sub.access_until && (
+              <div className="p-3 bg-sky-950/30 border border-sky-700/40 rounded-lg text-sm space-y-1.5">
+                <p className="text-sky-300 font-medium">구독·자동결제는 해지되었습니다</p>
+                <p className="text-slate-300">
+                  등록된 카드(빌링키)는 삭제되었으며 추가 결제되지 않습니다. 서비스는{' '}
+                  <span className="text-white font-medium">
+                    {formatDate(sub.access_until)}
+                  </span>
+                  까지 이용할 수 있습니다.
+                </p>
+                <p className="text-slate-500 text-xs">
+                  해지 요청일: {formatDate(sub.cancelled_at)}
+                </p>
+              </div>
+            )}
+            {sub.status === 'cancelled' && !sub.grace_access_active && (
               <div className="text-sm text-slate-400">
                 <p>
                   해지일: <span className="text-slate-200">{formatDate(sub.cancelled_at)}</span>
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  재사용을 원하시면 카드를 다시 등록해주세요.
+                  재사용을 원하시면 아래에서 카드를 다시 등록해 주세요.
                 </p>
               </div>
             )}
@@ -679,12 +739,27 @@ export default function SubscriptionPage() {
 
       {/* 결제 수단 카드 */}
       <Card className="bg-slate-900 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-white text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-slate-400" />
-            결제 수단
-          </CardTitle>
-          <CardDescription className="text-slate-400 text-xs">
+        <CardHeader className="space-y-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <CardTitle className="text-white text-base flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-slate-400" />
+              결제 수단 · 구독 관리
+            </CardTitle>
+            {sub &&
+              sub.status !== 'cancelled' &&
+              (sub.has_card || sub.status === 'active') && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-red-500/40 text-red-400 hover:bg-red-950/30 shrink-0"
+                  onClick={() => setCancelDialogOpen(true)}
+                >
+                  구독 취소
+                </Button>
+              )}
+          </div>
+          <CardDescription className="text-slate-400 text-xs pt-2">
             무료 체험 중에는 결제일이 오지 않으며, 체험 종료 후(또는 이미 결제일이 지난 경우)에는 카드
             등록 직후 즉시 첫 결제가 진행됩니다.
           </CardDescription>
@@ -736,7 +811,7 @@ export default function SubscriptionPage() {
               </div>
               <Button
                 onClick={openRegisterCardDialog}
-                disabled={isRegistering || sub?.status === 'cancelled'}
+                disabled={isRegistering}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {isRegistering ? (
@@ -958,20 +1033,6 @@ export default function SubscriptionPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 구독 해지 */}
-      {sub && sub.status !== 'cancelled' && sub.has_card && (
-        <div className="pt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCancelDialogOpen(true)}
-            className="text-slate-500 hover:text-red-400 hover:bg-red-950/20 text-xs"
-          >
-            구독 해지
-          </Button>
-        </div>
-      )}
-
       {/* 해지 확인 다이얼로그 */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
@@ -981,11 +1042,22 @@ export default function SubscriptionPage() {
               구독을 해지하시겠습니까?
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-sm space-y-2 pt-2">
+              {previewSubscriptionAccessEndLabel(sub) ? (
+                <span className="block text-slate-300">
+                  해지 후에도{' '}
+                  <strong className="text-white">
+                    {previewSubscriptionAccessEndLabel(sub)}
+                  </strong>
+                  까지 서비스를 이용할 수 있습니다. (유료 구독 중이면 현재 결제 주기 종료일,
+                  무료 체험 중이면 체험 종료일 기준)
+                </span>
+              ) : (
+                <span className="block">
+                  남은 무료 체험·결제 주기가 없으면 해지 직후부터 이용이 제한될 수 있습니다.
+                </span>
+              )}
               <span className="block">
-                해지 후에도 현재 결제 주기 종료일까지 서비스를 이용할 수 있습니다.
-              </span>
-              <span className="block">
-                등록된 카드 정보(빌링키)가 즉시 삭제되며, 다음 결제일에 자동 청구되지 않습니다.
+                등록된 카드(빌링키)는 즉시 삭제되며, 이후 자동 결제는 이루어지지 않습니다.
               </span>
             </DialogDescription>
           </DialogHeader>
