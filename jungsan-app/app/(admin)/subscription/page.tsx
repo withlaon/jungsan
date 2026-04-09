@@ -12,8 +12,6 @@ import {
   CalendarDays,
   Zap,
   BadgeCheck,
-  ExternalLink,
-  BookOpen,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -126,20 +124,6 @@ function billingRegisterErrorMessage(
   if (pgMessage && !message) return pgMessage
   return message ?? '카드 등록에 실패했습니다.'
 }
-
-/** 포트원 개발자센터·도움말 (AI 연동·문서) */
-const PORTONE_LINKS = {
-  billingKeyIssue:
-    'https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2',
-  billingPay:
-    'https://developers.portone.io/opi/ko/integration/start/v2/billing/payment?v=v2',
-  aiTools: 'https://developers.portone.io/opi/ko/integration/using-ai-tools?v=v2',
-  webhook: 'https://developers.portone.io/opi/ko/integration/webhook?v=v2',
-  kcpChannel: 'https://help.portone.io/content/kcp_channel',
-  mcpServer: 'https://github.com/portone-io/mcp-server',
-  portoneCli: 'https://github.com/portone-io/portone-cli',
-  llmsTxt: 'https://developers.portone.io/llms.txt',
-} as const
 
 const STATUS_CONFIG = {
   trial: {
@@ -501,129 +485,29 @@ export default function SubscriptionPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 pb-16">
-      {/* 헤더 — 월 자동결제 (PortOne V2 + KCP) */}
+      {/* 헤더 */}
       <div className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex flex-wrap items-center gap-2">
-              <CreditCard className="h-7 w-7 text-blue-400 shrink-0" />
-              구독 · 자동결제
-            </h1>
-            <p className="text-slate-400 text-sm mt-2 max-w-xl">
-              카드만 등록하면 매월 자동 청구됩니다. 결제 인프라는{' '}
-              <span className="text-slate-300">포트원(PortOne) V2</span>, PG는{' '}
-              <span className="text-slate-300">NHN KCP</span> 정기(빌링키) 채널을 사용합니다.
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <Badge variant="outline" className="border-blue-500/40 text-blue-300 text-xs">
-                PortOne V2
-              </Badge>
-              <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 text-xs">
-                NHN KCP · 빌링키
-              </Badge>
-              <Badge variant="outline" className="border-amber-500/40 text-amber-200 text-xs">
-                {formatAmount(SUBSCRIPTION_AMOUNT)} /월 (VAT 포함)
-              </Badge>
-            </div>
-          </div>
-          <div className="rounded-xl border border-slate-600/80 bg-slate-800/40 px-4 py-3 text-sm text-slate-300 min-w-[min(100%,260px)]">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">
-              이용 흐름
-            </p>
-            <ol className="space-y-2 list-decimal list-inside text-slate-200">
-              <li>아래에서 고객 정보 확인 후 카드 등록</li>
-              <li>포트원·KCP 창에서 카드 인증</li>
-              <li>매월 동일 금액 자동 결제 (스케줄·웹훅)</li>
-            </ol>
+        <div>
+          <h1 className="text-2xl font-bold text-white flex flex-wrap items-center gap-2">
+            <CreditCard className="h-7 w-7 text-blue-400 shrink-0" />
+            구독 · 자동결제
+          </h1>
+          <p className="text-slate-400 text-sm mt-2 max-w-xl">
+            결제가 필요한 시점에는 카드 등록 직후 바로 청구되고, 이후 매월 동일 금액이 자동으로
+            결제됩니다.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Badge variant="outline" className="border-blue-500/40 text-blue-300 text-xs">
+              PortOne V2
+            </Badge>
+            <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 text-xs">
+              NHN KCP · 빌링키
+            </Badge>
+            <Badge variant="outline" className="border-amber-500/40 text-amber-200 text-xs">
+              {formatAmount(SUBSCRIPTION_AMOUNT)} /월 (VAT 포함)
+            </Badge>
           </div>
         </div>
-
-        <div
-          className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2.5 text-xs text-amber-100/90 leading-relaxed"
-          role="note"
-        >
-          <strong className="text-amber-200">보안:</strong> V2 API Secret, 웹훅 Secret, PG 개인키
-          비밀번호는 절대 코드·채팅에 올리지 말고 Vercel/서버 환경변수만 사용하세요. 노출된 키는
-          포트원 콘솔에서 즉시 재발급하는 것이 안전합니다.
-        </div>
-
-        <Card className="bg-slate-900/80 border-slate-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-sm flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-indigo-400" />
-              연동 참고 (포트원 공식)
-            </CardTitle>
-            <CardDescription className="text-slate-500 text-xs">
-              Cursor·Claude 등 AI 도구로 연동하려면 MCP 서버·llms.txt·CLI를 함께 쓰면 문서와 스펙을 맞추기 쉽습니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
-            <a
-              href={PORTONE_LINKS.billingKeyIssue}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
-            >
-              빌링키 발급 (V2) <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.billingPay}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
-            >
-              빌링키로 결제 <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.webhook}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
-            >
-              웹훅 연동 <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.aiTools}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
-            >
-              AI 도구 활용 <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.mcpServer}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-300"
-            >
-              portone-io/mcp-server <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.portoneCli}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-300"
-            >
-              portone-io/portone-cli <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.llmsTxt}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-300"
-            >
-              llms.txt <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={PORTONE_LINKS.kcpChannel}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
-            >
-              KCP 채널·배치그룹 도움말 <ExternalLink className="h-3 w-3" />
-            </a>
-          </CardContent>
-        </Card>
       </div>
 
       {statusError && (
@@ -726,7 +610,7 @@ export default function SubscriptionPage() {
                   </p>
                 )}
                 <p className="text-amber-300/70 text-xs">
-                  카드는 정상 등록되었습니다. 잠시 후 자동 청구되며, 완료되면 상태가「구독 중」으로 바뀝니다.
+                  카드는 정상 등록되었습니다. 청구가 진행 중이며, 완료되면 상태가「구독 중」으로 바뀝니다.
                 </p>
               </div>
             )}
@@ -801,46 +685,11 @@ export default function SubscriptionPage() {
             결제 수단
           </CardTitle>
           <CardDescription className="text-slate-400 text-xs">
-            등록된 카드로 무료 체험 종료 후 자동 결제됩니다.
+            무료 체험 중에는 결제일이 오지 않으며, 체험 종료 후(또는 이미 결제일이 지난 경우)에는 카드
+            등록 직후 즉시 첫 결제가 진행됩니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div
-            className="rounded-lg border border-slate-600/80 bg-slate-800/40 px-3 py-2.5 text-xs text-slate-400 leading-relaxed space-y-2"
-            role="note"
-          >
-            <p className="font-medium text-slate-300">운영자 체크리스트 (NHN KCP 정기)</p>
-            <ul className="list-disc list-inside space-y-1 text-slate-400">
-              <li>
-                포트원 콘솔 채널은{' '}
-                <strong className="text-slate-300">KCP API 정기결제(V2·실연동)</strong> 등 빌링용
-                모듈이어야 합니다.
-              </li>
-              <li>
-                콘솔의 <strong className="text-slate-300">배치결제그룹아이디(과금명)</strong>와 KCP
-                파트너센터 자동결제 그룹이 일치해야 합니다. (예: 과금명{' '}
-                <code className="text-slate-300">JUNGSAN</code> — KCP 화면의 그룹ID는 별도 코드로
-                표시될 수 있습니다.)
-              </li>
-              <li>
-                <code className="text-slate-300">PG-API 인증서·개인 키(.pem)</code>는{' '}
-                <strong>포트원 채널 설정에만</strong> 업로드합니다. Next.js 저장소에는 넣지 않습니다.
-              </li>
-              <li>
-                서버 환경변수{' '}
-                <code className="text-slate-300">PORTONE_BILLING_CHANNEL_KEY_DOMESTIC</code>에 위
-                채널의 <strong className="text-slate-300">채널 키</strong>만 넣습니다.
-              </li>
-            </ul>
-            <a
-              href={PORTONE_LINKS.kcpChannel}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-400 underline hover:text-blue-300"
-            >
-              포트원 도움말 — KCP 채널·배치그룹 <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
           {sub?.has_card ? (
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
               <div className="flex items-center gap-3">

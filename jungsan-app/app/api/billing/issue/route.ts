@@ -91,8 +91,6 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
 
-    let shouldTryImmediateCharge = false
-
     if (!subscription) {
       // 기존 가입자 - 프로필 created_at 기준 trial_ends_at 계산
       const { data: profile } = await admin
@@ -117,11 +115,9 @@ export async function POST(req: NextRequest) {
         failed_count: 0,
         next_billing_at: insertedAsPastDue ? now.toISOString() : trialEndsAt.toISOString(),
       })
-      shouldTryImmediateCharge = insertedAsPastDue
     } else {
       const trialEndsAt = new Date(subscription.trial_ends_at)
       const isTrialOver = now > trialEndsAt
-      shouldTryImmediateCharge = isTrialOver && subscription.status !== 'active'
 
       await admin
         .from('subscriptions')
@@ -142,6 +138,17 @@ export async function POST(req: NextRequest) {
         })
         .eq('user_id', user.id)
     }
+
+    const { data: subAfter } = await admin
+      .from('subscriptions')
+      .select('next_billing_at')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const nextAt = subAfter?.next_billing_at ? new Date(subAfter.next_billing_at) : null
+    const shouldTryImmediateCharge = Boolean(
+      nextAt && nextAt.getTime() <= now.getTime()
+    )
 
     if (shouldTryImmediateCharge) {
       const chargeResult = await attemptSubscriptionCharge(admin, user.id, now)
