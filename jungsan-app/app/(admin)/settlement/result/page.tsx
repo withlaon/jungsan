@@ -25,23 +25,35 @@ export default function SettlementResultPage() {
   const [details, setDetails] = useState<DetailWithRider[]>([])
   const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
-  // settlements 로드 후 첫 번째 주차 자동 선택
+  // 목록에 없는 선택 ID 제거·삭제 후 올바른 주차로 이동
   useEffect(() => {
-    if (settlements.length > 0 && !selectedId) {
-      setSelectedId(settlements[0].id)
+    if (settlements.length === 0) {
+      setSelectedId('')
+      return
     }
-  }, [settlements, selectedId])
+    setSelectedId((prev) => {
+      if (prev && settlements.some((s) => s.id === prev)) return prev
+      return settlements[0].id
+    })
+  }, [settlements])
 
   const currentSettlement = settlements.find(s => s.id === selectedId) ?? null
 
-  // 선택된 주차 상세 데이터 조회 (탭 재진입 시 모듈 캐시 우선)
+  // 주차 변경 시 이전 테이블을 비운 뒤 캐시·DB로 상세 로드 (레이스 취소)
   useEffect(() => {
-    if (!selectedId) return
-    const cached = readDetailsCache<DetailWithRider>(selectedId, 'result')
-    if (cached) {
-      setDetails(cached)
+    if (!selectedId) {
+      setDetails([])
       return
     }
+    let cancelled = false
+    setDetails([])
+
+    const cached = readDetailsCache<DetailWithRider>(selectedId, 'result')
+    if (cached != null) {
+      if (!cancelled) setDetails(cached)
+      return () => { cancelled = true }
+    }
+
     const sb = createClient()
     ;(async () => {
       try {
@@ -50,13 +62,14 @@ export default function SettlementResultPage() {
           .select('*, riders(*)')
           .eq('settlement_id', selectedId)
           .order('final_amount', { ascending: false })
-        if (!error && data) {
-          const rows = data as DetailWithRider[]
-          writeDetailsCache(selectedId, 'result', rows)
-          setDetails(rows)
-        }
+        if (cancelled || error || !data) return
+        const rows = data as DetailWithRider[]
+        writeDetailsCache(selectedId, 'result', rows)
+        if (!cancelled) setDetails(rows)
       } catch { /* ignore */ }
     })()
+
+    return () => { cancelled = true }
   }, [selectedId])
 
   const handleConfirm = async (id: string) => {
@@ -69,8 +82,12 @@ export default function SettlementResultPage() {
     await revalidateSettlements()
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('이 정산을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.')) return
+  const handleDelete = async () => {
+    const s = currentSettlement
+    if (!s) return
+    if (!confirm(`${s.week_start} ~ ${s.week_end} 정산을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.`)) return
+    const id = s.id
+    const nextSelected = settlements.filter((x) => x.id !== id)[0]?.id ?? ''
     try {
       const res = await fetch(`/api/admin/settlement?id=${id}`, {
         method: 'DELETE',
@@ -81,8 +98,9 @@ export default function SettlementResultPage() {
       toast.success('정산이 삭제되었습니다.')
       deleteDetailsCacheEntry(id)
       removeSettlementFromCache(id)
+      setPreviewDetail(null)
       setDetails([])
-      setSelectedId('')
+      setSelectedId(nextSelected)
       await revalidateSettlements()
     } catch {
       toast.error('삭제 실패: 네트워크 오류')
@@ -168,7 +186,7 @@ export default function SettlementResultPage() {
             <Badge className={currentSettlement.status === 'confirmed' ? 'bg-emerald-700' : 'bg-amber-700'}>
               {currentSettlement.status === 'confirmed' ? '확정' : '임시저장'}
             </Badge>
-            <Button size="sm" variant="ghost" onClick={() => handleDelete(selectedId)}
+            <Button size="sm" variant="ghost" onClick={() => void handleDelete()}
               className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 h-8">
               <Trash2 className="h-4 w-4 mr-1" />삭제
             </Button>

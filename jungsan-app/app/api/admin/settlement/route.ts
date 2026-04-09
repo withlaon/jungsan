@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { recalculateAllSettlementsForUser } from '@/lib/settlement/recalculate-user-settlements'
 
 async function verifyUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,12 +28,24 @@ export async function DELETE(req: NextRequest) {
       db = supabase
     }
 
-    const { data: wsMeta } = await db
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const isSiteAdmin = profile?.username?.toLowerCase() === 'admin'
+
+    const { data: wsRow } = await db
       .from('weekly_settlements')
-      .select('user_id')
+      .select('user_id, week_start, week_end')
       .eq('id', id)
       .maybeSingle()
-    const ownerUserId = wsMeta?.user_id as string | null | undefined
+    if (!wsRow) {
+      return NextResponse.json({ error: '정산을 찾을 수 없습니다.' }, { status: 404 })
+    }
+    if (!isSiteAdmin && wsRow.user_id !== user.id) {
+      return NextResponse.json({ error: '삭제 권한이 없습니다.' }, { status: 403 })
+    }
 
     // 1. 이 정산에 연결된 선지급금 deducted_settlement_id 초기화
     const { error: advErr } = await db
@@ -61,15 +72,6 @@ export async function DELETE(req: NextRequest) {
       .eq('id', id)
     if (settlementErr) {
       return NextResponse.json({ error: '정산 삭제 실패: ' + settlementErr.message }, { status: 500 })
-    }
-
-    if (ownerUserId) {
-      try {
-        const admin = createAdminClient()
-        await recalculateAllSettlementsForUser(admin, ownerUserId)
-      } catch (e) {
-        console.warn('[settlement DELETE] 남은 정산 재계산:', e)
-      }
     }
 
     return NextResponse.json({ success: true })
