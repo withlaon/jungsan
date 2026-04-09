@@ -203,7 +203,18 @@ function subscriptionCardUiConfig(sub: SubscriptionStatus | null) {
   ) {
     return STATUS_CONFIG.past_due_pending
   }
-  return STATUS_CONFIG[sub.status]
+  switch (sub.status) {
+    case 'trial':
+      return STATUS_CONFIG.trial
+    case 'active':
+      return STATUS_CONFIG.active
+    case 'past_due':
+      return STATUS_CONFIG.past_due
+    case 'cancelled':
+      return STATUS_CONFIG.cancelled
+    default:
+      return STATUS_CONFIG.trial
+  }
 }
 
 export default function SubscriptionPage() {
@@ -237,8 +248,10 @@ export default function SubscriptionPage() {
   const [billingConfigMessage, setBillingConfigMessage] = useState<string | null>(null)
 
   const fetchStatus = useCallback(async () => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 20_000)
     try {
-      const res = await fetch('/api/billing/status')
+      const res = await fetch('/api/billing/status', { signal: controller.signal })
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       if (res.ok) {
         setSub(data as SubscriptionStatus)
@@ -253,9 +266,18 @@ export default function SubscriptionPage() {
         console.error('[subscription] 상태 조회 실패:', data.error ?? res.status)
       }
     } catch (e) {
-      setStatusError('네트워크 오류로 구독 상태를 확인할 수 없습니다.')
+      const aborted =
+        (e instanceof DOMException && e.name === 'AbortError') ||
+        (e instanceof Error && e.name === 'AbortError')
+      setStatusError(
+        aborted
+          ? '구독 정보 응답이 지연되고 있습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.'
+          : '네트워크 오류로 구독 상태를 확인할 수 없습니다.',
+      )
       setSub(null)
       console.error('[subscription] 상태 조회 오류:', e)
+    } finally {
+      clearTimeout(timer)
     }
   }, [])
 
@@ -293,30 +315,37 @@ export default function SubscriptionPage() {
   }, [])
 
   useEffect(() => {
+    let alive = true
     const init = async () => {
       setLoading(true)
       try {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
+        if (user && alive) {
           setUserId(user.id)
 
           const { data: profile } = await supabase
             .from('profiles')
             .select('manager_name, phone, email')
             .eq('id', user.id)
-            .single()
+            .maybeSingle()
+          if (!alive) return
           setUserName(profile?.manager_name ?? '')
           setUserPhone(profile?.phone ?? '')
           /** KCP customer.email: 로그인 이메일 우선, 없으면 프로필 email */
           setUserEmail((user.email ?? profile?.email ?? '').trim())
         }
-        await Promise.all([fetchStatus(), fetchHistory()])
+        // 결제 내역(Supabase)이 지연되어도 구독 화면은 먼저 표시
+        if (alive) await fetchStatus()
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
+      if (alive) void fetchHistory()
     }
-    init()
+    void init()
+    return () => {
+      alive = false
+    }
   }, [fetchStatus, fetchHistory])
 
   /** PG 리디렉션 복귀(모바일 KCP 등): URL 쿼리로 빌링키·오류 전달 */
