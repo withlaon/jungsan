@@ -20,13 +20,13 @@ export async function GET() {
 
     const admin = createAdminClient()
 
+    // * : 마이그레이션 전후 컬럼 차이·알 수 없는 컬럼 조회 오류 방지
+    // maybeSingle : 0행일 때 PostgREST 오류 없이 null
     let { data: subscription } = await admin
       .from('subscriptions')
-      .select(
-        'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, access_until, created_at'
-      )
+      .select('*')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     // 기존 가입자 처리: 구독 레코드가 없으면 자동 생성
     if (!subscription) {
@@ -34,26 +34,40 @@ export async function GET() {
         .from('profiles')
         .select('created_at')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       const profileCreatedAt = profile?.created_at ? new Date(profile.created_at) : new Date()
       const trialEndsAt = new Date(profileCreatedAt)
       trialEndsAt.setDate(trialEndsAt.getDate() + 30)
 
-      await admin.from('subscriptions').insert({
+      const { error: insertError } = await admin.from('subscriptions').insert({
         user_id: user.id,
         trial_ends_at: trialEndsAt.toISOString(),
       })
 
-      const { data: newSub } = await admin
-        .from('subscriptions')
-        .select(
-          'status, billing_key, card_company, card_number_masked, trial_ends_at, next_billing_at, current_period_start, current_period_end, last_payment_id, last_payment_at, failed_count, cancelled_at, access_until, created_at'
+      // 동시에 카드 저장 등으로 행이 생긴 경우(유니크 충돌) → 다시 조회
+      if (insertError?.code === '23505') {
+        const { data: again } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        subscription = again
+      } else if (insertError) {
+        console.error('[billing/status] 구독 자동 생성 실패:', insertError.message)
+        return NextResponse.json(
+          { error: '구독 정보를 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+          { status: 503 },
         )
-        .eq('user_id', user.id)
-        .single()
+      } else {
+        const { data: newSub } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
 
-      subscription = newSub
+        subscription = newSub
+      }
     }
 
     if (!subscription) {

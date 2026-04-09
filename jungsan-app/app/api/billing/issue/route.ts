@@ -119,10 +119,8 @@ export async function POST(req: NextRequest) {
       const trialEndsAt = new Date(subscription.trial_ends_at)
       const isTrialOver = now > trialEndsAt
 
-      const clears = {
-        cancelled_at: null,
-        access_until: null,
-      } as const
+      // cancelled_at 만 초기화 (access_until 은 마이그레이션 미적용 DB에서 컬럼 없을 수 있음)
+      const clears = { cancelled_at: null } as const
 
       if (subscription.status === 'cancelled') {
         await admin
