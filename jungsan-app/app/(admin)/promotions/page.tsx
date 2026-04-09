@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { useRiders } from '@/hooks/useRiders'
 import { Promotion, PromoRange, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -240,6 +241,13 @@ export default function PromotionsPage() {
     }
   }
 
+  const bumpSettlementResults = () => {
+    void recalculateSettlementsAndRefreshViews().catch((e) => {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : '정산 결과 반영에 실패했습니다.')
+    })
+  }
+
   // ── 프로모션 중복 라이더 ID (2개 이상 그룹에 속한 라이더) ──
   const duplicatePromoRiderIds = useMemo(() => {
     const counts = new Map<string, number>()
@@ -335,6 +343,7 @@ export default function PromotionsPage() {
       if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
       toast.success('프로모션이 등록되었습니다.')
     }
+    bumpSettlementResults()
     setSaving(false); setRegOpen(false); fetchData()
   }
 
@@ -352,6 +361,7 @@ export default function PromotionsPage() {
       if (fresh.length === 0) setDetailGroup(null)
       else setDetailGroup(g => g ? { ...g, promos: fresh } : null)
     }
+    bumpSettlementResults()
   }
 
   const handleAddRidersToGroup = async (g: PromoGroup) => {
@@ -370,6 +380,7 @@ export default function PromotionsPage() {
     const { error } = await supabase.from('promotions').insert(newIds.map(id => ({ ...base, rider_id: id })))
     if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
     toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    bumpSettlementResults()
     setDetailAddIds([])
     setDetailSaving(false)
     setDetailTab('info')
@@ -407,8 +418,10 @@ export default function PromotionsPage() {
     const { error } = await supabase.from('promotions').update(updates).in('id', g.promos.map(p => p.id))
     if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
     toast.success('프로모션이 수정되었습니다.')
+    bumpSettlementResults()
     setDetailTab('info')
     setDetailSaving(false)
+    setDetailGroup(null)
     fetchData()
   }
 
@@ -418,6 +431,7 @@ export default function PromotionsPage() {
     const { error } = await supabase.from('promotions').delete().in('id', ids)
     if (error) { toast.error('삭제 실패'); return }
     toast.success('삭제되었습니다.')
+    bumpSettlementResults()
     setDetailGroup(null)
     fetchData()
   }

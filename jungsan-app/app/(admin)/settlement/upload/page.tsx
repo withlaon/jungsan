@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { revalidateSettlements } from '@/hooks/useSettlements'
 import { useRiders } from '@/hooks/useRiders'
 import { ParsedRiderRow, ExcelSummary } from '@/lib/excel/baemin-parser'
 import { calculateSettlement, RiderSettlementResult } from '@/lib/settlement/calculator'
@@ -533,6 +534,7 @@ export default function SettlementUploadPage() {
 
     toast.success('정산이 저장되었습니다.')
     setSaving(false)
+    await revalidateSettlements()
     router.push('/settlement/result')
   }
 

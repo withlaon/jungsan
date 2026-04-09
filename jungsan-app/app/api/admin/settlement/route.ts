@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { recalculateAllSettlementsForUser } from '@/lib/settlement/recalculate-user-settlements'
 
 async function verifyUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,6 +29,13 @@ export async function DELETE(req: NextRequest) {
       db = supabase
     }
 
+    const { data: wsMeta } = await db
+      .from('weekly_settlements')
+      .select('user_id')
+      .eq('id', id)
+      .maybeSingle()
+    const ownerUserId = wsMeta?.user_id as string | null | undefined
+
     // 1. 이 정산에 연결된 선지급금 deducted_settlement_id 초기화
     const { error: advErr } = await db
       .from('advance_payments')
@@ -53,6 +61,15 @@ export async function DELETE(req: NextRequest) {
       .eq('id', id)
     if (settlementErr) {
       return NextResponse.json({ error: '정산 삭제 실패: ' + settlementErr.message }, { status: 500 })
+    }
+
+    if (ownerUserId) {
+      try {
+        const admin = createAdminClient()
+        await recalculateAllSettlementsForUser(admin, ownerUserId)
+      } catch (e) {
+        console.warn('[settlement DELETE] 남은 정산 재계산:', e)
+      }
     }
 
     return NextResponse.json({ success: true })

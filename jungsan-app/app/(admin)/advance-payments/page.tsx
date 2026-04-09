@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
 import { useAdvancePayments, revalidatePayments, applyOptimisticPayment } from '@/hooks/useAdvancePayments'
+import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -158,6 +159,13 @@ export default function AdvancePaymentsPage() {
   const [editingPayment, setEditingPayment] = useState<PaymentWithRider | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
 
+  const bumpSettlementResults = () => {
+    void recalculateSettlementsAndRefreshViews().catch((e) => {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : '정산 결과 반영에 실패했습니다.')
+    })
+  }
+
   const handleSave = async (type: 'advance' | 'recovery') => {
     const form = type === 'advance' ? advanceForm : recoveryForm
     if (!form.rider_id || !form.amount || !form.week) {
@@ -184,6 +192,7 @@ export default function AdvancePaymentsPage() {
     if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
 
     toast.success(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
+    bumpSettlementResults()
     setSaving(false)
     if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
     else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
@@ -227,6 +236,7 @@ export default function AdvancePaymentsPage() {
     if (error) { toast.error('수정 실패: ' + error.message); setSaving(false); return }
 
     toast.success('수정되었습니다.')
+    bumpSettlementResults()
     setSaving(false)
     setEditOpen(false)
     setEditingPayment(null)
@@ -252,6 +262,7 @@ export default function AdvancePaymentsPage() {
       }
       applyOptimisticPayment(p, 'remove')
       toast.success('삭제되었습니다.')
+      bumpSettlementResults()
       await revalidatePayments()
     } catch {
       toast.error('삭제 실패: 네트워크 오류')

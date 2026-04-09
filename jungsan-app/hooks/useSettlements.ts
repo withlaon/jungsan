@@ -74,6 +74,35 @@ export async function revalidateSettlements(): Promise<WeeklySettlement[]> {
   return loadSettlements(cached?.userId ?? null, cached?.isAdmin ?? false, true)
 }
 
+/**
+ * 서버에서 settlement_details를 최신 프로모션·관리비·선지급 등으로 재계산한 뒤
+ * 목록·화면 캐시를 무효화합니다.
+ */
+export async function recalculateSettlementsAndRefreshViews(): Promise<{
+  recalculated: number
+  errors: string[]
+}> {
+  const res = await fetch('/api/settlement/recalculate', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string
+    recalculated?: number
+    errors?: string[]
+  }
+  if (!res.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : '정산 재계산에 실패했습니다.')
+  }
+  await revalidateSettlements()
+  return {
+    recalculated: data.recalculated ?? 0,
+    errors: Array.isArray(data.errors) ? data.errors : [],
+  }
+}
+
 /** 사용자 전환(로그아웃/로그인) 시 settlements 캐시 완전 초기화 */
 export function clearSettlementsCache() {
   _listCache = null

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
+import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { useRiders } from '@/hooks/useRiders'
 import { InsuranceFee, ManagementFee, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -216,6 +217,13 @@ export default function SettingsPage() {
     }
   }
 
+  const bumpSettlementResults = () => {
+    void recalculateSettlementsAndRefreshViews().catch((e) => {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : '정산 결과 반영에 실패했습니다.')
+    })
+  }
+
   const setGF = (patch: Partial<ReturnType<typeof initGeneral>>) => setGeneralForm(f=>({...f,...patch}))
   const setCF = (patch: Partial<ReturnType<typeof initCall>>)    => setCallForm(f=>({...f,...patch}))
   const setIF = (patch: Partial<ReturnType<typeof initInsurance>>)=> setInsuranceForm(f=>({...f,...patch}))
@@ -259,6 +267,7 @@ export default function SettingsPage() {
     const {error}=await supabase.from('management_fees').insert(rows)
     if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
     toast.success(`일반관리비 ${rows.length}건 등록되었습니다.`)
+    bumpSettlementResults()
     setSaving(false);setDialogType(null);setGeneralForm(initGeneral());fetchData()
   }
   const handleSaveCall = async () => {
@@ -271,6 +280,7 @@ export default function SettingsPage() {
     const {error}=await supabase.from('management_fees').insert(rows)
     if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
     toast.success(`콜관리비 ${rows.length}건 등록되었습니다.`)
+    bumpSettlementResults()
     setSaving(false);setDialogType(null);setCallForm(initCall());fetchData()
   }
   const handleSaveInsurance = async () => {
@@ -284,6 +294,7 @@ export default function SettingsPage() {
     const {error}=await supabase.from('insurance_fees').insert(rows)
     if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
     toast.success(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
+    bumpSettlementResults()
     setSaving(false);setDialogType(null);setInsuranceForm(initInsurance());fetchData()
   }
 
@@ -293,6 +304,7 @@ export default function SettingsPage() {
     const {error}=await supabase.from('management_fees').delete().eq('id',id)
     if (error){toast.error('삭제 실패');return}
     toast.success('삭제되었습니다.')
+    bumpSettlementResults()
     const updated=fees.filter(f=>f.id!==id)
     _feesCache = updated
     setFees(updated)
@@ -307,13 +319,16 @@ export default function SettingsPage() {
     if (!confirm(`"${g.item_name}" 관리비 전체를 삭제하시겠습니까?`)) return
     const {error}=await supabase.from('management_fees').delete().in('id',g.items.map(i=>i.id))
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.');setDetailFee(null);fetchData()
+    toast.success('삭제되었습니다.')
+    bumpSettlementResults()
+    setDetailFee(null);fetchData()
   }
   const deleteInsOne = async (id: string) => {
     if (!confirm('이 항목을 삭제하시겠습니까?')) return
     const {error}=await supabase.from('insurance_fees').delete().eq('id',id)
     if (error){toast.error('삭제 실패');return}
     toast.success('삭제되었습니다.')
+    bumpSettlementResults()
     const updated=insuranceFees.filter(f=>f.id!==id)
     _insCache = updated
     setInsuranceFees(updated)
@@ -327,7 +342,9 @@ export default function SettingsPage() {
     if (!confirm('고용산재 관리비 전체를 삭제하시겠습니까?')) return
     const {error}=await supabase.from('insurance_fees').delete().in('id',g.items.map(i=>i.id))
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.');setDetailIns(null);fetchData()
+    toast.success('삭제되었습니다.')
+    bumpSettlementResults()
+    setDetailIns(null);fetchData()
   }
 
   const feeGroupKey  = (f: FeeWithRider) => [f.fee_type,f.item_name,f.amount,f.date_mode,f.week_start??'',f.deadline_date??''].join('||')
@@ -343,6 +360,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from('management_fees').insert(rows)
     if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
     toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    bumpSettlementResults()
     setFeeAddIds([]); setFeeDetailTab('info'); setDetailSaving(false); fetchData()
   }
 
@@ -356,6 +374,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from('management_fees').update(updates).in('id', g.items.map(i => i.id))
     if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
     toast.success('수정되었습니다.')
+    bumpSettlementResults()
     setFeeDetailTab('info'); setDetailSaving(false); setDetailFee(null); fetchData()
   }
 
@@ -369,6 +388,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from('insurance_fees').insert(rows)
     if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
     toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+    bumpSettlementResults()
     setInsAddIds([]); setInsDetailTab('info'); setDetailSaving(false); fetchData()
   }
 
@@ -382,6 +402,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from('insurance_fees').update(updates).in('id', g.items.map(i => i.id))
     if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
     toast.success('수정되었습니다.')
+    bumpSettlementResults()
     setInsDetailTab('info'); setDetailSaving(false); setDetailIns(null); fetchData()
   }
 
