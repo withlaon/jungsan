@@ -12,21 +12,16 @@
  *
  * @see https://developers.portone.io/opi/ko/integration/start/v2/billing/issue?v=v2
  *
- * KCP 전문 길이: issueName·issueId·buyer 필드를 최소화( lib/portone/kcp-payload-limits.ts ).
- * 배치결제그룹아이디 등은 포트원 콘솔 채널 설정에서만 반영됩니다.
+ * KCP「잘못된_전문길이」: `customer`·`issueName`·`issueId`·`offerPeriod` 등은 PG 전문을 늘려
+ * 오류를 유발할 수 있어, 빌링키 발급 요청은 **storeId + channelKey + billingKeyMethod** 만 보냅니다.
+ * (모바일 리디렉션은 windowType·redirectUrl만 추가.) 구매자 정보는 구독 화면에서 프로필 저장으로만 사용합니다.
+ * 배치결제그룹아이디는 포트원 콘솔 채널 설정에만 반영됩니다.
  */
 
 import PortOne, {
   BillingKeyMethod,
   WindowType,
-  type Customer,
 } from '@portone/browser-sdk/v2'
-import {
-  kcpBillingIssueDisplayName,
-  kcpBillingIssueMerchantUid,
-  sanitizeKcpEmail,
-  sanitizeKcpPersonName,
-} from '@/lib/portone/kcp-payload-limits'
 
 export const SUBSCRIPTION_AMOUNT = 20_000
 export const TRIAL_DAYS = 30
@@ -149,27 +144,6 @@ export function getKcpBillingCustomerGaps(request: IssueBillingKeyRequest): Arra
   return gaps
 }
 
-/** KCP 주문/고객 키 — 짧은 16자 hex */
-function sdkCustomerId(internalId: string): string {
-  const hex = internalId.replace(/[^a-fA-F0-9]/g, '').slice(0, 16)
-  if (hex.length >= 8) return hex
-  const s = internalId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16)
-  return s.length >= 8 ? s : `u${internalId.replace(/\W/g, '').slice(0, 12)}`
-}
-
-function buildSdkCustomer(req: IssueBillingKeyRequest): Customer {
-  const fullName = sanitizeKcpPersonName(req.customerName?.trim() || 'User', 14)
-  const customer: Customer = {
-    customerId: sdkCustomerId(req.customerId.trim()),
-    fullName,
-  }
-  const phone = normalizeKcpPhone(req.customerPhone)
-  if (phone) customer.phoneNumber = phone
-  const em = req.customerEmail?.trim()
-  if (em) customer.email = sanitizeKcpEmail(em, 32)
-  return customer
-}
-
 function isMobileBillingEnvironment(): boolean {
   if (typeof window === 'undefined') return false
   if (/Android|iPhone|iPad|iPod|Mobile|IEMobile|BlackBerry/i.test(navigator.userAgent)) {
@@ -248,8 +222,10 @@ function interpretIssueBillingKeySdkResponse(
  */
 export async function requestIssueBillingKeyWithConfig(
   config: BillingIssueConfig,
-  request: IssueBillingKeyRequest,
+  /** 프로필 저장용(구독 UI). KCP 전문 길이 방지를 위해 SDK에는 전달하지 않습니다. */
+  _request: IssueBillingKeyRequest,
 ): Promise<IssueBillingKeyResult> {
+  void _request
   if (!config.storeId?.trim() || !config.channelKey?.trim()) {
     return {
       success: false,
@@ -280,7 +256,6 @@ export async function requestIssueBillingKeyWithConfig(
             mobile: WindowType.REDIRECTION,
           },
           redirectUrl,
-          offerPeriod: { interval: '1m' as const },
         }
       : {}
 
@@ -289,9 +264,6 @@ export async function requestIssueBillingKeyWithConfig(
       storeId,
       channelKey,
       billingKeyMethod: BillingKeyMethod.CARD,
-      issueName: kcpBillingIssueDisplayName(),
-      issueId: kcpBillingIssueMerchantUid(),
-      customer: buildSdkCustomer(request),
       ...mobileOnly,
     })
     return interpretIssueBillingKeySdkResponse(

@@ -100,8 +100,11 @@ function billingRegisterErrorMessage(
     blob.includes('잘못된 전문')
   ) {
     return (
-      'PG 전문 길이 오류입니다. 앱에서는 포트원 문서와 동일하게 storeId·channelKey·billingKeyMethod만 보냅니다. ' +
-      '여전히 같은 메시지면 콘솔 채널이 반드시「NHN KCP · 빌링키/정기결제」용 사이트코드인지 확인하세요. 일반 결제 채널이면 동일 오류가 반복됩니다.'
+      'PG 전문 길이 오류입니다. 카드 등록 요청은 storeId·channelKey·카드 수단만 보내도록 맞춰 두었습니다. ' +
+      '그래도 동일하면 (1) PORTONE_BILLING_CHANNEL_KEY_DOMESTIC이 「KCP API 정기결제」등 빌링 전용 채널 키인지 ' +
+      '(2) 콘솔에 배치(정기)결제 그룹아이디·KCP 파트너 자동결제 그룹이 일치하는지 ' +
+      '(3) 일반 결제 채널 키를 쓰고 있지 않은지 확인해 주세요. ' +
+      '도움말: https://help.portone.io/content/kcp_channel'
     )
   }
   if (
