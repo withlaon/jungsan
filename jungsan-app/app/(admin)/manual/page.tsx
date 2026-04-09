@@ -384,7 +384,7 @@ export default function ManualPage() {
                 '선지급금 등록·공제·회수 처리',
                 '라이더별 개인 정산서 링크 발행 (계정별 전용 URL)',
                 '공지사항 이미지 생성 · 저장 · 관리',
-                '구독 결제 관리(무료 체험 · 카드 등록 · 월 자동결제 · 해지)',
+                '구독 · 자동결제(무료 체험 · 카드 등록 · 월 자동결제 · 해지)',
                 '전체관리자에게 문의하기 (채팅 형태 답변)',
                 '주간 지사 순이익 대시보드',
               ].map((t, i) => (
@@ -818,16 +818,16 @@ export default function ManualPage() {
     },
 
     /* ══════════════════════════════════════════
-       12. 구독 결제 관리
+       12. 구독 · 자동결제
     ══════════════════════════════════════════ */
     {
-      id: 'subscription', title: '구독 결제 관리', icon: CreditCard,
+      id: 'subscription', title: '구독 · 자동결제', icon: CreditCard,
       badge: '결제 · 이용권', badgeColor: 'bg-indigo-700',
       content: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
           <p>
             <strong className="text-white">정산타임</strong>은 월 구독 형태로 제공됩니다. 사이드바 메뉴{' '}
-            <strong className="text-white">구독 결제 관리</strong>에서 무료 체험 기간, 결제 수단, 결제 내역을 확인할 수 있습니다.
+            <strong className="text-white">구독 · 자동결제</strong>에서 무료 체험 기간, 결제 수단, 결제 내역을 확인할 수 있습니다.
           </p>
 
           <div className="space-y-2">
@@ -973,11 +973,11 @@ export default function ManualPage() {
             },
             {
               q: '무료 체험이 끝났는데 어떻게 계속 쓰나요?',
-              a: '구독 결제 관리 메뉴에서 결제 수단(카드)을 등록하면 체험 종료 후 월 구독으로 전환됩니다. 이미 등록했다면 다음 결제일과 상태를 같은 화면에서 확인할 수 있습니다.',
+              a: '구독 · 자동결제 메뉴에서 결제 수단(카드)을 등록하면 체험 종료 후 월 구독으로 전환됩니다. 이미 등록했다면 다음 결제일과 상태를 같은 화면에서 확인할 수 있습니다.',
             },
             {
               q: '구독을 해지하면 바로 못 쓰나요?',
-              a: '해지 절차와 이용 종료 시점은 시스템 정책에 따릅니다. 해지 후에도 일정 기간 이용이 이어질 수 있으니, 구독 결제 관리 화면의 안내와 결제 내역을 참고하세요.',
+              a: '해지 절차와 이용 종료 시점은 시스템 정책에 따릅니다. 해지 후에도 일정 기간 이용이 이어질 수 있으니, 구독 · 자동결제 화면의 안내와 결제 내역을 참고하세요.',
             },
           ].map(({ q, a }, i) => (
             <div key={i} className="border border-slate-700 rounded-lg p-4 space-y-2">

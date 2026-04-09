@@ -74,7 +74,7 @@ const navItems = [
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
   { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
   { href: '/rider-site',         label: '라이더사이트',      icon: Globe      },
-  { href: '/subscription',       label: '구독 결제 관리',    icon: CreditCard },
+  { href: '/subscription',       label: '구독 · 자동결제',    icon: CreditCard },
 ]
 
 const bottomNavItems = [
