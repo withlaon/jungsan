@@ -79,6 +79,7 @@ export async function GET() {
       status: subscription.status,
       failed_count: subscription.failed_count,
       billing_key: subscription.billing_key,
+      last_payment_id: subscription.last_payment_id,
     })
 
     const { data: refreshed } = await admin

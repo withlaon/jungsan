@@ -1,9 +1,12 @@
 /**
  * Link subscription payment IDs (sub-{uuid8}-...) to users and heal stale past_due rows.
+ * Always trusts PortOne GET /payments/:id over local DB status (fixes FAILED/CANCELLED drift).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { PortOnePaymentResponse } from '@/lib/portone/server'
 import { getPayment } from '@/lib/portone/server'
+import { savePayment } from '@/lib/portone/db'
 import { isPaidPortOneStatus } from '@/lib/portone/payment-normalize'
 import { SUBSCRIPTION_CHARGE_AMOUNT } from '@/lib/portone/subscription-charge'
 
@@ -43,10 +46,46 @@ function addOneMonth(isoStart: string): string {
   return d.toISOString()
 }
 
+function paymentAmountMatches(payment: PortOnePaymentResponse): boolean {
+  const total = payment.amount?.total
+  if (typeof total === 'number' && total === SUBSCRIPTION_CHARGE_AMOUNT) return true
+  return false
+}
+
 type SubscriptionRow = {
   status: string
   failed_count: number | null
   billing_key: string | null
+  last_payment_id?: string | null
+}
+
+async function healFromPaidPortOnePayment(
+  admin: SupabaseClient,
+  userId: string,
+  live: PortOnePaymentResponse,
+): Promise<void> {
+  const periodStartIso = live.paidAt ?? new Date().toISOString()
+  const periodStart = new Date(periodStartIso)
+  const nextBillingAt = new Date(periodStart)
+  nextBillingAt.setMonth(nextBillingAt.getMonth() + 1)
+  const periodEnd = new Date(periodStart)
+  periodEnd.setMonth(periodEnd.getMonth() + 1)
+
+  await admin
+    .from('subscriptions')
+    .update({
+      status: 'active',
+      failed_count: 0,
+      last_payment_id: live.id,
+      last_payment_at: periodStartIso,
+      current_period_start: periodStart.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      next_billing_at: nextBillingAt.toISOString(),
+    })
+    .eq('user_id', userId)
+
+  const isTest = process.env.NODE_ENV !== 'production'
+  await savePayment(live, { userId, isTest })
 }
 
 /**
@@ -64,50 +103,41 @@ export async function reconcileSubscriptionIfPortOnePaid(
   const prefix = userId.replace(/-/g, '').slice(0, 8).toLowerCase()
   if (!prefix || prefix.length !== 8) return false
 
-  const { data: candidates, error } = await admin
-    .from('payments')
-    .select('payment_id, status, amount, paid_at')
-    .like('payment_id', `sub-${prefix}-%`)
-    .order('paid_at', { ascending: false, nullsFirst: false })
-    .limit(15)
+  const tried = new Set<string>()
 
-  if (error || !candidates?.length) return false
-
-  for (const row of candidates) {
-    const pid = row.payment_id as string
-    const paidAt = row.paid_at as string | null
-    if (!paidAt) continue
-    const rowStatus = String(row.status ?? '').toUpperCase()
-    if (rowStatus !== 'PAID') continue
-
-    const amt = Number(row.amount)
-    if (amt !== SUBSCRIPTION_CHARGE_AMOUNT) continue
+  const tryPaymentId = async (pid: string): Promise<boolean> => {
+    const p = pid.trim()
+    if (!p || tried.has(p)) return false
+    if (!p.toLowerCase().startsWith(`sub-${prefix}-`)) return false
+    tried.add(p)
 
     try {
-      const live = await getPayment(pid)
-      if (!isPaidPortOneStatus(live.status)) continue
-      if (live.amount?.total !== SUBSCRIPTION_CHARGE_AMOUNT) continue
+      const live = await getPayment(p)
+      if (!isPaidPortOneStatus(live.status)) return false
+      if (!paymentAmountMatches(live)) return false
 
-      const periodStart = live.paidAt ?? paidAt
-      const periodEnd = addOneMonth(periodStart)
-      const nextBill = addOneMonth(periodStart)
-
-      await admin
-        .from('subscriptions')
-        .update({
-          status: 'active',
-          failed_count: 0,
-          last_payment_id: pid,
-          last_payment_at: periodStart,
-          current_period_start: periodStart,
-          current_period_end: periodEnd,
-          next_billing_at: nextBill,
-        })
-        .eq('user_id', userId)
-
+      await healFromPaidPortOnePayment(admin, userId, live)
       return true
     } catch {
-      continue
+      return false
+    }
+  }
+
+  const lastPid = subscription.last_payment_id?.trim()
+  if (lastPid && (await tryPaymentId(lastPid))) return true
+
+  const { data: candidates, error } = await admin
+    .from('payments')
+    .select('payment_id')
+    .like('payment_id', `sub-${prefix}-%`)
+    .order('paid_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(25)
+
+  if (!error && candidates?.length) {
+    for (const row of candidates) {
+      const pid = String(row.payment_id ?? '')
+      if (await tryPaymentId(pid)) return true
     }
   }
 
