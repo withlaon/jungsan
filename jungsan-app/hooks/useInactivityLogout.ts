@@ -2,70 +2,84 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 
-const INACTIVITY_MS = 60 * 60 * 1000      // 1시간
-const WARN_BEFORE_MS = 5 * 60 * 1000       // 로그아웃 5분 전 경고
+/** 1 hour idle → logout */
+const INACTIVITY_MS = 60 * 60 * 1000
+const WARN_BEFORE_MS = 5 * 60 * 1000
+const TICK_MS = 15 * 1000
+/** Avoid resetting idle clock on every mousemove (reduces main-thread work & navigation jank) */
+const BUMP_THROTTLE_MS = 1000
 
 const ACTIVITY_EVENTS = [
-  'mousemove', 'mousedown', 'keydown',
-  'touchstart', 'touchmove', 'scroll', 'click',
-]
+  'mousemove',
+  'mousedown',
+  'keydown',
+  'touchstart',
+  'scroll',
+  'click',
+  'wheel',
+] as const
 
 /**
- * 브라우저 비활성 상태 1시간 지속 시 onLogout 콜백 실행
- * onWarn: 로그아웃 5분 전 경고 콜백 (선택)
+ * No user activity for INACTIVITY_MS → onLogout().
+ * Uses a throttled activity bump + interval tick (does not clearTimeout on every mousemove).
  */
 export function useInactivityLogout(
   onLogout: () => void,
   onWarn?: () => void,
   enabled = true,
 ) {
-  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const warnTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const warnedRef      = useRef(false)
-  const onLogoutRef    = useRef(onLogout)
-  const onWarnRef      = useRef(onWarn)
+  const lastActivityRef = useRef(Date.now())
+  const warnedRef = useRef(false)
+  const onLogoutRef = useRef(onLogout)
+  const onWarnRef = useRef(onWarn)
+  const lastBumpRef = useRef(0)
 
-  // 최신 콜백 참조 유지
-  useEffect(() => { onLogoutRef.current = onLogout }, [onLogout])
-  useEffect(() => { onWarnRef.current = onWarn },     [onWarn])
+  useEffect(() => {
+    onLogoutRef.current = onLogout
+  }, [onLogout])
+  useEffect(() => {
+    onWarnRef.current = onWarn
+  }, [onWarn])
 
-  const resetTimers = useCallback(() => {
+  const bumpActivity = useCallback(() => {
     if (!enabled) return
-
-    if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
-    if (warnTimerRef.current)   clearTimeout(warnTimerRef.current)
-
+    const now = Date.now()
+    if (now - lastBumpRef.current < BUMP_THROTTLE_MS) return
+    lastBumpRef.current = now
+    lastActivityRef.current = now
     warnedRef.current = false
-
-    // 경고 타이머 (로그아웃 5분 전)
-    warnTimerRef.current = setTimeout(() => {
-      if (!warnedRef.current) {
-        warnedRef.current = true
-        onWarnRef.current?.()
-      }
-    }, INACTIVITY_MS - WARN_BEFORE_MS)
-
-    // 로그아웃 타이머 (1시간)
-    logoutTimerRef.current = setTimeout(() => {
-      onLogoutRef.current()
-    }, INACTIVITY_MS)
   }, [enabled])
 
   useEffect(() => {
     if (!enabled) return
 
-    resetTimers()
+    lastActivityRef.current = Date.now()
+    lastBumpRef.current = Date.now()
+    warnedRef.current = false
 
-    ACTIVITY_EVENTS.forEach(evt =>
-      window.addEventListener(evt, resetTimers, { passive: true })
-    )
+    const tick = () => {
+      const idle = Date.now() - lastActivityRef.current
+      if (idle >= INACTIVITY_MS) {
+        onLogoutRef.current()
+        return
+      }
+      if (onWarnRef.current && !warnedRef.current && idle >= INACTIVITY_MS - WARN_BEFORE_MS) {
+        warnedRef.current = true
+        onWarnRef.current()
+      }
+    }
+
+    const interval = setInterval(tick, TICK_MS)
+
+    ACTIVITY_EVENTS.forEach((evt) => {
+      window.addEventListener(evt, bumpActivity, { passive: true, capture: true })
+    })
 
     return () => {
-      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
-      if (warnTimerRef.current)   clearTimeout(warnTimerRef.current)
-      ACTIVITY_EVENTS.forEach(evt =>
-        window.removeEventListener(evt, resetTimers)
-      )
+      clearInterval(interval)
+      ACTIVITY_EVENTS.forEach((evt) => {
+        window.removeEventListener(evt, bumpActivity, { capture: true })
+      })
     }
-  }, [enabled, resetTimers])
+  }, [enabled, bumpActivity])
 }

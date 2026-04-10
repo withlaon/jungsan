@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Shield, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { InactivityGuard } from '@/components/layout/InactivityGuard'
 
 export default function SiteAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -49,6 +50,7 @@ export default function SiteAdminLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-slate-950">
+      <InactivityGuard />
       <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Shield className="h-6 w-6 text-amber-400" />

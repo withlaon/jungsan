@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -92,10 +93,144 @@ interface Profile {
   logo_url: string
 }
 
+type PlatformConfig = (typeof PLATFORM_CONFIG)[keyof typeof PLATFORM_CONFIG]
+
+function AdminSidebarPanel({
+  pathname,
+  config,
+  PlatformIcon,
+  sidebarLogoUrl,
+  onCloseMobile,
+  onLogout,
+  onOpenProfile,
+  onOpenWithdraw,
+}: {
+  pathname: string
+  config: PlatformConfig
+  PlatformIcon: LucideIcon
+  sidebarLogoUrl: string
+  onCloseMobile: () => void
+  onLogout: () => void
+  onOpenProfile: () => void
+  onOpenWithdraw: () => void
+}) {
+  return (
+    <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
+      <div className="p-5 flex items-center gap-3 border-b border-slate-700">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden`}
+            style={{ width: 40, height: 40 }}>
+            {sidebarLogoUrl ? (
+              <Image
+                src={sidebarLogoUrl}
+                alt="로고"
+                width={40}
+                height={40}
+                className="w-full h-full object-contain"
+                unoptimized
+              />
+            ) : (
+              <div className={`${config.accent} w-full h-full flex items-center justify-center`}>
+                <PlatformIcon className="h-6 w-6 text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
+            <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="md:hidden text-slate-400 hover:text-white p-1"
+          onClick={onCloseMobile}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto flex flex-col">
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
+                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
+                <span className="truncate">{item.label}</span>
+                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-1">
+          {bottomNavItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
+                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
+                <span className="truncate">{item.label}</span>
+                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+
+      <div className="p-3 border-t border-slate-700 space-y-1">
+        <Separator className="bg-slate-700 mb-2" />
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onLogout}
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+        >
+          <LogOut className="h-4 w-4" />
+          로그아웃
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onOpenProfile}
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+        >
+          <Pencil className="h-4 w-4" />
+          정보수정
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onOpenWithdraw}
+          className="w-full justify-start text-rose-500 hover:text-rose-400 hover:bg-rose-900/20 gap-3"
+        >
+          <UserX className="h-4 w-4" />
+          회원탈퇴
+        </Button>
+      </div>
+    </aside>
+  )
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { platform, logoUrl: cachedLogoUrl } = useUser()
   const config = PLATFORM_CONFIG[platform ?? 'baemin']
   const PlatformIcon = config.icon
@@ -301,114 +436,20 @@ export function Sidebar() {
   // 모바일에서 경로 변경 시 드로어 닫기
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  const SidebarInner = () => (
-    <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
-      <div className="p-5 flex items-center gap-3 border-b border-slate-700">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className={`${sidebarLogoUrl ? '' : config.accent} rounded-xl shrink-0 overflow-hidden`}
-            style={{ width: 40, height: 40 }}>
-            {sidebarLogoUrl ? (
-              <Image
-                src={sidebarLogoUrl}
-                alt="로고"
-                width={40}
-                height={40}
-                className="w-full h-full object-contain"
-                unoptimized
-              />
-            ) : (
-              <div className={`${config.accent} w-full h-full flex items-center justify-center`}>
-                <PlatformIcon className="h-6 w-6 text-white" />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-white font-bold text-sm leading-tight truncate">{config.label}</h1>
-            <p className="text-slate-400 text-xs">{config.sub} 관리자</p>
-          </div>
-        </div>
-        {/* 모바일 닫기 버튼 */}
-        <button
-          className="md:hidden text-slate-400 hover:text-white p-1"
-          onClick={() => setMobileOpen(false)}
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
+  const sidebarPanelProps = {
+    pathname,
+    config,
+    PlatformIcon,
+    sidebarLogoUrl,
+    onCloseMobile: () => setMobileOpen(false),
+    onLogout: handleLogout,
+    onOpenProfile: () => setProfileOpen(true),
+    onOpenWithdraw: () => {
+      setWithdrawMsg('')
+      setWithdrawOpen(true)
+    },
+  }
 
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto flex flex-col">
-        <div className="space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                )}
-              >
-                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
-                <span className="truncate">{item.label}</span>
-                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
-              </Link>
-            )
-          })}
-        </div>
-
-        <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-1">
-          {bottomNavItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                )}
-              >
-                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
-                <span className="truncate">{item.label}</span>
-                {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
-              </Link>
-            )
-          })}
-        </div>
-      </nav>
-
-      <div className="p-3 border-t border-slate-700 space-y-1">
-        <Separator className="bg-slate-700 mb-2" />
-        <Button
-          variant="ghost"
-          onClick={handleLogout}
-          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
-        >
-          <LogOut className="h-4 w-4" />
-          로그아웃
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => setProfileOpen(true)}
-          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
-        >
-          <Pencil className="h-4 w-4" />
-          정보수정
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => { setWithdrawMsg(''); setWithdrawOpen(true) }}
-          className="w-full justify-start text-rose-500 hover:text-rose-400 hover:bg-rose-900/20 gap-3"
-        >
-          <UserX className="h-4 w-4" />
-          회원탈퇴
-        </Button>
-      </div>
-    </aside>
-  )
 
   return (
     <>
@@ -428,7 +469,7 @@ export function Sidebar() {
 
       {/* 데스크탑 사이드바 (md 미만 숨김) */}
       <div className="hidden md:block">
-        <SidebarInner />
+        <AdminSidebarPanel {...sidebarPanelProps} />
       </div>
 
       {/* 모바일 드로어 오버레이 */}
@@ -444,7 +485,7 @@ export function Sidebar() {
             className="relative z-10"
             onClick={e => e.stopPropagation()}
           >
-            <SidebarInner />
+            <AdminSidebarPanel {...sidebarPanelProps} />
           </div>
         </div>
       )}
