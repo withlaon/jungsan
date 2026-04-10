@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Rider } from '@/types'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
+
+const FETCH_TIMEOUT_MS = 25_000
 
 // 모듈 수준 캐시 — 탭 간 이동 시 재사용 (페이지 새로고침 시 초기화)
 let _cache: Rider[] | null = null
@@ -36,14 +39,22 @@ async function loadRiders(force = false): Promise<Rider[]> {
 
       // force 시 브라우저 캐시 완전 우회 (타임스탬프 파라미터 + no-store)
       const url = force ? `/api/admin/riders?t=${Date.now()}` : '/api/admin/riders'
-      const res = await fetch(url, { headers, ...(force ? { cache: 'no-store' } : {}) })
+      const res = await fetchWithTimeout(
+        url,
+        { headers, credentials: 'same-origin', ...(force ? { cache: 'no-store' } : {}) },
+        FETCH_TIMEOUT_MS
+      )
 
       // 401: 토큰 만료 가능성 → 세션 갱신 후 1회 재시도
       if (res.status === 401) {
         const { data: { session: newSession }, error: refreshErr } = await supabase.auth.refreshSession()
         if (!refreshErr && newSession?.access_token) {
           const retryHeaders = { 'Authorization': `Bearer ${newSession.access_token}` }
-          const retryRes = await fetch(`/api/admin/riders?t=${Date.now()}`, { headers: retryHeaders, cache: 'no-store' })
+          const retryRes = await fetchWithTimeout(
+            `/api/admin/riders?t=${Date.now()}`,
+            { headers: retryHeaders, cache: 'no-store', credentials: 'same-origin' },
+            FETCH_TIMEOUT_MS
+          )
           if (retryRes.ok) {
             const d = await retryRes.json()
             const data = Array.isArray(d) ? d : []

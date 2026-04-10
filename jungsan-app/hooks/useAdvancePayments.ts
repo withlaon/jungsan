@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { raceWithTimeout } from '@/lib/fetch-utils'
+
+const QUERY_TIMEOUT_MS = 25_000
 import { useUser, getCachedUser } from '@/hooks/useUser'
 import { AdvancePayment, Rider } from '@/types'
 
@@ -37,7 +40,11 @@ async function loadPayments(
         .order('paid_date', { ascending: false })
       if (userId) q = q.eq('user_id', userId)
 
-      const { data, error } = await q
+      const { data, error } = await raceWithTimeout(
+        (async () => await q)(),
+        QUERY_TIMEOUT_MS,
+        'advance_payments_query_timeout'
+      )
       if (error) throw error
 
       const result = (data ?? []) as PaymentWithRider[]

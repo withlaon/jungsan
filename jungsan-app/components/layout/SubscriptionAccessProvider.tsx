@@ -21,10 +21,23 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useUser } from '@/hooks/useUser'
+import { revalidateRiders } from '@/hooks/useRiders'
+import { revalidateSettlements } from '@/hooks/useSettlements'
+import { revalidatePayments } from '@/hooks/useAdvancePayments'
 import {
   merchantHasAppAccessFromBillingApiPayload,
   trialReminderDaysFromBillingApiPayload,
 } from '@/lib/subscription/merchant-subscription-access'
+
+const BILLING_STATUS_FETCH_MS = 22_000
+
+async function refreshMerchantDataCaches() {
+  await Promise.all([
+    revalidateRiders().catch(() => []),
+    revalidateSettlements().catch(() => []),
+    revalidatePayments().catch(() => []),
+  ])
+}
 
 type BillingStatusPayload = {
   is_trial_active: boolean
@@ -40,7 +53,7 @@ type SubscriptionAccessContextValue = {
   merchantGatePending: boolean
   statusLoading: boolean
   statusError: string | null
-  refetchSubscription: () => Promise<void>
+  refetchSubscription: (opts?: { silent?: boolean }) => Promise<void>
 }
 
 const SubscriptionAccessContext = createContext<SubscriptionAccessContextValue | null>(null)
@@ -50,7 +63,9 @@ const DEFAULT_CTX: SubscriptionAccessContextValue = {
   merchantGatePending: false,
   statusLoading: false,
   statusError: null,
-  refetchSubscription: async () => {},
+  refetchSubscription: async () => {
+    /* default no-op */
+  },
 }
 
 export function useSubscriptionAccess(): SubscriptionAccessContextValue {
@@ -72,31 +87,42 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
   const [trialDialogOpen, setTrialDialogOpen] = useState(false)
   const [trialDays, setTrialDays] = useState<number | null>(null)
 
-  const refetchSubscription = useCallback(async () => {
-    if (!user || isAdmin) {
-      setPayload(null)
-      setStatusLoading(false)
-      setStatusError(null)
-      return
-    }
-    setStatusLoading(true)
-    setStatusError(null)
-    try {
-      const res = await fetch('/api/billing/status', { credentials: 'include' })
-      const data = (await res.json().catch(() => ({}))) as BillingStatusPayload & { error?: string }
-      if (!res.ok) {
+  const refetchSubscription = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = Boolean(opts?.silent)
+      if (!user || isAdmin) {
         setPayload(null)
-        setStatusError(typeof data.error === 'string' ? data.error : ERR_FETCH)
+        if (!silent) setStatusLoading(false)
+        setStatusError(null)
         return
       }
-      setPayload(data as BillingStatusPayload)
-    } catch {
-      setPayload(null)
-      setStatusError(ERR_FETCH)
-    } finally {
-      setStatusLoading(false)
-    }
-  }, [user, isAdmin])
+      if (!silent) setStatusLoading(true)
+      setStatusError(null)
+      const ac = new AbortController()
+      const abortTimer = setTimeout(() => ac.abort(), BILLING_STATUS_FETCH_MS)
+      try {
+        const res = await fetch('/api/billing/status', {
+          credentials: 'include',
+          signal: ac.signal,
+        })
+        const data = (await res.json().catch(() => ({}))) as BillingStatusPayload & { error?: string }
+        if (!res.ok) {
+          if (!silent) setPayload(null)
+          setStatusError(typeof data.error === 'string' ? data.error : ERR_FETCH)
+          return
+        }
+        setPayload(data as BillingStatusPayload)
+        setStatusError(null)
+      } catch {
+        if (!silent) setPayload(null)
+        setStatusError(ERR_FETCH)
+      } finally {
+        clearTimeout(abortTimer)
+        if (!silent) setStatusLoading(false)
+      }
+    },
+    [user, isAdmin]
+  )
 
   useEffect(() => {
     if (userLoading) return
@@ -108,6 +134,39 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
     }
     void refetchSubscription()
   }, [user, userLoading, isAdmin, refetchSubscription])
+
+  /** Sidebar route change: force-refresh module caches (fixes blank UI after long idle). */
+  useEffect(() => {
+    if (!user || isAdmin || userLoading || !pathname) return
+    let cancelled = false
+    const id = window.setTimeout(() => {
+      if (cancelled) return
+      void refreshMerchantDataCaches()
+    }, 0)
+    return () => {
+      cancelled = true
+      clearTimeout(id)
+    }
+  }, [pathname, user?.id, isAdmin, userLoading])
+
+  /** Browser tab visible again: refresh billing + lists. */
+  useEffect(() => {
+    if (!user || isAdmin) return
+    let debounce: ReturnType<typeof setTimeout> | undefined
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        void refetchSubscription({ silent: true })
+        void refreshMerchantDataCaches()
+      }, 250)
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      if (debounce) clearTimeout(debounce)
+    }
+  }, [user, isAdmin, refetchSubscription])
 
   useEffect(() => {
     trialDialogDismissedRef.current = false

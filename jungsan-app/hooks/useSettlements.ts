@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser, getCachedUser } from '@/hooks/useUser'
 import { invalidateAllSettlementViewCaches } from '@/hooks/settlementViewCache'
+import { raceWithTimeout } from '@/lib/fetch-utils'
+
+const QUERY_TIMEOUT_MS = 25_000
 import { WeeklySettlement } from '@/types'
 
 // ─── 정산 목록 모듈 캐시 ──────────────────────────────────────────────────
@@ -47,7 +50,11 @@ async function loadSettlements(
         .order('week_start', { ascending: false })
       if (!isAdmin && userId) q = q.eq('user_id', userId)  // admin은 전체 정산 조회 가능
 
-      const { data, error } = await q
+      const { data, error } = await raceWithTimeout(
+        (async () => await q)(),
+        QUERY_TIMEOUT_MS,
+        'settlements_query_timeout'
+      )
       if (error) throw error
 
       const result = data ?? []
