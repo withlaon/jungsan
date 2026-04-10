@@ -9,6 +9,42 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bike, Loader2, UserPlus } from 'lucide-react'
+import { merchantHasAppAccessFromBillingApiPayload } from '@/lib/subscription/merchant-subscription-access'
+
+async function resolvePostLoginRedirect(
+  supabase: ReturnType<typeof createClient>,
+  redirectTo: string
+): Promise<string> {
+  const safe = redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return safe
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (prof?.username?.toLowerCase() === 'admin') return '/site-admin'
+
+  const res = await fetch('/api/billing/status', { credentials: 'include' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) return '/subscription'
+  if (
+    merchantHasAppAccessFromBillingApiPayload(
+      data as {
+        is_trial_active: boolean
+        grace_access_active?: boolean
+        status: string
+        has_card: boolean
+        failed_count?: number
+      }
+    )
+  ) {
+    return safe
+  }
+  return '/subscription'
+}
 
 function LoginForm() {
   const [username, setUsername] = useState('')
@@ -37,9 +73,13 @@ function LoginForm() {
       })
       return
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+        const dest = await resolvePostLoginRedirect(
+          supabase,
+          redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+        )
+        router.replace(dest)
       } else {
         setCheckingSession(false)
       }
@@ -110,10 +150,16 @@ function LoginForm() {
     // admin 로그인 시: 라이더 정산 시스템 전체관리자 페이지로 이동 (새창 없음)
     if (trimmedUsername.toLowerCase() === 'admin') {
       router.push('/site-admin')
+      setLoading(false)
       return
     }
 
-    router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+    const dest = await resolvePostLoginRedirect(
+      supabase,
+      redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+    )
+    router.push(dest)
+    setLoading(false)
   }
 
   if (checkingSession) {

@@ -38,6 +38,7 @@ import {
   parseBillingIssueReturnFromSearchParams,
   stripBillingIssueQueryParams,
 } from '@/lib/portone/billing-redirect'
+import { useSubscriptionAccess } from '@/components/layout/SubscriptionAccessProvider'
 
 interface SubscriptionStatus {
   status: 'trial' | 'active' | 'past_due' | 'cancelled'
@@ -218,6 +219,7 @@ function subscriptionCardUiConfig(sub: SubscriptionStatus | null) {
 }
 
 export default function SubscriptionPage() {
+  const { refetchSubscription } = useSubscriptionAccess()
   const [sub, setSub] = useState<SubscriptionStatus | null>(null)
   const [history, setHistory] = useState<PaymentHistory[]>([])
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -295,9 +297,10 @@ export default function SubscriptionPage() {
       }
       toast.success('카드가 등록되었습니다. 무료 체험 종료 후 자동 결제됩니다.')
       await fetchStatus()
+      await refetchSubscription()
       return true
     },
-    [fetchStatus]
+    [fetchStatus, refetchSubscription]
   )
 
   const fetchHistory = useCallback(async () => {

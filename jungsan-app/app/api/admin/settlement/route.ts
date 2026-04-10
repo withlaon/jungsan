@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 async function verifyUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -34,6 +35,23 @@ export async function DELETE(req: NextRequest) {
       .eq('id', user.id)
       .maybeSingle()
     const isSiteAdmin = profile?.username?.toLowerCase() === 'admin'
+
+    if (!isSiteAdmin) {
+      try {
+        const adminForGate = createAdminClient()
+        const denied = await merchantSubscriptionAccessDenied(
+          adminForGate,
+          user.id,
+          profile?.username
+        )
+        if (denied) return denied
+      } catch {
+        return NextResponse.json(
+          { error: '서버 설정 오류로 요청을 처리할 수 없습니다.' },
+          { status: 503 }
+        )
+      }
+    }
 
     const { data: wsRow } = await db
       .from('weekly_settlements')

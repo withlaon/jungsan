@@ -35,8 +35,10 @@ import {
   CreditCard,
 } from 'lucide-react'
 import Image from 'next/image'
+import { toast } from 'sonner'
 import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
 import { clearSettlementsCache } from '@/hooks/useSettlements'
+import { useSubscriptionAccess } from '@/components/layout/SubscriptionAccessProvider'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -95,6 +97,9 @@ interface Profile {
 
 type PlatformConfig = (typeof PLATFORM_CONFIG)[keyof typeof PLATFORM_CONFIG]
 
+const TOAST_SUBSCRIPTION_FIRST =
+  '\uBA3C\uC800 \uAD6C\uB3C5\u00B7\uC790\uB3D9\uACB0\uC81C\uB97C \uB4F1\uB85D\uD574 \uC8FC\uC138\uC694.'
+
 function AdminSidebarPanel({
   pathname,
   config,
@@ -104,6 +109,7 @@ function AdminSidebarPanel({
   onLogout,
   onOpenProfile,
   onOpenWithdraw,
+  subscriptionNavBlocked,
 }: {
   pathname: string
   config: PlatformConfig
@@ -113,6 +119,7 @@ function AdminSidebarPanel({
   onLogout: () => void
   onOpenProfile: () => void
   onOpenWithdraw: () => void
+  subscriptionNavBlocked: boolean
 }) {
   return (
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
@@ -154,14 +161,31 @@ function AdminSidebarPanel({
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            const blocked = subscriptionNavBlocked && item.href !== '/subscription'
+            const cls = cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group w-full text-left',
+              isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+              blocked && 'opacity-45 cursor-not-allowed hover:bg-transparent hover:text-slate-400'
+            )
+            if (blocked) {
+              return (
+                <button
+                  type="button"
+                  key={item.href}
+                  className={cls}
+                  onClick={() => toast.error(TOAST_SUBSCRIPTION_FIRST)}
+                >
+                  <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500')} />
+                  <span className="truncate">{item.label}</span>
+                  {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+                </button>
+              )
+            }
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                )}
+                className={cls}
               >
                 <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
                 <span className="truncate">{item.label}</span>
@@ -175,14 +199,31 @@ function AdminSidebarPanel({
           {bottomNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            const blocked = subscriptionNavBlocked && item.href !== '/subscription'
+            const cls = cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group w-full text-left',
+              isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+              blocked && 'opacity-45 cursor-not-allowed hover:bg-transparent hover:text-slate-400'
+            )
+            if (blocked) {
+              return (
+                <button
+                  type="button"
+                  key={item.href}
+                  className={cls}
+                  onClick={() => toast.error(TOAST_SUBSCRIPTION_FIRST)}
+                >
+                  <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500')} />
+                  <span className="truncate">{item.label}</span>
+                  {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+                </button>
+              )
+            }
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group',
-                  isActive ? config.activeNav : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                )}
+                className={cls}
               >
                 <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-slate-500 group-hover:text-white')} />
                 <span className="truncate">{item.label}</span>
@@ -207,7 +248,13 @@ function AdminSidebarPanel({
         <Button
           type="button"
           variant="ghost"
-          onClick={onOpenProfile}
+          onClick={() => {
+            if (subscriptionNavBlocked) {
+              toast.error(TOAST_SUBSCRIPTION_FIRST)
+              return
+            }
+            onOpenProfile()
+          }}
           className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
         >
           <Pencil className="h-4 w-4" />
@@ -216,7 +263,13 @@ function AdminSidebarPanel({
         <Button
           type="button"
           variant="ghost"
-          onClick={onOpenWithdraw}
+          onClick={() => {
+            if (subscriptionNavBlocked) {
+              toast.error(TOAST_SUBSCRIPTION_FIRST)
+              return
+            }
+            onOpenWithdraw()
+          }}
           className="w-full justify-start text-rose-500 hover:text-rose-400 hover:bg-rose-900/20 gap-3"
         >
           <UserX className="h-4 w-4" />
@@ -231,7 +284,9 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const { platform, logoUrl: cachedLogoUrl } = useUser()
+  const { platform, logoUrl: cachedLogoUrl, isAdmin } = useUser()
+  const { subscriptionLocked, merchantGatePending } = useSubscriptionAccess()
+  const subscriptionNavBlocked = !isAdmin && (subscriptionLocked || merchantGatePending)
   const config = PLATFORM_CONFIG[platform ?? 'baemin']
   const PlatformIcon = config.icon
 
@@ -448,6 +503,7 @@ export function Sidebar() {
       setWithdrawMsg('')
       setWithdrawOpen(true)
     },
+    subscriptionNavBlocked,
   }
 
 

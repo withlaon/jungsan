@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recalculateAllSettlementsForUser } from '@/lib/settlement/recalculate-user-settlements'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
 
+    const adminGate = createAdminClient()
+    const { data: profile } = await adminGate
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(adminGate, user.id, profile?.username)
+    if (denied) return denied
+
     let onlySettlementId: string | undefined
     try {
       const body = (await req.json()) as { settlementId?: string }
@@ -27,9 +37,8 @@ export async function POST(req: NextRequest) {
       /* body 없음 */
     }
 
-    const admin = createAdminClient()
     const { recalculated, errors } = await recalculateAllSettlementsForUser(
-      admin,
+      adminGate,
       user.id,
       onlySettlementId ?? null
     )

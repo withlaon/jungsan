@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 async function getAuthUser() {
   const supabase = await createClient()
@@ -15,6 +16,15 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+    if (denied) return denied
 
     const body = await request.json()
     const { join_date, name, rider_username, id_number, phone, bank_name, bank_account, account_holder, status = 'active' } = body ?? {}
@@ -34,7 +44,6 @@ export async function POST(request: NextRequest) {
       status: status === 'inactive' ? 'inactive' : 'active',
     }
 
-    const admin = createAdminClient()
     const { data: inserted, error } = await admin.from('riders').insert(row).select().single()
     if (error) {
       const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : error.message
@@ -55,6 +64,15 @@ export async function PATCH(request: NextRequest) {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+    if (denied) return denied
+
     const body = await request.json()
     const { id, join_date, name, rider_username, id_number, phone, bank_name, bank_account, account_holder, status } = body ?? {}
 
@@ -63,7 +81,6 @@ export async function PATCH(request: NextRequest) {
 
   const trim = (v: unknown) => (v != null && String(v).trim()) || null
 
-    const admin = createAdminClient()
     const { data: updated, error } = await admin.from('riders').update({
       join_date:       trim(join_date),
       name:            String(name).trim(),
@@ -95,10 +112,18 @@ export async function DELETE(request: NextRequest) {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+    if (denied) return denied
+
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
 
-    const admin = createAdminClient()
     const { error } = await admin.from('riders').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })

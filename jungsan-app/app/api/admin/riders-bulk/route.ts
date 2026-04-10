@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 interface RiderRow {
   join_date: string | null
@@ -26,6 +27,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
+
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+    if (denied) return denied
 
     const body = await request.json()
     const riders = body?.riders as RiderRow[] | undefined
@@ -53,7 +63,6 @@ export async function POST(request: NextRequest) {
     let error: { message: string } | null = null
 
     try {
-      const admin = createAdminClient()
       const withUserId = validRows.map((r) => ({ ...r, user_id: user.id }))
       const { error: insertError } = await admin.from('riders').insert(withUserId)
       error = insertError

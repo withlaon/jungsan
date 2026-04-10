@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 /**
  * 라이더 목록 조회 API
@@ -38,6 +39,15 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
 
     const isAdmin = profile?.username?.toLowerCase() === 'admin'
+
+    if (!isAdmin) {
+      const denied = await merchantSubscriptionAccessDenied(
+        adminClient,
+        user.id,
+        profile?.username
+      )
+      if (denied) return denied
+    }
 
     let data: unknown[] = []
 

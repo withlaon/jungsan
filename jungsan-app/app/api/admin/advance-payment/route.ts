@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 /**
  * DELETE /api/admin/advance-payment?id=<uuid>
@@ -32,6 +33,19 @@ export async function DELETE(req: NextRequest) {
       .eq('id', user.id)
       .maybeSingle()
     const isGlobalAdmin = profile?.username?.toLowerCase() === 'admin'
+
+    if (!isGlobalAdmin) {
+      try {
+        const admin = createAdminClient()
+        const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+        if (denied) return denied
+      } catch {
+        return NextResponse.json(
+          { error: '서버 설정 오류로 요청을 처리할 수 없습니다.' },
+          { status: 503 }
+        )
+      }
+    }
 
     const { data: row, error: selErr } = await db
       .from('advance_payments')

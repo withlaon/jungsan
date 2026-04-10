@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 import * as XLSX from 'xlsx'
 import type { ParsedRiderRow, ExcelSummary } from '@/lib/excel/baemin-parser'
 
@@ -449,6 +452,28 @@ async function decryptWithXlsxPopulate(buffer: Buffer, password: string): Promis
 // ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
+    if (denied) {
+      const body = await denied.json().catch(() => ({}))
+      const msg = typeof (body as { error?: string }).error === 'string'
+        ? (body as { error: string }).error
+        : '이용할 수 없습니다.'
+      return NextResponse.json({ success: false, error: msg }, { status: denied.status })
+    }
+
     const formData    = await request.formData()
     const file        = formData.get('file') as File | null
     const rawBizNum   = (formData.get('bizNum') as string | null) || ''
