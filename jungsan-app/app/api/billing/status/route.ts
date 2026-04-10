@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { reconcileSubscriptionIfPortOnePaid } from '@/lib/portone/subscription-reconcile'
 
 export async function GET() {
   try {
@@ -72,6 +73,22 @@ export async function GET() {
 
     if (!subscription) {
       return NextResponse.json({ error: '구독 정보를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    await reconcileSubscriptionIfPortOnePaid(admin, user.id, {
+      status: subscription.status,
+      failed_count: subscription.failed_count,
+      billing_key: subscription.billing_key,
+    })
+
+    const { data: refreshed } = await admin
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (refreshed) {
+      subscription = refreshed
     }
 
     const now = new Date()

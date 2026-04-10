@@ -21,27 +21,30 @@ export async function savePayment(
 
   const isTest = options.isTest ?? true;
 
-  const { error } = await supabase.from("payments").upsert(
-    {
-      payment_id: payment.id,
-      portone_tx_id: payment.txId ?? null,
-      user_id: options.userId ?? null,
-      status: payment.status,
-      order_name: payment.orderName,
-      amount: payment.amount.total,
-      currency: payment.amount.currency ?? "KRW",
-      pay_method: payment.method?.type ?? null,
-      customer_name: payment.customer?.fullName ?? null,
-      customer_email: payment.customer?.email ?? null,
-      customer_phone: payment.customer?.phoneNumber ?? null,
-      paid_at: payment.paidAt ?? null,
-      cancelled_at: payment.cancelledAt ?? null,
-      failed_at: payment.failedAt ?? null,
-      raw_response: payment,
-      is_test: isTest,
-    },
-    { onConflict: "payment_id" }
-  );
+  const row: Record<string, unknown> = {
+    payment_id: payment.id,
+    portone_tx_id: payment.txId ?? null,
+    status: payment.status,
+    order_name: payment.orderName,
+    amount: payment.amount.total,
+    currency: payment.amount.currency ?? "KRW",
+    pay_method: payment.method?.type ?? null,
+    customer_name: payment.customer?.fullName ?? null,
+    customer_email: payment.customer?.email ?? null,
+    customer_phone: payment.customer?.phoneNumber ?? null,
+    paid_at: payment.paidAt ?? null,
+    cancelled_at: payment.cancelledAt ?? null,
+    failed_at: payment.failedAt ?? null,
+    raw_response: payment,
+    is_test: isTest,
+  };
+  if (options.userId) {
+    row.user_id = options.userId;
+  }
+
+  const { error } = await supabase.from("payments").upsert(row, {
+    onConflict: "payment_id",
+  });
 
   if (error) {
     console.error("[DB] 결제 내역 저장 실패:", error.message);

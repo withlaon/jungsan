@@ -5,6 +5,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { chargeBillingKey } from '@/lib/portone/billing-server'
 import { savePayment } from '@/lib/portone/db'
+import { billingChargeIndicatesPaid } from '@/lib/portone/payment-normalize'
 
 export const SUBSCRIPTION_CHARGE_AMOUNT = 20_000
 const MAX_FAIL_COUNT = 3
@@ -59,7 +60,7 @@ export async function attemptSubscriptionCharge(
       customerPhone: profile?.phone ?? undefined,
     })
 
-    if (chargeResult.status === 'PAID') {
+    if (billingChargeIndicatesPaid(chargeResult)) {
       const periodStart = now
       const periodEnd = addOneMonth(now)
       const nextBillingAt = addOneMonth(now)

@@ -1,19 +1,14 @@
 /**
- * 포트원 V2 웹훅 처리 API
- *
- * 포트원 관리자콘솔 > 연동 관리 > 결제알림(Webhook) 관리 에서
- * 아래 URL을 웹훅 URL로 등록하세요:
- *
- * - 테스트:  http://localhost:3000/api/payment/webhook  (ngrok 등 터널 필요)
- * - 실연동:  https://your-domain.com/api/payment/webhook
- *
- * 웹훅 시크릿 발급 후 서버 환경변수: PORTONE_WEBHOOK_SECRET (= 콘솔의 whsec_... 값)
+ * PortOne V2 webhook handler.
+ * Register POST URL in PortOne console. Env: PORTONE_WEBHOOK_SECRET (whsec_...)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPayment } from "@/lib/portone/server";
 import { savePayment, updatePaymentStatus } from "@/lib/portone/db";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPaidPortOneStatus } from "@/lib/portone/payment-normalize";
+import { resolveUserIdBySubscriptionPaymentPrefix } from "@/lib/portone/subscription-reconcile";
 import {
   getPortOneWebhookSecret,
   verifyPortOneWebhookPayload,
@@ -39,7 +34,7 @@ export async function POST(request: NextRequest) {
         hookSecret,
       )
     ) {
-      console.warn("[웹훅] 서명 검증 실패");
+      console.warn("[webhook] signature verification failed");
       return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
     }
 
@@ -49,99 +44,107 @@ export async function POST(request: NextRequest) {
     };
     const { type, data } = body;
 
-    // 결제 완료 웹훅
     if (type === "Transaction.Paid") {
       const { paymentId } = data;
       if (!paymentId) {
         return NextResponse.json({ error: "paymentId가 없습니다." }, { status: 400 });
       }
 
-      // 포트원 서버에서 실제 결제 정보 조회
       const payment = await getPayment(paymentId);
 
-      if (payment.status !== "PAID") {
-        console.error(`[웹훅] 결제 상태 이상 - paymentId: ${paymentId}, status: ${payment.status}`);
+      if (!isPaidPortOneStatus(payment.status)) {
+        console.error(
+          `[webhook] unexpected payment status paymentId=${paymentId} status=${payment.status}`,
+        );
         return NextResponse.json(
-          { error: `결제 상태가 올바르지 않습니다: ${payment.status}` },
+          { error: `Invalid payment status: ${payment.status}` },
           { status: 400 }
         );
       }
 
-      // DB에 결제 내역 저장
-      const { success, error } = await savePayment(payment, { isTest: IS_TEST });
-      if (!success) {
-        console.error(`[웹훅] DB 저장 실패 - paymentId: ${paymentId}, 오류: ${error}`);
-        // DB 저장 실패해도 200 응답 (포트원 재전송 방지)
-        // 실제 운영 시 슬랙 알림 등 모니터링 연동 권장
+      const admin = createAdminClient();
+      let resolvedUserId: string | undefined;
+      if (paymentId.startsWith("sub-")) {
+        const r = await resolveUserIdBySubscriptionPaymentPrefix(admin, paymentId);
+        if (r) resolvedUserId = r;
       }
 
-      console.log(`[웹훅] 결제 완료 - paymentId: ${paymentId}, 금액: ${payment.amount.total}원`);
+      const { success, error } = await savePayment(payment, {
+        isTest: IS_TEST,
+        userId: resolvedUserId,
+      });
+      if (!success) {
+        console.error(`[webhook] DB save failed paymentId=${paymentId} err=${error}`);
+      }
 
-      // 구독 자동 결제(빌링키) 결제 완료 처리
-      // paymentId 패턴 "sub-{userId8}-..." 이면 구독 결제
-      if (paymentId.startsWith('sub-')) {
+      console.log(`[webhook] paid paymentId=${paymentId} amount=${payment.amount.total}`);
+
+      if (paymentId.startsWith("sub-")) {
         try {
-          const admin = createAdminClient();
-          const now = new Date();
-          const nextBillingAt = new Date(now);
+          const periodStartIso = payment.paidAt ?? new Date().toISOString();
+          const periodStart = new Date(periodStartIso);
+          const nextBillingAt = new Date(periodStart);
           nextBillingAt.setMonth(nextBillingAt.getMonth() + 1);
+          const periodEnd = new Date(periodStart);
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-          // payment DB에서 user_id 조회
           const { data: paymentRow } = await admin
-            .from('payments')
-            .select('user_id')
-            .eq('payment_id', paymentId)
-            .single();
+            .from("payments")
+            .select("user_id")
+            .eq("payment_id", paymentId)
+            .maybeSingle();
 
-          if (paymentRow?.user_id) {
-            await admin.from('subscriptions').update({
-              status: 'active',
-              failed_count: 0,
-              last_payment_id: paymentId,
-              last_payment_at: now.toISOString(),
-              current_period_start: now.toISOString(),
-              current_period_end: nextBillingAt.toISOString(),
-              next_billing_at: nextBillingAt.toISOString(),
-            }).eq('user_id', paymentRow.user_id);
+          const uid = paymentRow?.user_id ?? resolvedUserId;
+          if (uid) {
+            await admin
+              .from("subscriptions")
+              .update({
+                status: "active",
+                failed_count: 0,
+                last_payment_id: paymentId,
+                last_payment_at: periodStartIso,
+                current_period_start: periodStart.toISOString(),
+                current_period_end: periodEnd.toISOString(),
+                next_billing_at: nextBillingAt.toISOString(),
+              })
+              .eq("user_id", uid);
 
-            console.log(`[웹훅] 구독 갱신 완료 - userId: ${paymentRow.user_id}`);
+            console.log(`[webhook] subscription renewed userId=${uid}`);
+          } else {
+            console.warn(
+              `[webhook] subscription renew skipped: no user_id paymentId=${paymentId}`,
+            );
           }
         } catch (subErr) {
-          console.error('[웹훅] 구독 갱신 실패:', subErr);
+          console.error("[webhook] subscription renew error:", subErr);
         }
       }
 
       return NextResponse.json({ success: true });
     }
 
-    // 결제 취소 웹훅
     if (type === "Transaction.Cancelled") {
       const { paymentId } = data;
       await updatePaymentStatus(paymentId, "CANCELLED", {
         cancelledAt: new Date().toISOString(),
       });
-      console.log(`[웹훅] 결제 취소 - paymentId: ${paymentId}`);
+      console.log(`[webhook] cancelled paymentId=${paymentId}`);
       return NextResponse.json({ success: true });
     }
 
-    // 결제 실패 웹훅
     if (type === "Transaction.Failed") {
       const { paymentId } = data;
       await updatePaymentStatus(paymentId, "FAILED", {
         failedAt: new Date().toISOString(),
       });
-      console.log(`[웹훅] 결제 실패 - paymentId: ${paymentId}`);
+      console.log(`[webhook] failed paymentId=${paymentId}`);
       return NextResponse.json({ success: true });
     }
 
-    // 알 수 없는 타입 - 200 응답 (재전송 방지)
-    console.log(`[웹훅] 미처리 이벤트: ${type}`);
+    console.log(`[webhook] ignored event type=${type}`);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[웹훅] 처리 오류:", error);
-    return NextResponse.json(
-      { error: "웹훅 처리 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    console.error("[webhook] error:", error);
+    return NextResponse.json({ error: "Webhook processing failed." }, { status: 500 });
   }
 }

@@ -4,6 +4,10 @@
  */
 
 import { getPortOneApiSecret } from "@/lib/portone/api-secret";
+import {
+  isPaidPortOneStatus,
+  normalizePortOnePaymentPayload,
+} from "@/lib/portone/payment-normalize";
 
 const PORTONE_API_BASE = "https://api.portone.io";
 
@@ -60,7 +64,12 @@ export async function getPayment(
     );
   }
 
-  return response.json() as Promise<PortOnePaymentResponse>;
+  const raw: unknown = await response.json();
+  const normalized = normalizePortOnePaymentPayload(raw);
+  if (!normalized) {
+    throw new Error("PortOne payment response could not be parsed.");
+  }
+  return normalized;
 }
 
 /**
@@ -75,7 +84,7 @@ export async function verifyPayment(
   try {
     const payment = await getPayment(paymentId);
 
-    if (payment.status !== "PAID") {
+    if (!isPaidPortOneStatus(payment.status)) {
       return {
         valid: false,
         payment,
