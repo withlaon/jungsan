@@ -60,8 +60,9 @@ export async function listRecentPaymentIds(params: {
       console.warn('[portone] list payments failed', res.status, raw)
       return []
     }
-    if (isRecord(raw) && Array.isArray(raw.items)) {
-      return idsFromItemsArray(raw.items)
+    if (isRecord(raw)) {
+      const items = raw.items ?? (isRecord(raw.data) ? raw.data.items : undefined)
+      if (Array.isArray(items)) return idsFromItemsArray(items)
     }
     return []
   }
