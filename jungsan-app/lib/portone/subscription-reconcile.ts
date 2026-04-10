@@ -1,6 +1,6 @@
 /**
- * Link subscription payment IDs (sub-{uuid8}-...) to users and heal stale past_due rows.
- * Always trusts PortOne GET /payments/:id over local DB status (fixes FAILED/CANCELLED drift).
+ * Heal subscriptions: trust PortOne GET /payments/:id over local DB rows.
+ * Covers: wrong payments.status, missing payments rows, last_payment_id mismatch.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -8,7 +8,11 @@ import type { PortOnePaymentResponse } from '@/lib/portone/server'
 import { getPayment } from '@/lib/portone/server'
 import { savePayment } from '@/lib/portone/db'
 import { isPaidPortOneStatus } from '@/lib/portone/payment-normalize'
-import { SUBSCRIPTION_CHARGE_AMOUNT } from '@/lib/portone/subscription-charge'
+import {
+  SUBSCRIPTION_CHARGE_AMOUNT,
+  SUBSCRIPTION_ORDER_NAME,
+} from '@/lib/portone/subscription-charge'
+import { listRecentPaymentIds } from '@/lib/portone/payments-list'
 
 export function subscriptionPaymentIdUserPrefix(paymentId: string): string | null {
   const m = paymentId.match(/^sub-([0-9a-f]{8})-/i)
@@ -52,6 +56,11 @@ function paymentAmountMatches(payment: PortOnePaymentResponse): boolean {
   return false
 }
 
+function orderLooksLikeSubscription(payment: PortOnePaymentResponse): boolean {
+  const name = payment.orderName ?? ''
+  return name === SUBSCRIPTION_ORDER_NAME || name.includes('정산타임')
+}
+
 type SubscriptionRow = {
   status: string
   failed_count: number | null
@@ -88,8 +97,15 @@ async function healFromPaidPortOnePayment(
   await savePayment(live, { userId, isTest })
 }
 
+function liveQualifiesForHeal(live: PortOnePaymentResponse): boolean {
+  if (!isPaidPortOneStatus(live.status)) return false
+  const total = Number(live.amount?.total)
+  if (total !== SUBSCRIPTION_CHARGE_AMOUNT) return false
+  return paymentAmountMatches(live) || orderLooksLikeSubscription(live)
+}
+
 /**
- * If DB shows past_due with failures but PortOne has a successful sub-* charge, sync subscription.
+ * If DB shows past_due but PortOne has a paid subscription charge, sync to active.
  */
 export async function reconcileSubscriptionIfPortOnePaid(
   admin: SupabaseClient,
@@ -97,7 +113,6 @@ export async function reconcileSubscriptionIfPortOnePaid(
   subscription: SubscriptionRow,
 ): Promise<boolean> {
   if (subscription.status !== 'past_due') return false
-  if ((subscription.failed_count ?? 0) < 1) return false
   if (!subscription.billing_key) return false
 
   const prefix = userId.replace(/-/g, '').slice(0, 8).toLowerCase()
@@ -105,16 +120,15 @@ export async function reconcileSubscriptionIfPortOnePaid(
 
   const tried = new Set<string>()
 
-  const tryPaymentId = async (pid: string): Promise<boolean> => {
+  const tryPaymentId = async (pid: string, mode: 'strict' | 'trusted'): Promise<boolean> => {
     const p = pid.trim()
     if (!p || tried.has(p)) return false
-    if (!p.toLowerCase().startsWith(`sub-${prefix}-`)) return false
+    if (mode === 'strict' && !p.toLowerCase().startsWith(`sub-${prefix}-`)) return false
     tried.add(p)
 
     try {
       const live = await getPayment(p)
-      if (!isPaidPortOneStatus(live.status)) return false
-      if (!paymentAmountMatches(live)) return false
+      if (!liveQualifiesForHeal(live)) return false
 
       await healFromPaidPortOnePayment(admin, userId, live)
       return true
@@ -124,9 +138,24 @@ export async function reconcileSubscriptionIfPortOnePaid(
   }
 
   const lastPid = subscription.last_payment_id?.trim()
-  if (lastPid && (await tryPaymentId(lastPid))) return true
+  if (lastPid && (await tryPaymentId(lastPid, 'trusted'))) return true
 
-  const { data: candidates, error } = await admin
+  const { data: byUser } = await admin
+    .from('payments')
+    .select('payment_id')
+    .eq('user_id', userId)
+    .eq('amount', SUBSCRIPTION_CHARGE_AMOUNT)
+    .order('created_at', { ascending: false })
+    .limit(25)
+
+  if (byUser?.length) {
+    for (const row of byUser) {
+      const pid = String(row.payment_id ?? '')
+      if (await tryPaymentId(pid, 'trusted')) return true
+    }
+  }
+
+  const { data: byPrefix } = await admin
     .from('payments')
     .select('payment_id')
     .like('payment_id', `sub-${prefix}-%`)
@@ -134,10 +163,23 @@ export async function reconcileSubscriptionIfPortOnePaid(
     .order('created_at', { ascending: false })
     .limit(25)
 
-  if (!error && candidates?.length) {
-    for (const row of candidates) {
+  if (byPrefix?.length) {
+    for (const row of byPrefix) {
       const pid = String(row.payment_id ?? '')
-      if (await tryPaymentId(pid)) return true
+      if (await tryPaymentId(pid, 'strict')) return true
+    }
+  }
+
+  const listed = await listRecentPaymentIds({
+    billingKey: subscription.billing_key,
+    daysBack: 120,
+    pageSize: 100,
+  })
+
+  for (const pid of listed) {
+    const pl = pid.toLowerCase()
+    if (pl.startsWith(`sub-${prefix}-`)) {
+      if (await tryPaymentId(pid, 'strict')) return true
     }
   }
 

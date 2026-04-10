@@ -34,8 +34,15 @@ export function normalizePortOnePaymentPayload(raw: unknown): PortOnePaymentResp
   const amountRaw = inner.amount
   let total = 0
   let currency = 'KRW'
-  if (isRecord(amountRaw)) {
-    if (typeof amountRaw.total === 'number') total = amountRaw.total
+  if (typeof amountRaw === 'number' && Number.isFinite(amountRaw)) {
+    total = amountRaw
+  } else if (isRecord(amountRaw)) {
+    const t = amountRaw.total
+    if (typeof t === 'number' && Number.isFinite(t)) total = t
+    else if (typeof t === 'string' && t.trim() !== '') {
+      const n = Number(t)
+      if (Number.isFinite(n)) total = n
+    }
     if (typeof amountRaw.currency === 'string') currency = amountRaw.currency
   }
 

@@ -8,6 +8,7 @@ import { savePayment } from '@/lib/portone/db'
 import { billingChargeIndicatesPaid } from '@/lib/portone/payment-normalize'
 
 export const SUBSCRIPTION_CHARGE_AMOUNT = 20_000
+export const SUBSCRIPTION_ORDER_NAME = '정산타임 �� 구��료'
 const MAX_FAIL_COUNT = 3
 
 export function generateSubscriptionPaymentId(userId: string): string {
@@ -52,7 +53,7 @@ export async function attemptSubscriptionCharge(
     const chargeResult = await chargeBillingKey({
       paymentId,
       billingKey: sub.billing_key,
-      orderName: '정산타임 월 구독료',
+      orderName: SUBSCRIPTION_ORDER_NAME,
       amount: SUBSCRIPTION_CHARGE_AMOUNT,
       customerId: userId,
       customerName: profile?.manager_name ?? '구독자',
@@ -84,7 +85,7 @@ export async function attemptSubscriptionCharge(
           txId: chargeResult.txId,
           transactionType: 'PAYMENT',
           status: 'PAID',
-          orderName: '정산타임 월 구독료',
+          orderName: SUBSCRIPTION_ORDER_NAME,
           amount: { total: SUBSCRIPTION_CHARGE_AMOUNT, currency: 'KRW' },
           paidAt: chargeResult.paidAt,
         },
