@@ -187,6 +187,8 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
     if (!user || isAdmin || statusLoading) return
     if (hasAccess) return
     if (pathname === '/subscription') return
+    // 구독(무료체험) 만료 후에도 라이더 관리 화면 접근 허용(목록·데이터 확인용)
+    if (pathname === '/riders') return
     router.replace('/subscription')
   }, [user, isAdmin, statusLoading, hasAccess, pathname, router])
 
