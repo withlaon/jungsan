@@ -89,7 +89,7 @@ export async function ensureSubscriptionRowForUser(
   admin: AdminDb,
   userId: string
 ): Promise<SubscriptionGateRow | null> {
-  // select('*'): 새 컬럼이 추가되어도 쿼리가 깨지지 않음 (access_until 등)
+  // select('*'): 새 컬럼(access_until 등)이 추가되어도 쿼리가 깨지지 않음
   const { data: existing, error: selErr } = await admin
     .from('subscriptions')
     .select('*')
@@ -119,7 +119,7 @@ export async function ensureSubscriptionRowForUser(
     trial_ends_at: trialEndsAt.toISOString(),
   })
 
-  // 항상 재조회 — 유니크 충돌(23505)이든 다른 오류든 이미 행이 있을 수 있음
+  // 항상 재조회 — 유니크 충돌·트리거 중복 생성 모두 처리
   const { data: afterInsert, error: afterErr } = await admin
     .from('subscriptions')
     .select('*')
@@ -141,6 +141,12 @@ export async function ensureSubscriptionRowForUser(
   return null
 }
 
+/**
+ * 구독 게이트 확인.
+ * - admin 또는 구독 중인 사용자는 null(허용) 반환
+ * - 구독 미가입/만료 시 403 반환
+ * - DB 오류·예외 발생 시 null(허용) 반환 — 인프라 문제로 구독 중인 사용자를 차단하지 않음
+ */
 export async function merchantSubscriptionAccessDenied(
   admin: AdminDb,
   userId: string,
@@ -148,18 +154,24 @@ export async function merchantSubscriptionAccessDenied(
 ): Promise<NextResponse | null> {
   if (profileUsername?.toLowerCase() === 'admin') return null
 
-  const row = await ensureSubscriptionRowForUser(admin, userId)
-  if (!row) {
+  try {
+    const row = await ensureSubscriptionRowForUser(admin, userId)
+
+    if (!row) {
+      // 구독 행을 생성할 수도 없는 경우 — 인프라 오류로 간주하고 허용
+      console.error('[subscription-gate] could not ensure subscription row for userId:', userId)
+      return null
+    }
+
+    if (merchantHasAppAccessFromRow(row)) return null
+
     return NextResponse.json(
       { error: ERR_REQUIRED, code: 'SUBSCRIPTION_REQUIRED' },
       { status: 403 }
     )
+  } catch (err) {
+    // 예외가 발생해도 구독 중인 사용자를 차단하지 않도록 허용 (fail-open)
+    console.error('[subscription-gate] unexpected error for userId:', userId, err)
+    return null
   }
-
-  if (merchantHasAppAccessFromRow(row, new Date())) return null
-
-  return NextResponse.json(
-    { error: ERR_REQUIRED, code: 'SUBSCRIPTION_REQUIRED' },
-    { status: 403 }
-  )
 }

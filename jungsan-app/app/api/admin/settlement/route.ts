@@ -45,11 +45,9 @@ export async function DELETE(req: NextRequest) {
           profile?.username
         )
         if (denied) return denied
-      } catch {
-        return NextResponse.json(
-          { error: '서버 설정 오류로 요청을 처리할 수 없습니다.' },
-          { status: 503 }
-        )
+      } catch (gateErr) {
+        // admin client 설정 오류 등 인프라 문제 발생 시에도 구독 중인 사용자를 차단하지 않음
+        console.error('[settlement] subscription gate error:', gateErr)
       }
     }
 
