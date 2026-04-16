@@ -46,29 +46,16 @@ export async function GET() {
         trial_ends_at: trialEndsAt.toISOString(),
       })
 
-      // 동시에 카드 저장 등으로 행이 생긴 경우(유니크 충돌) → 다시 조회
-      if (insertError?.code === '23505') {
-        const { data: again } = await admin
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        subscription = again
-      } else if (insertError) {
+      if (insertError && insertError.code !== '23505') {
         console.error('[billing/status] 구독 자동 생성 실패:', insertError.message)
-        return NextResponse.json(
-          { error: '구독 정보를 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
-          { status: 503 },
-        )
-      } else {
-        const { data: newSub } = await admin
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        subscription = newSub
       }
+      // INSERT 성공·유니크 충돌 모두 재조회 (경쟁 조건 및 트리거 생성 모두 처리)
+      const { data: again } = await admin
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      subscription = again
     }
 
     if (!subscription) {

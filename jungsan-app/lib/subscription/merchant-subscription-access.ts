@@ -9,13 +9,11 @@ export type SubscriptionGateRow = {
   trial_ends_at: string
   billing_key: string | null
   failed_count: number | null
-  access_until: string | null
+  access_until?: string | null   // optional: column may not exist in older schema
 }
 
 type AdminDb = SupabaseClient
 
-const ERR_GATE =
-  '\uAD6C\uB3C5 \uC815\uBCF4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.'
 const ERR_REQUIRED =
   '\uBB34\uB8CC \uCCB4\uD5D8 \uAE30\uAC04\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uAD6C\uB3C5\u00B7\uC790\uB3D9\uACB0\uC81C\uB97C \uB4F1\uB85D\uD55C \uD6C4 \uC774\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
 
@@ -83,15 +81,24 @@ export function trialReminderDaysFromBillingApiPayload(j: {
   return null
 }
 
+/**
+ * 구독 행 조회. select('*')를 사용해 스키마 변경(컬럼 추가)에도 쿼리가 깨지지 않도록 함.
+ * 행이 없으면 생성을 시도하고, 실패하면 재조회한 뒤에도 없을 때만 null 반환.
+ */
 export async function ensureSubscriptionRowForUser(
   admin: AdminDb,
   userId: string
 ): Promise<SubscriptionGateRow | null> {
-  const { data: existing } = await admin
+  // select('*'): 새 컬럼이 추가되어도 쿼리가 깨지지 않음 (access_until 등)
+  const { data: existing, error: selErr } = await admin
     .from('subscriptions')
-    .select('status, trial_ends_at, billing_key, failed_count, access_until')
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle()
+
+  if (selErr) {
+    console.error('[subscription-gate] select error:', selErr.message)
+  }
 
   if (existing) {
     return existing as SubscriptionGateRow
@@ -112,27 +119,26 @@ export async function ensureSubscriptionRowForUser(
     trial_ends_at: trialEndsAt.toISOString(),
   })
 
-  if (insertError?.code === '23505') {
-    const { data: again } = await admin
-      .from('subscriptions')
-      .select('status, trial_ends_at, billing_key, failed_count, access_until')
-      .eq('user_id', userId)
-      .maybeSingle()
-    return (again as SubscriptionGateRow) ?? null
-  }
-
-  if (insertError) {
-    console.error('[subscription-gate] insert:', insertError.message)
-    return null
-  }
-
-  const { data: created } = await admin
+  // 항상 재조회 — 유니크 충돌(23505)이든 다른 오류든 이미 행이 있을 수 있음
+  const { data: afterInsert, error: afterErr } = await admin
     .from('subscriptions')
-    .select('status, trial_ends_at, billing_key, failed_count, access_until')
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle()
 
-  return (created as SubscriptionGateRow) ?? null
+  if (afterErr) {
+    console.error('[subscription-gate] post-insert select error:', afterErr.message)
+  }
+
+  if (afterInsert) {
+    return afterInsert as SubscriptionGateRow
+  }
+
+  if (insertError && insertError.code !== '23505') {
+    console.error('[subscription-gate] insert error:', insertError.code, insertError.message)
+  }
+
+  return null
 }
 
 export async function merchantSubscriptionAccessDenied(
@@ -145,8 +151,8 @@ export async function merchantSubscriptionAccessDenied(
   const row = await ensureSubscriptionRowForUser(admin, userId)
   if (!row) {
     return NextResponse.json(
-      { error: ERR_GATE, code: 'SUBSCRIPTION_GATE_ERROR' },
-      { status: 503 }
+      { error: ERR_REQUIRED, code: 'SUBSCRIPTION_REQUIRED' },
+      { status: 403 }
     )
   }
 
