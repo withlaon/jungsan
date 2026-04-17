@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
 
 type Step = 'upload' | 'preview' | 'confirm'
 type FileStatus = 'pending' | 'parsing' | 'success' | 'error'
@@ -208,7 +209,7 @@ export default function SettlementUploadPage() {
     if (rawBizNumRef.current) formData.append('bizNum', rawBizNumRef.current)
     formData.append('windcallMode', isWindcall ? 'true' : 'false')
     try {
-      const res  = await fetch('/api/parse-excel', { method: 'POST', body: formData })
+      const res  = await fetchWithTimeout('/api/parse-excel', { method: 'POST', body: formData }, 90_000)
       const data = await res.json()
       if (data.success) {
         // 디버그: 실제 파일 시트/헤더 구조 콘솔 출력 (쿠팡이츠 파싱 문제 분석용)
@@ -236,16 +237,25 @@ export default function SettlementUploadPage() {
   // 서버(API)에서 사업자등록번호 여러 형식으로 자동 시도하므로 클라이언트는 1회 호출만
   const parseFile = async (id: string, file: File) => {
     setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'parsing', errorMsg: undefined } : f))
-    // bizNum을 아직 못 가져왔으면 먼저 조회
-    if (!rawBizNumRef.current) await fetchProfileNumbers()
-    const result = await parseFileCore(file)
-    if (result.success) {
+    try {
+      if (!rawBizNumRef.current) await fetchProfileNumbers()
+      const result = await parseFileCore(file)
+      if (result.success) {
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === id ? { ...f, status: 'success', rows: result.rows, summary: result.summary, detectedPlatform: result.detectedPlatform, errorMsg: undefined } : f
+        ))
+      } else {
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === id ? { ...f, status: 'error', rows: [], errorMsg: result.errorMsg } : f
+        ))
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const isTimeout = msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('timeout')
       setUploadedFiles(prev => prev.map(f =>
-        f.id === id ? { ...f, status: 'success', rows: result.rows, summary: result.summary, detectedPlatform: result.detectedPlatform, errorMsg: undefined } : f
-      ))
-    } else {
-      setUploadedFiles(prev => prev.map(f =>
-        f.id === id ? { ...f, status: 'error', rows: [], errorMsg: result.errorMsg } : f
+        f.id === id
+          ? { ...f, status: 'error', rows: [], errorMsg: isTimeout ? '파싱 시간 초과 (90초). 파일을 다시 업로드해 주세요.' : '파싱 중 오류: ' + msg }
+          : f
       ))
     }
   }
@@ -470,72 +480,77 @@ export default function SettlementUploadPage() {
   const handleSave = async (status: 'draft' | 'confirmed') => {
     if (results.length === 0) { toast.error('저장할 정산 데이터가 없습니다.'); return }
     setSaving(true)
-    const fileNames = uploadedFiles.filter(f => f.status === 'success').map(f => f.file.name).join(', ')
+    try {
+      const fileNames = uploadedFiles.filter(f => f.status === 'success').map(f => f.file.name).join(', ')
 
-    const insertRow: Record<string, unknown> = {
-      week_start: weekStart, week_end: weekEnd, status, raw_file_name: fileNames || null,
-      settled_amount:                 summaryData?.settledAmount               ?? 0,
-      branch_fee:                     summaryData?.branchFee                   ?? 0,
-      vat_amount:                     summaryData?.vatAmount                   ?? 0,
-      employer_employment_insurance:  summaryData?.employerEmploymentInsurance ?? 0,
-      employer_accident_insurance:    summaryData?.employerAccidentInsurance   ?? 0,
-    }
-    if (userId) insertRow.user_id = userId
-    const { data: settlement, error: settlementError } = await supabase
-      .from('weekly_settlements')
-      .insert(insertRow)
-      .select().single()
-
-    if (settlementError || !settlement) {
-      toast.error('정산 생성 실패: ' + settlementError?.message)
-      setSaving(false); return
-    }
-
-    const details = results.map(r => ({
-      settlement_id:                settlement.id,
-      rider_id:                     r.riderId,
-      delivery_count:               r.deliveryCount,
-      base_amount:                  r.baseAmount,
-      delivery_fee:                 r.deliveryFee,
-      additional_pay:               r.additionalPay,
-      hourly_insurance:             r.hourlyInsurance,
-      excel_employment_insurance:   r.excelEmploymentInsurance,
-      excel_accident_insurance:     r.excelAccidentInsurance,
-      promotion_amount:             r.promotionAmount,
-      insurance_deduction:          r.insuranceDeduction,
-      income_tax_deduction:         r.incomeTaxDeduction,
-      management_fee_deduction:     r.managementFeeDeduction,
-      call_fee_deduction:           r.callFeeDeduction,
-      employment_insurance_addition: r.employmentInsuranceAddition,
-      accident_insurance_addition:   r.accidentInsuranceAddition,
-      advance_deduction:            r.advanceDeduction,
-      advance_recovery:             r.advanceRecovery,
-      tax_base_amount:              r.taxBaseAmount,
-      final_amount:                 r.finalAmount,
-    }))
-
-    const { error: detailError } = await supabase.from('settlement_details').insert(details)
-    if (detailError) {
-      toast.error('상세 데이터 저장 실패: ' + detailError.message)
-      await supabase.from('weekly_settlements').delete().eq('id', settlement.id)
-      setSaving(false); return
-    }
-
-    for (const r of results) {
-      if (r.advanceDeduction > 0) {
-        await supabase.from('advance_payments').update({ deducted_settlement_id: settlement.id })
-          .eq('rider_id', r.riderId).eq('type', 'advance').is('deducted_settlement_id', null)
+      const insertRow: Record<string, unknown> = {
+        week_start: weekStart, week_end: weekEnd, status, raw_file_name: fileNames || null,
+        settled_amount:                 summaryData?.settledAmount               ?? 0,
+        branch_fee:                     summaryData?.branchFee                   ?? 0,
+        vat_amount:                     summaryData?.vatAmount                   ?? 0,
+        employer_employment_insurance:  summaryData?.employerEmploymentInsurance ?? 0,
+        employer_accident_insurance:    summaryData?.employerAccidentInsurance   ?? 0,
       }
-      if (r.advanceRecovery > 0) {
-        await supabase.from('advance_payments').update({ deducted_settlement_id: settlement.id })
-          .eq('rider_id', r.riderId).eq('type', 'recovery').is('deducted_settlement_id', null)
-      }
-    }
+      if (userId) insertRow.user_id = userId
+      const { data: settlement, error: settlementError } = await supabase
+        .from('weekly_settlements')
+        .insert(insertRow)
+        .select().single()
 
-    toast.success('정산이 저장되었습니다.')
-    setSaving(false)
-    await revalidateSettlements()
-    router.push('/settlement/result')
+      if (settlementError || !settlement) {
+        toast.error('정산 생성 실패: ' + settlementError?.message)
+        return
+      }
+
+      const details = results.map(r => ({
+        settlement_id:                settlement.id,
+        rider_id:                     r.riderId,
+        delivery_count:               r.deliveryCount,
+        base_amount:                  r.baseAmount,
+        delivery_fee:                 r.deliveryFee,
+        additional_pay:               r.additionalPay,
+        hourly_insurance:             r.hourlyInsurance,
+        excel_employment_insurance:   r.excelEmploymentInsurance,
+        excel_accident_insurance:     r.excelAccidentInsurance,
+        promotion_amount:             r.promotionAmount,
+        insurance_deduction:          r.insuranceDeduction,
+        income_tax_deduction:         r.incomeTaxDeduction,
+        management_fee_deduction:     r.managementFeeDeduction,
+        call_fee_deduction:           r.callFeeDeduction,
+        employment_insurance_addition: r.employmentInsuranceAddition,
+        accident_insurance_addition:   r.accidentInsuranceAddition,
+        advance_deduction:            r.advanceDeduction,
+        advance_recovery:             r.advanceRecovery,
+        tax_base_amount:              r.taxBaseAmount,
+        final_amount:                 r.finalAmount,
+      }))
+
+      const { error: detailError } = await supabase.from('settlement_details').insert(details)
+      if (detailError) {
+        toast.error('상세 데이터 저장 실패: ' + detailError.message)
+        await supabase.from('weekly_settlements').delete().eq('id', settlement.id)
+        return
+      }
+
+      for (const r of results) {
+        if (r.advanceDeduction > 0) {
+          await supabase.from('advance_payments').update({ deducted_settlement_id: settlement.id })
+            .eq('rider_id', r.riderId).eq('type', 'advance').is('deducted_settlement_id', null)
+        }
+        if (r.advanceRecovery > 0) {
+          await supabase.from('advance_payments').update({ deducted_settlement_id: settlement.id })
+            .eq('rider_id', r.riderId).eq('type', 'recovery').is('deducted_settlement_id', null)
+        }
+      }
+
+      toast.success('정산이 저장되었습니다.')
+      void revalidateSettlements()
+      router.push('/settlement/result')
+    } catch (e) {
+      toast.error('저장 중 오류가 발생했습니다: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const mappedCount = Object.values(riderMapping).filter(Boolean).length
