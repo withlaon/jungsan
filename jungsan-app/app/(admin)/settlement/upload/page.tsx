@@ -543,6 +543,16 @@ export default function SettlementUploadPage() {
         }
       }
 
+      // 해당 주차(date_mode='week')용 프로모션을 이 정산에 연결 → 다음 정산 계산 시 중복 적용 방지
+      if (userId && weekStart) {
+        await supabase.from('promotions')
+          .update({ settlement_id: settlement.id })
+          .eq('user_id', userId)
+          .eq('date_mode', 'week')
+          .eq('week_start', weekStart)
+          .is('settlement_id', null)
+      }
+
       toast.success('정산이 저장되었습니다.')
       void revalidateSettlements()
       router.push('/settlement/result')
