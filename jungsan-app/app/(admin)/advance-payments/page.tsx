@@ -179,24 +179,32 @@ export default function AdvancePaymentsPage() {
     }
 
     setSaving(true)
-    const insertRow: Record<string, unknown> = {
-      rider_id: form.rider_id,
-      amount,
-      paid_date: form.week,
-      memo: form.memo || null,
-      type,
+    try {
+      const insertRow: Record<string, unknown> = {
+        rider_id: form.rider_id,
+        amount,
+        paid_date: form.week,
+        memo: form.memo || null,
+        type,
+      }
+      if (userId) insertRow.user_id = userId
+      const { error } = await supabase.from('advance_payments').insert(insertRow)
+
+      if (error) {
+        toast.error('등록 실패: ' + error.message)
+        return
+      }
+
+      toast.success(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
+      if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
+      else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
+      bumpSettlementResults()
+      void revalidatePayments()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
     }
-    if (userId) insertRow.user_id = userId
-    const { error } = await supabase.from('advance_payments').insert(insertRow)
-
-    if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
-
-    toast.success(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
-    bumpSettlementResults()
-    setSaving(false)
-    if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
-    else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
-    revalidatePayments()
   }
 
   const openEdit = (p: PaymentWithRider) => {
@@ -223,24 +231,32 @@ export default function AdvancePaymentsPage() {
     }
 
     setSaving(true)
-    const { error } = await supabase
-      .from('advance_payments')
-      .update({
-        rider_id: editForm.rider_id,
-        amount,
-        paid_date: editForm.week,
-        memo: editForm.memo || null,
-      })
-      .eq('id', editingPayment.id)
+    try {
+      const { error } = await supabase
+        .from('advance_payments')
+        .update({
+          rider_id: editForm.rider_id,
+          amount,
+          paid_date: editForm.week,
+          memo: editForm.memo || null,
+        })
+        .eq('id', editingPayment.id)
 
-    if (error) { toast.error('수정 실패: ' + error.message); setSaving(false); return }
+      if (error) {
+        toast.error('수정 실패: ' + error.message)
+        return
+      }
 
-    toast.success('수정되었습니다.')
-    bumpSettlementResults()
-    setSaving(false)
-    setEditOpen(false)
-    setEditingPayment(null)
-    revalidatePayments()
+      toast.success('수정되었습니다.')
+      setEditOpen(false)
+      setEditingPayment(null)
+      bumpSettlementResults()
+      void revalidatePayments()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '수정 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDelete = async (p: PaymentWithRider) => {
