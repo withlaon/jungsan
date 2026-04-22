@@ -13,14 +13,186 @@ import {
   CreditCard,
 } from 'lucide-react'
 
-const MANUAL_VERSION      = '4.0'
+const MANUAL_VERSION       = '4.0'
 const MANUAL_REVISION_DATE = '2026-04-16'
+
+/* ─────────────────────────────────────────────────────────────
+   html2canvas 색상 처리 유틸 (oklch/lab/lch → rgb 변환)
+   html2canvas 내부 파서는 CSS Color 4+ 문법을 지원하지 않으므로
+   클론 문서의 모든 스타일시트를 제거하고 계산값을 인라인으로 복사.
+───────────────────────────────────────────────────────────────*/
+
+/** html2canvas가 ::before 등으로 삽입한 노드 */
+function isHtml2CanvasPseudoNode(el: Element): boolean {
+  const c = el.className
+  return typeof c === 'string' && c.includes('___html2canvas___pseudoelement')
+}
+
+/** 깊이 우선·전위 순서로 방문 (원본/클론 매칭용) */
+function listMirrorTargets(root: HTMLElement, skipHtml2Pseudo: boolean): HTMLElement[] {
+  const out: HTMLElement[] = []
+  const walk = (el: HTMLElement) => {
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return
+    if (skipHtml2Pseudo && isHtml2CanvasPseudoNode(el)) return
+    out.push(el)
+    for (const ch of el.children) walk(ch as HTMLElement)
+  }
+  walk(root)
+  return out
+}
+
+const UNSUPPORTED_COLOR_FUNC = /\b(lab|oklch|lch)\(|color\(/i
+const COLOR_FUNC_START_RE    = /\b(?:lab|oklch|lch)\(|color\(/gi
+
+function findMatchingCloseParen(s: string, openIdx: number): number {
+  let depth = 0
+  for (let i = openIdx; i < s.length; i++) {
+    if (s[i] === '(') depth++
+    else if (s[i] === ')') { depth--; if (depth === 0) return i }
+  }
+  return -1
+}
+
+function findNextColorFuncStart(s: string, from: number): { start: number; openParen: number } | null {
+  const sub = s.slice(from)
+  COLOR_FUNC_START_RE.lastIndex = 0
+  const m = COLOR_FUNC_START_RE.exec(sub)
+  if (!m) return null
+  return { start: from + m.index, openParen: from + m.index + m[0].length - 1 }
+}
+
+function coerceSingleColorToken(token: string, ctx: CanvasRenderingContext2D): string {
+  try {
+    ctx.fillStyle = '#000'
+    ctx.fillStyle = token
+    const resolved = String(ctx.fillStyle)
+    if (!UNSUPPORTED_COLOR_FUNC.test(resolved)) return resolved
+  } catch { /* fall through */ }
+  return 'transparent'
+}
+
+function replaceColorFuncsInValue(value: string, ctx: CanvasRenderingContext2D): string {
+  let out = '', i = 0
+  while (i < value.length) {
+    const next = findNextColorFuncStart(value, i)
+    if (!next) { out += value.slice(i); break }
+    out += value.slice(i, next.start)
+    const close = findMatchingCloseParen(value, next.openParen)
+    if (close < 0) { out += value.slice(next.start); break }
+    out += coerceSingleColorToken(value.slice(next.start, close + 1), ctx)
+    i = close + 1
+  }
+  return out
+}
+
+function coerceValueForHtml2Canvas(propName: string, value: string, ctx: CanvasRenderingContext2D): string {
+  if (!value || !UNSUPPORTED_COLOR_FUNC.test(value)) return value
+  const replaced = replaceColorFuncsInValue(value, ctx)
+  if (!UNSUPPORTED_COLOR_FUNC.test(replaced)) return replaced
+  if (/shadow/i.test(propName)) return 'none'
+  if (/^(filter|backdrop-filter)$/i.test(propName)) return 'none'
+  if (/^(background|background-image)$/i.test(propName) && /gradient/i.test(value)) return 'none'
+  return 'transparent'
+}
+
+function scrubElementInlineColorFunctions(el: Element, ctx: CanvasRenderingContext2D) {
+  if (el instanceof HTMLElement && isHtml2CanvasPseudoNode(el)) { el.removeAttribute('style'); return }
+  if (!('style' in el) || !(el as HTMLElement | SVGElement).style) return
+  const s = (el as HTMLElement | SVGElement).style
+  for (let i = s.length - 1; i >= 0; i--) {
+    const name = s.item(i)
+    if (!name) continue
+    const v = s.getPropertyValue(name)
+    if (!UNSUPPORTED_COLOR_FUNC.test(v)) continue
+    const safe = coerceValueForHtml2Canvas(name, v, ctx)
+    if (UNSUPPORTED_COLOR_FUNC.test(safe)) s.removeProperty(name)
+    else s.setProperty(name, safe, 'important')
+  }
+}
+
+/**
+ * 클론 문서에서 모든 스타일시트를 제거하고
+ * 브라우저가 계산한 sRGB 값을 인라인으로 복사한다.
+ */
+function neutralizeModernColorsOnClone(
+  clonedDoc: Document,
+  cloneHtml2pdfContainer: HTMLElement,
+  originalPrintRoot: HTMLElement,
+) {
+  const inner = cloneHtml2pdfContainer.firstElementChild as HTMLElement | null
+  if (!inner) return
+
+  const canvas = document.createElement('canvas')
+  canvas.width = 1; canvas.height = 1
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(e => e.remove())
+  clonedDoc.querySelectorAll('style').forEach(e => e.remove())
+  clonedDoc.documentElement.style.setProperty('background-color', '#0f172a', 'important')
+  clonedDoc.body.style.setProperty('background-color', '#0f172a', 'important')
+
+  const origEls  = listMirrorTargets(originalPrintRoot, false)
+  const cloneEls = listMirrorTargets(inner, true)
+  const pairCount = Math.min(origEls.length, cloneEls.length)
+
+  const skipProps = new Set([
+    'transition', 'transition-property', 'transition-duration',
+    'transition-delay', 'transition-timing-function',
+    'animation', 'animation-name', 'animation-duration',
+    'animation-delay', 'animation-timing-function',
+  ])
+
+  const clearInlineStylesRec = (el: HTMLElement) => {
+    el.removeAttribute('style')
+    for (const ch of el.children) clearInlineStylesRec(ch as HTMLElement)
+  }
+  clearInlineStylesRec(inner)
+
+  for (let i = 0; i < pairCount; i++) {
+    const o = origEls[i], c = cloneEls[i]
+    const computed = window.getComputedStyle(o)
+    for (let j = 0; j < computed.length; j++) {
+      const name = computed.item(j)
+      if (!name || skipProps.has(name)) continue
+      const value = computed.getPropertyValue(name)
+      if (!value) continue
+      const safe = coerceValueForHtml2Canvas(name, value, ctx)
+      if (!safe) continue
+      try { c.style.setProperty(name, safe, 'important') }
+      catch { try { c.style.removeProperty(name) } catch { /**/ } }
+    }
+  }
+
+  const stripClass = (el: HTMLElement) => {
+    if (!isHtml2CanvasPseudoNode(el)) el.removeAttribute('class')
+    for (const ch of el.children) stripClass(ch as HTMLElement)
+  }
+  stripClass(inner)
+
+  scrubElementInlineColorFunctions(cloneHtml2pdfContainer, ctx)
+  cloneHtml2pdfContainer.querySelectorAll('*').forEach(el => {
+    scrubElementInlineColorFunctions(el, ctx)
+  })
+
+  inner.querySelectorAll<SVGElement>('[fill], [stroke]').forEach(svgEl => {
+    for (const attr of ['fill', 'stroke'] as const) {
+      const v = svgEl.getAttribute(attr)
+      if (v && UNSUPPORTED_COLOR_FUNC.test(v))
+        svgEl.setAttribute(attr, coerceValueForHtml2Canvas(attr, v, ctx))
+    }
+  })
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ManualPage
+───────────────────────────────────────────────────────────────*/
 
 export default function ManualPage() {
   const printRef  = useRef<HTMLDivElement>(null)
   const { platform, userId } = useUser()
   const isBaemin  = platform === 'baemin'
-  const [pdfLoading,    setPdfLoading]    = useState(false)
+  const [downloading,   setDownloading]   = useState(false)
   const [incomeTaxRate, setIncomeTaxRate] = useState<number>(0.033)
 
   useEffect(() => {
@@ -37,15 +209,15 @@ export default function ManualPage() {
     })()
   }, [userId])
 
-  const taxRateLabel   = `${(incomeTaxRate * 100).toFixed(1)}%`
-  const platformLabel  = isBaemin ? '배달의 민족' : '쿠팡이츠'
-  const platformColor  = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
-  const platformBg     = isBaemin ? 'bg-emerald-900/30 border-emerald-700/40' : 'bg-yellow-900/30 border-yellow-700/40'
+  const taxRateLabel  = `${(incomeTaxRate * 100).toFixed(1)}%`
+  const platformLabel = isBaemin ? '배달의 민족' : '쿠팡이츠'
+  const platformColor = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
+  const platformBg    = isBaemin ? 'bg-emerald-900/30 border-emerald-700/40' : 'bg-yellow-900/30 border-yellow-700/40'
 
-  /* ── PDF 다운로드 ── */
-  const handleDownloadPDF = async () => {
-    if (!printRef.current || pdfLoading) return
-    setPdfLoading(true)
+  /* ── 메뉴얼 다운로드 (PDF) ── */
+  const handleDownload = async () => {
+    if (!printRef.current || downloading) return
+    setDownloading(true)
 
     const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
     noPrintEls.forEach(el => { el.style.display = 'none' })
@@ -59,72 +231,40 @@ export default function ManualPage() {
       const filename  = `라이더정산시스템_사용자메뉴얼_v${MANUAL_VERSION}.pdf`
       const printRoot = printRef.current
 
-      await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const opts: any = {
-        margin:    [10, 8, 10, 8],
+      const buildOpts = (scale: number): any => ({
+        margin:    [12, 10, 12, 10],
         filename,
         image:     { type: 'jpeg', quality: 0.92 },
         html2canvas: {
-          scale:   1.5,
+          scale,
           useCORS: true,
           backgroundColor: '#0f172a',
           logging: false,
           foreignObjectRendering: false,
-          removeContainer: true,
-          onclone: (_doc: Document, clone: HTMLElement) => {
-            // oklch/lab 등 미지원 색상값을 안전하게 치환
-            const unsupported = /\b(lab|oklch|lch)\(|color\(/i
-            const canvas = document.createElement('canvas')
-            canvas.width = 1; canvas.height = 1
-            const ctx = canvas.getContext('2d')
-            if (!ctx) return
-            const fix = (v: string, prop: string) => {
-              if (!unsupported.test(v)) return v
-              if (/shadow|filter|backdrop/.test(prop)) return 'none'
-              if (/gradient/.test(v)) return 'none'
-              try { ctx.fillStyle = '#000'; ctx.fillStyle = v; return ctx.fillStyle } catch { return 'transparent' }
-            }
-            const process = (el: HTMLElement) => {
-              const computed = window.getComputedStyle(
-                printRoot.querySelector('[data-uid="' + el.dataset.uid + '"]') as Element ?? el
-              )
-              for (let i = 0; i < computed.length; i++) {
-                const name = computed.item(i)
-                const val  = computed.getPropertyValue(name)
-                if (val && unsupported.test(val)) {
-                  try { el.style.setProperty(name, fix(val, name), 'important') } catch { /**/ }
-                }
-              }
-              for (const ch of el.children) process(ch as HTMLElement)
-            }
-            if (clone.firstElementChild) process(clone.firstElementChild as HTMLElement)
+          onclone: (clonedDoc: Document, cloneContainer: HTMLElement) => {
+            if (printRoot) neutralizeModernColorsOnClone(clonedDoc, cloneContainer, printRoot)
           },
         },
         jsPDF:     { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] },
-      }
+      })
+
+      await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
       try {
-        await html2pdf().set(opts).from(printRoot).save()
+        await html2pdf().set(buildOpts(1.5)).from(printRoot).save()
       } catch (e1) {
-        // scale 낮춰 재시도
-        opts.html2canvas.scale = 1
-        delete opts.html2canvas.onclone
-        try {
-          await html2pdf().set(opts).from(printRoot).save()
-        } catch {
-          throw e1
-        }
+        console.warn('PDF 1차 생성 실패, scale 낮춰 재시도:', e1)
+        await html2pdf().set(buildOpts(1)).from(printRoot).save()
       }
     } catch (err) {
       console.error('PDF 생성 실패:', err)
-      // 최후 수단: 브라우저 인쇄 대화상자 (Save as PDF 선택)
+      // 최후 수단: 브라우저 인쇄 → Save as PDF
       window.print()
     } finally {
       noPrintEls.forEach(el => { el.style.display = '' })
-      setPdfLoading(false)
+      setDownloading(false)
     }
   }
 
@@ -373,9 +513,9 @@ export default function ManualPage() {
             <p className="text-white font-medium">프로모션 종류</p>
             <ul className="space-y-2 ml-2 text-xs">
               {[
-                ['고정금액',    '설정 조건 충족 시 일정 금액 지급',       '예) 100건 이상이면 50,000원 지급'],
-                ['구간별 금액', '배달건수 구간에 따라 다른 금액 적용',     '예) 50~99건: 20,000원, 100건↑: 50,000원'],
-                ['건당 금액',   '기준 건수 초과분에 단가 적용',            '예) 50건 초과 시 건당 500원'],
+                ['고정금액',    '설정 조건 충족 시 일정 금액 지급',    '예) 100건 이상이면 50,000원 지급'],
+                ['구간별 금액', '배달건수 구간에 따라 다른 금액 적용', '예) 50~99건: 20,000원, 100건↑: 50,000원'],
+                ['건당 금액',   '기준 건수 초과분에 단가 적용',        '예) 50건 초과 시 건당 500원'],
               ].map(([t, d, ex]) => (
                 <li key={t}>
                   <span className="text-white font-medium">{t}:</span> {d}
@@ -426,13 +566,13 @@ export default function ManualPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-white font-medium">고용산재관리비 (보험비 추가분)</p>
-            <p className="text-xs ml-2">관리비 설정 탭에서 라이더별 <strong className="text-white">고용보험 추가분</strong>과 <strong className="text-white">산재보험 추가분</strong>을 설정할 수 있습니다. 정산서의 고용·산재보험 공제 금액에 합산 반영됩니다.</p>
+            <p className="text-white font-medium">고용산재관리비</p>
+            <p className="text-xs ml-2">라이더별 <strong className="text-white">고용보험 추가분</strong>과 <strong className="text-white">산재보험 추가분</strong>을 설정할 수 있습니다. 정산서의 고용·산재보험 공제 금액에 합산 반영됩니다.</p>
           </div>
 
           {isBaemin && (
             <div className="space-y-2">
-              <p className="text-white font-medium">시간제보험료 (배달의 민족 전용)</p>
+              <p className="text-white font-medium">시간제보험료 <span className="text-xs text-slate-500">(배달의 민족 전용)</span></p>
               <p className="text-xs ml-2">라이더별 설정 금액을 최종정산금액에서 별도 차감합니다.</p>
             </div>
           )}
@@ -485,8 +625,8 @@ export default function ManualPage() {
             </ul>
           </div>
 
-          {/* 플랫폼별 계산식 - 공통 표시 */}
-          <div className={`border rounded-lg p-4 space-y-3 ${isBaemin ? 'bg-emerald-900/20 border-emerald-700/40' : 'bg-yellow-900/20 border-yellow-700/40'}`}>
+          {/* 플랫폼별 계산식 */}
+          <div className={`border rounded-lg p-4 space-y-2 ${isBaemin ? 'bg-emerald-900/20 border-emerald-700/40' : 'bg-yellow-900/20 border-yellow-700/40'}`}>
             <p className={`text-xs font-semibold ${platformColor}`}>📐 {platformLabel} 정산 계산 공식</p>
             {isBaemin ? (
               <div className="space-y-1 text-xs text-slate-300 font-mono">
@@ -734,8 +874,8 @@ export default function ManualPage() {
           <div className="space-y-3">
             {[
               ['브라우저/탭 닫기', '창을 닫는 즉시 서버 세션이 무효화됩니다. 재접속 시 로그인이 필요합니다.'],
-              ['1시간 무활동', '마우스·키보드 입력이 1시간 없으면 자동 로그아웃됩니다. 5분 전 화면에 경고 알림이 표시됩니다.'],
-              ['수동 로그아웃', '사이드바 하단 로그아웃 버튼을 클릭하면 즉시 로그아웃됩니다.'],
+              ['1시간 무활동',     '마우스·키보드 입력이 1시간 없으면 자동 로그아웃됩니다. 5분 전 화면에 경고 알림이 표시됩니다.'],
+              ['수동 로그아웃',    '사이드바 하단 로그아웃 버튼을 클릭하면 즉시 로그아웃됩니다.'],
             ].map(([t, d]) => (
               <div key={t as string} className="border border-slate-700 rounded-lg p-3 space-y-1">
                 <p className="text-white font-medium text-sm">{t as string}</p>
@@ -756,50 +896,28 @@ export default function ManualPage() {
       content: (
         <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
           {[
-            {
-              q: '파일 업로드 후 라이더 매핑이 안 되어 있어요.',
-              a: '파일의 라이더 이름·아이디가 등록된 라이더 정보와 정확히 일치해야 자동 매핑됩니다. 라이더 관리 탭에서 아이디를 등록하면 정확도가 높아집니다.',
-            },
-            {
-              q: '정산 계산 후 결과가 보이지 않아요.',
-              a: '라이더 연결 단계에서 모든 라이더를 "연결 안함"으로 설정하면 결과가 없습니다. 최소 1명 이상 연결해주세요.',
-            },
-            {
-              q: '선지급금이 자동으로 차감되지 않아요.',
-              a: '정산 확정 시 "미공제" 상태의 선지급금만 자동 차감됩니다. 이미 공제 완료된 항목은 다시 차감되지 않습니다.',
-            },
-            {
-              q: '같은 라이더가 여러 파일에 있어요.',
-              a: '파일을 동시에 업로드하면 동일 라이더 데이터를 자동 합산합니다. 합산된 배달건수 기준으로 프로모션이 적용됩니다.',
-            },
-            {
-              q: '라이더를 삭제했는데 정산 데이터도 삭제되나요?',
-              a: '완전 삭제 시 정산 상세·선지급금·프로모션·관리비 설정이 모두 삭제됩니다. 단순 비활성화는 데이터가 보존됩니다.',
-            },
-            {
-              q: '정산 결과를 삭제했는데 선지급금은요?',
-              a: '정산 결과 삭제 시 해당 정산에서 공제된 선지급금의 공제 상태가 "미공제"로 자동 초기화됩니다.',
-            },
-            {
-              q: '소득세가 예상과 다르게 계산되어요.',
-              a: `배달의 민족은 세금신고금액(기본정산금액+지사프로모션) × ${taxRateLabel}를 원단위 절상(올림)하여 계산합니다. 쿠팡이츠는 기본정산금액 × ${taxRateLabel}를 내림하여 계산합니다.`,
-            },
-            {
-              q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',
-              a: '네. 보안을 위해 브라우저·탭을 닫으면 자동 로그아웃됩니다. 재접속 시 아이디·비밀번호를 다시 입력해야 합니다.',
-            },
-            {
-              q: '무료 체험이 끝났는데 어떻게 계속 쓰나요?',
-              a: '구독 · 자동결제 메뉴에서 결제 수단(카드)을 등록하면 체험 종료 후 월 구독으로 전환됩니다.',
-            },
-            {
-              q: '구독을 해지하면 바로 못 쓰나요?',
-              a: '해지 후에도 현재 결제 주기 종료일까지 이용이 가능합니다. 구독 · 자동결제 화면의 안내를 참고하세요.',
-            },
-            {
-              q: 'PDF 저장이 안 돼요.',
-              a: 'PDF 저장 버튼을 클릭하면 자동으로 다운로드됩니다. 만약 오류가 발생하면 브라우저의 인쇄(Ctrl+P) 기능에서 대상 프린터를 "PDF로 저장"으로 선택해 주세요.',
-            },
+            { q: '파일 업로드 후 라이더 매핑이 안 되어 있어요.',
+              a: '파일의 라이더 이름·아이디가 등록된 라이더 정보와 정확히 일치해야 자동 매핑됩니다. 라이더 관리 탭에서 아이디를 등록하면 정확도가 높아집니다.' },
+            { q: '정산 계산 후 결과가 보이지 않아요.',
+              a: '라이더 연결 단계에서 모든 라이더를 "연결 안함"으로 설정하면 결과가 없습니다. 최소 1명 이상 연결해주세요.' },
+            { q: '선지급금이 자동으로 차감되지 않아요.',
+              a: '정산 확정 시 "미공제" 상태의 선지급금만 자동 차감됩니다. 이미 공제 완료된 항목은 다시 차감되지 않습니다.' },
+            { q: '같은 라이더가 여러 파일에 있어요.',
+              a: '파일을 동시에 업로드하면 동일 라이더 데이터를 자동 합산합니다. 합산된 배달건수 기준으로 프로모션이 적용됩니다.' },
+            { q: '라이더를 삭제했는데 정산 데이터도 삭제되나요?',
+              a: '완전 삭제 시 정산 상세·선지급금·프로모션·관리비 설정이 모두 삭제됩니다. 단순 비활성화는 데이터가 보존됩니다.' },
+            { q: '정산 결과를 삭제했는데 선지급금은요?',
+              a: '정산 결과 삭제 시 해당 정산에서 공제된 선지급금의 공제 상태가 "미공제"로 자동 초기화됩니다.' },
+            { q: '소득세가 예상과 다르게 계산되어요.',
+              a: `배달의 민족: 세금신고금액(기본정산금액+지사프로모션) × ${taxRateLabel} 원단위 절상. 쿠팡이츠: 기본정산금액 × ${taxRateLabel} 내림.` },
+            { q: '브라우저를 닫았다가 다시 열면 로그인이 필요한가요?',
+              a: '네. 보안을 위해 브라우저·탭을 닫으면 자동 로그아웃됩니다. 재접속 시 아이디·비밀번호를 다시 입력해야 합니다.' },
+            { q: '무료 체험이 끝났는데 어떻게 계속 쓰나요?',
+              a: '구독 · 자동결제 메뉴에서 결제 수단(카드)을 등록하면 체험 종료 후 월 구독으로 전환됩니다.' },
+            { q: '구독을 해지하면 바로 못 쓰나요?',
+              a: '해지 후에도 현재 결제 주기 종료일까지 이용이 가능합니다. 구독 · 자동결제 화면의 안내를 참고하세요.' },
+            { q: '메뉴얼 다운로드가 안 돼요.',
+              a: '메뉴얼 다운로드 버튼을 클릭하면 PDF 파일로 자동 다운로드됩니다. 오류 발생 시 브라우저 인쇄(Ctrl+P) → 대상 프린터를 "PDF로 저장"으로 선택해 주세요.' },
           ].map(({ q, a }, i) => (
             <div key={i} className="border border-slate-700 rounded-lg p-4 space-y-2">
               <p className="text-white font-medium flex items-start gap-2">
@@ -820,7 +938,7 @@ export default function ManualPage() {
       <style>{`
         @media print {
           body, html { background: #0f172a !important; }
-          .no-print { display: none !important; }
+          .no-print  { display: none !important; }
           .print-content { padding: 16px !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
@@ -841,13 +959,17 @@ export default function ManualPage() {
               </span>
             </p>
           </div>
+          {/* ─ 메뉴얼 다운로드 버튼 (우측 상단) ─ */}
           <div className="no-print shrink-0">
-            <Button onClick={handleDownloadPDF} disabled={pdfLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
-              {pdfLoading
+            <Button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+            >
+              {downloading
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <Download className="h-4 w-4" />}
-              {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
+              {downloading ? '다운로드 중...' : '메뉴얼 다운로드'}
             </Button>
           </div>
         </div>
@@ -898,14 +1020,18 @@ export default function ManualPage() {
           })}
         </div>
 
-        {/* 하단 PDF 버튼 */}
+        {/* 하단 다운로드 버튼 */}
         <div className="flex justify-center pt-2 no-print">
-          <Button onClick={handleDownloadPDF} disabled={pdfLoading} size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
-            {pdfLoading
+          <Button
+            onClick={handleDownload}
+            disabled={downloading}
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+          >
+            {downloading
               ? <Loader2 className="h-5 w-5 animate-spin" />
               : <Download className="h-5 w-5" />}
-            {pdfLoading ? 'PDF 생성 중...' : 'PDF로 저장하기'}
+            {downloading ? '다운로드 중...' : '메뉴얼 다운로드'}
           </Button>
         </div>
       </div>
