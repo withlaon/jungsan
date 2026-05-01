@@ -167,12 +167,12 @@ export function calculateSettlement(
       .filter(p => p.rider_id === riderId && !p.deducted_settlement_id && p.type === 'recovery')
       .reduce((s, p) => s + p.amount, 0)
 
-    // ── 최종정산금액 ──
+    // ── 최종정산금액 (음수 허용: 선지급금 공제 등으로 마이너스 가능) ──
     let finalAmount: number
     if (isBaemin) {
       // [배민] 최종 = 기본정산금액 - 시간제보험료 - 고용보험 - 산재보험
       //             + 지사프로모션 - 콜관리비 - 소득세 - 선지급금 + 선지급금회수
-      finalAmount = Math.max(0,
+      finalAmount =
         baseAmount
         - hourlyInsurance
         - totalEmploymentInsurance
@@ -182,10 +182,9 @@ export function calculateSettlement(
         - incomeTaxDeduction
         - advanceDeduction
         + advanceRecovery
-      )
     } else if (isCoupang) {
       // [쿠팡이츠] 최종 = 배달수익 + 지원금(프로모션) - 고용보험 - 산재보험 - 세금 - 차감금 + 선지급금회수
-      finalAmount = Math.max(0,
+      finalAmount =
         baseAmount
         + promotionAmount
         - totalEmploymentInsurance
@@ -193,10 +192,9 @@ export function calculateSettlement(
         - incomeTaxDeduction
         - advanceDeduction
         + advanceRecovery
-      )
     } else {
       // 기타 플랫폼: 세금신고금액 - 소득세 - 선지급금 + 선지급금회수
-      finalAmount = Math.max(0, taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery)
+      finalAmount = taxBaseAmount - incomeTaxDeduction - advanceDeduction + advanceRecovery
     }
 
     // 하위호환 필드

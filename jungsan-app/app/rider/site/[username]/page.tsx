@@ -321,9 +321,9 @@ export default function RiderSiteByUserPage() {
                         ))}
                       </>
                     )}
-                    <div className="mt-3 bg-emerald-900/30 rounded-xl p-4 flex justify-between items-center border border-emerald-700/30">
-                      <span className="text-emerald-300 font-bold">최종 지급액</span>
-                      <span className="text-emerald-400 text-2xl font-bold">{formatKRW(selectedDetail.final_amount)}</span>
+                    <div className={`mt-3 rounded-xl p-4 flex justify-between items-center border ${selectedDetail.final_amount < 0 ? 'bg-rose-900/30 border-rose-700/30' : 'bg-emerald-900/30 border-emerald-700/30'}`}>
+                      <span className={`${selectedDetail.final_amount < 0 ? 'text-rose-300' : 'text-emerald-300'} font-bold`}>최종 지급액</span>
+                      <span className={`${selectedDetail.final_amount < 0 ? 'text-rose-400' : 'text-emerald-400'} text-2xl font-bold`}>{formatKRW(selectedDetail.final_amount)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -369,7 +369,7 @@ export default function RiderSiteByUserPage() {
                         <span className="text-slate-300 text-xs">
                           {d.weekly_settlements.week_start} ~ {d.weekly_settlements.week_end}
                         </span>
-                        <span className="text-emerald-400 font-bold text-sm">{formatKRW(d.final_amount)}</span>
+                        <span className={`${d.final_amount < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold text-sm`}>{formatKRW(d.final_amount)}</span>
                       </button>
                     ))}
                   </div>

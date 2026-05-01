@@ -954,7 +954,7 @@ export default function SettlementUploadPage() {
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                       <p className="text-slate-400 text-xs">총 최종정산금액</p>
-                      <p className="text-blue-400 font-bold">{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
+                      <p className={`${results.reduce((s, r) => s + r.finalAmount, 0) < 0 ? 'text-rose-400' : 'text-blue-400'} font-bold`}>{formatKRW(results.reduce((s, r) => s + r.finalAmount, 0))}</p>
                     </div>
                   </div>
 
@@ -1053,7 +1053,7 @@ export default function SettlementUploadPage() {
                             <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(r.incomeTaxDeduction)}</TableCell>
                             <TableCell className="text-amber-300 text-right whitespace-nowrap">{r.advanceDeduction > 0 ? `-${formatKRW(r.advanceDeduction)}` : '-'}</TableCell>
                             <TableCell className="text-teal-400 text-right whitespace-nowrap">{r.advanceRecovery > 0 ? `+${formatKRW(r.advanceRecovery)}` : '-'}</TableCell>
-                            <TableCell className="text-emerald-400 font-bold text-right whitespace-nowrap">{formatKRW(r.finalAmount)}</TableCell>
+                            <TableCell className={`${r.finalAmount < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold text-right whitespace-nowrap`}>{formatKRW(r.finalAmount)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
