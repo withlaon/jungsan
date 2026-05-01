@@ -960,7 +960,8 @@ export default function SettlementUploadPage() {
 
                   {/* windcall 전용: 지사 순이익 구성 항목 */}
                   {isWindcall && summaryData && (summaryData.settledAmount > 0 || (summaryData.insuranceRefund ?? 0) > 0) && (() => {
-                    const totalRiderPay      = results.reduce((s, r) => s + r.finalAmount, 0)
+                    // 음수(-금액) 라이더는 지사가 미지급이므로 지사 지출에서 제외(0원 처리)
+                    const totalRiderPay      = results.reduce((s, r) => s + Math.max(0, r.finalAmount), 0)
                     const insuranceRefund    = summaryData.insuranceRefund ?? 0
                     const branchNetProfit    =
                       summaryData.settledAmount
