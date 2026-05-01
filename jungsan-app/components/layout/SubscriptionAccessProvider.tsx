@@ -121,7 +121,9 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
         if (!silent) setStatusLoading(false)
       }
     },
-    [user, isAdmin]
+    // user?.id 사용: 동일 유저라면 객체 참조가 달라져도 함수를 재생성하지 않음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.id, isAdmin]
   )
 
   useEffect(() => {
@@ -133,21 +135,9 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
       return
     }
     void refetchSubscription()
-  }, [user, userLoading, isAdmin, refetchSubscription])
-
-  /** Sidebar route change: force-refresh module caches (fixes blank UI after long idle). */
-  useEffect(() => {
-    if (!user || userLoading || !pathname) return
-    let cancelled = false
-    const id = window.setTimeout(() => {
-      if (cancelled) return
-      void refreshMerchantDataCaches()
-    }, 0)
-    return () => {
-      cancelled = true
-      clearTimeout(id)
-    }
-  }, [pathname, user?.id, userLoading])
+    // user?.id: 동일 유저 재렌더 시 불필요한 구독 재조회 방지
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, userLoading, isAdmin, refetchSubscription])
 
   /** Browser tab visible again: refresh billing + lists. */
   useEffect(() => {
