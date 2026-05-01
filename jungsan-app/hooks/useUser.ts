@@ -23,18 +23,6 @@ let _promise: Promise<UserCache> | null = null
 const _listeners = new Set<(data: UserCache) => void>()
 
 function broadcastUser(data: UserCache) {
-  // 동일 userId라면 _cache를 업데이트만 하고 setState 호출을 생략해
-  // 불필요한 리렌더와 useCallback 재생성을 방지한다
-  if (
-    _cache &&
-    _cache.userId === data.userId &&
-    _cache.isAdmin === data.isAdmin &&
-    _cache.platform === data.platform &&
-    _cache.username === data.username &&
-    _cache.logoUrl === data.logoUrl
-  ) {
-    return
-  }
   _listeners.forEach(fn => fn(data))
 }
 

@@ -149,8 +149,10 @@ export function useSettlements() {
   }, [])
 
   useEffect(() => {
-    // 유저 정보 로드 완료 후 실행
+    // 유저 정보 로드 완료 전에는 대기
     if (userLoading) return
+    // userId 미확정(로그인 직후 일시적 null) 상태에서는 빈 배열로 종료하지 않음
+    if (!userId && !isAdmin) return
 
     if (_listCache) {
       setSettlements(_listCache)
