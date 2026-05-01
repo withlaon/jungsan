@@ -231,10 +231,10 @@ export default function SettlementResultPage() {
                 <p className="text-rose-400 font-bold text-lg">-{formatKRW(summary.total_income_tax)}</p>
               </CardContent>
             </Card>
-            <Card className="border-emerald-900/30 bg-emerald-900/10">
+            <Card className={summary.total_final < 0 ? 'border-rose-900/30 bg-rose-900/10' : 'border-emerald-900/30 bg-emerald-900/10'}>
               <CardContent className="p-4">
                 <p className="text-slate-400 text-xs">총 최종정산금액</p>
-                <p className="text-emerald-400 font-bold text-lg">{formatKRW(summary.total_final)}</p>
+                <p className={`${summary.total_final < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold text-lg`}>{formatKRW(summary.total_final)}</p>
               </CardContent>
             </Card>
           </div>
@@ -286,7 +286,7 @@ export default function SettlementResultPage() {
                         <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(incomeTax(d))}</TableCell>
                         <TableCell className="text-amber-300 text-right whitespace-nowrap">{d.advance_deduction > 0 ? `-${formatKRW(d.advance_deduction)}` : '-'}</TableCell>
                         <TableCell className="text-teal-400 text-right whitespace-nowrap">{(d.advance_recovery ?? 0) > 0 ? `+${formatKRW(d.advance_recovery ?? 0)}` : '-'}</TableCell>
-                        <TableCell className="text-emerald-400 font-bold text-right whitespace-nowrap">{formatKRW(d.final_amount)}</TableCell>
+                        <TableCell className={`${d.final_amount < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold text-right whitespace-nowrap`}>{formatKRW(d.final_amount)}</TableCell>
                         <TableCell className="print:hidden whitespace-nowrap">
                           <div className="flex justify-end gap-1">
                             <Button size="sm" variant="ghost" onClick={() => setPreviewDetail(d)}
@@ -313,7 +313,7 @@ export default function SettlementResultPage() {
                       <TableCell className="text-rose-400 text-right">-{formatKRW(summary.total_income_tax)}</TableCell>
                       <TableCell className="text-amber-300 text-right">{summary.total_advance > 0 ? `-${formatKRW(summary.total_advance)}` : '-'}</TableCell>
                       <TableCell className="text-teal-400 text-right">{summary.total_recovery > 0 ? `+${formatKRW(summary.total_recovery)}` : '-'}</TableCell>
-                      <TableCell className="text-emerald-400 text-right">{formatKRW(summary.total_final)}</TableCell>
+                      <TableCell className={`${summary.total_final < 0 ? 'text-rose-400' : 'text-emerald-400'} text-right`}>{formatKRW(summary.total_final)}</TableCell>
                       <TableCell className="print:hidden" />
                     </TableRow>
                   </TableBody>
@@ -377,9 +377,9 @@ export default function SettlementResultPage() {
                       <span className={`font-medium text-sm ${item.color}`}>{item.value}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between py-2 bg-emerald-900/20 rounded-lg px-3 mt-2">
-                    <span className="text-emerald-400 font-bold">최종 정산금액</span>
-                    <span className="text-emerald-400 font-bold text-lg">{formatKRW(d.final_amount)}</span>
+                  <div className={`flex justify-between py-2 rounded-lg px-3 mt-2 ${d.final_amount < 0 ? 'bg-rose-900/20' : 'bg-emerald-900/20'}`}>
+                    <span className={`${d.final_amount < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>최종 정산금액</span>
+                    <span className={`${d.final_amount < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold text-lg`}>{formatKRW(d.final_amount)}</span>
                   </div>
                 </div>
                 <div className="text-sm text-slate-400 border-t border-slate-700 pt-3 space-y-1">
