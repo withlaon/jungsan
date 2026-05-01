@@ -17,174 +17,6 @@ const MANUAL_VERSION       = '4.0'
 const MANUAL_REVISION_DATE = '2026-04-16'
 
 /* ─────────────────────────────────────────────────────────────
-   html2canvas 색상 처리 유틸 (oklch/lab/lch → rgb 변환)
-   html2canvas 내부 파서는 CSS Color 4+ 문법을 지원하지 않으므로
-   클론 문서의 모든 스타일시트를 제거하고 계산값을 인라인으로 복사.
-───────────────────────────────────────────────────────────────*/
-
-/** html2canvas가 ::before 등으로 삽입한 노드 */
-function isHtml2CanvasPseudoNode(el: Element): boolean {
-  const c = el.className
-  return typeof c === 'string' && c.includes('___html2canvas___pseudoelement')
-}
-
-/** 깊이 우선·전위 순서로 방문 (원본/클론 매칭용) */
-function listMirrorTargets(root: HTMLElement, skipHtml2Pseudo: boolean): HTMLElement[] {
-  const out: HTMLElement[] = []
-  const walk = (el: HTMLElement) => {
-    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return
-    if (skipHtml2Pseudo && isHtml2CanvasPseudoNode(el)) return
-    out.push(el)
-    for (const ch of el.children) walk(ch as HTMLElement)
-  }
-  walk(root)
-  return out
-}
-
-const UNSUPPORTED_COLOR_FUNC = /\b(lab|oklch|lch)\(|color\(/i
-const COLOR_FUNC_START_RE    = /\b(?:lab|oklch|lch)\(|color\(/gi
-
-function findMatchingCloseParen(s: string, openIdx: number): number {
-  let depth = 0
-  for (let i = openIdx; i < s.length; i++) {
-    if (s[i] === '(') depth++
-    else if (s[i] === ')') { depth--; if (depth === 0) return i }
-  }
-  return -1
-}
-
-function findNextColorFuncStart(s: string, from: number): { start: number; openParen: number } | null {
-  const sub = s.slice(from)
-  COLOR_FUNC_START_RE.lastIndex = 0
-  const m = COLOR_FUNC_START_RE.exec(sub)
-  if (!m) return null
-  return { start: from + m.index, openParen: from + m.index + m[0].length - 1 }
-}
-
-function coerceSingleColorToken(token: string, ctx: CanvasRenderingContext2D): string {
-  try {
-    ctx.fillStyle = '#000'
-    ctx.fillStyle = token
-    const resolved = String(ctx.fillStyle)
-    if (!UNSUPPORTED_COLOR_FUNC.test(resolved)) return resolved
-  } catch { /* fall through */ }
-  return 'transparent'
-}
-
-function replaceColorFuncsInValue(value: string, ctx: CanvasRenderingContext2D): string {
-  let out = '', i = 0
-  while (i < value.length) {
-    const next = findNextColorFuncStart(value, i)
-    if (!next) { out += value.slice(i); break }
-    out += value.slice(i, next.start)
-    const close = findMatchingCloseParen(value, next.openParen)
-    if (close < 0) { out += value.slice(next.start); break }
-    out += coerceSingleColorToken(value.slice(next.start, close + 1), ctx)
-    i = close + 1
-  }
-  return out
-}
-
-function coerceValueForHtml2Canvas(propName: string, value: string, ctx: CanvasRenderingContext2D): string {
-  if (!value || !UNSUPPORTED_COLOR_FUNC.test(value)) return value
-  const replaced = replaceColorFuncsInValue(value, ctx)
-  if (!UNSUPPORTED_COLOR_FUNC.test(replaced)) return replaced
-  if (/shadow/i.test(propName)) return 'none'
-  if (/^(filter|backdrop-filter)$/i.test(propName)) return 'none'
-  if (/^(background|background-image)$/i.test(propName) && /gradient/i.test(value)) return 'none'
-  return 'transparent'
-}
-
-function scrubElementInlineColorFunctions(el: Element, ctx: CanvasRenderingContext2D) {
-  if (el instanceof HTMLElement && isHtml2CanvasPseudoNode(el)) { el.removeAttribute('style'); return }
-  if (!('style' in el) || !(el as HTMLElement | SVGElement).style) return
-  const s = (el as HTMLElement | SVGElement).style
-  for (let i = s.length - 1; i >= 0; i--) {
-    const name = s.item(i)
-    if (!name) continue
-    const v = s.getPropertyValue(name)
-    if (!UNSUPPORTED_COLOR_FUNC.test(v)) continue
-    const safe = coerceValueForHtml2Canvas(name, v, ctx)
-    if (UNSUPPORTED_COLOR_FUNC.test(safe)) s.removeProperty(name)
-    else s.setProperty(name, safe, 'important')
-  }
-}
-
-/**
- * 클론 문서에서 모든 스타일시트를 제거하고
- * 브라우저가 계산한 sRGB 값을 인라인으로 복사한다.
- */
-function neutralizeModernColorsOnClone(
-  clonedDoc: Document,
-  cloneHtml2pdfContainer: HTMLElement,
-  originalPrintRoot: HTMLElement,
-) {
-  const inner = cloneHtml2pdfContainer.firstElementChild as HTMLElement | null
-  if (!inner) return
-
-  const canvas = document.createElement('canvas')
-  canvas.width = 1; canvas.height = 1
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(e => e.remove())
-  clonedDoc.querySelectorAll('style').forEach(e => e.remove())
-  clonedDoc.documentElement.style.setProperty('background-color', '#0f172a', 'important')
-  clonedDoc.body.style.setProperty('background-color', '#0f172a', 'important')
-
-  const origEls  = listMirrorTargets(originalPrintRoot, false)
-  const cloneEls = listMirrorTargets(inner, true)
-  const pairCount = Math.min(origEls.length, cloneEls.length)
-
-  const skipProps = new Set([
-    'transition', 'transition-property', 'transition-duration',
-    'transition-delay', 'transition-timing-function',
-    'animation', 'animation-name', 'animation-duration',
-    'animation-delay', 'animation-timing-function',
-  ])
-
-  const clearInlineStylesRec = (el: HTMLElement) => {
-    el.removeAttribute('style')
-    for (const ch of el.children) clearInlineStylesRec(ch as HTMLElement)
-  }
-  clearInlineStylesRec(inner)
-
-  for (let i = 0; i < pairCount; i++) {
-    const o = origEls[i], c = cloneEls[i]
-    const computed = window.getComputedStyle(o)
-    for (let j = 0; j < computed.length; j++) {
-      const name = computed.item(j)
-      if (!name || skipProps.has(name)) continue
-      const value = computed.getPropertyValue(name)
-      if (!value) continue
-      const safe = coerceValueForHtml2Canvas(name, value, ctx)
-      if (!safe) continue
-      try { c.style.setProperty(name, safe, 'important') }
-      catch { try { c.style.removeProperty(name) } catch { /**/ } }
-    }
-  }
-
-  const stripClass = (el: HTMLElement) => {
-    if (!isHtml2CanvasPseudoNode(el)) el.removeAttribute('class')
-    for (const ch of el.children) stripClass(ch as HTMLElement)
-  }
-  stripClass(inner)
-
-  scrubElementInlineColorFunctions(cloneHtml2pdfContainer, ctx)
-  cloneHtml2pdfContainer.querySelectorAll('*').forEach(el => {
-    scrubElementInlineColorFunctions(el, ctx)
-  })
-
-  inner.querySelectorAll<SVGElement>('[fill], [stroke]').forEach(svgEl => {
-    for (const attr of ['fill', 'stroke'] as const) {
-      const v = svgEl.getAttribute(attr)
-      if (v && UNSUPPORTED_COLOR_FUNC.test(v))
-        svgEl.setAttribute(attr, coerceValueForHtml2Canvas(attr, v, ctx))
-    }
-  })
-}
-
-/* ─────────────────────────────────────────────────────────────
    ManualPage
 ───────────────────────────────────────────────────────────────*/
 
@@ -214,56 +46,73 @@ export default function ManualPage() {
   const platformColor = isBaemin ? 'text-emerald-400' : 'text-yellow-400'
   const platformBg    = isBaemin ? 'bg-emerald-900/30 border-emerald-700/40' : 'bg-yellow-900/30 border-yellow-700/40'
 
-  /* ── 메뉴얼 다운로드 (PDF) ── */
-  const handleDownload = async () => {
+  /**
+   * 메뉴얼 다운로드 — window.open + 브라우저 네이티브 print 방식
+   *
+   * html2pdf.js(html2canvas) 대신 새 창에서 인쇄 다이얼로그를 여는 방식을 사용한다.
+   * html2canvas의 `getComputedStyle` 전체 순회 루프가 수백 ms~수 초간 메인 스레드를
+   * 점거해 React 이벤트가 처리되지 않던 문제(탭 이동 불가)를 완전히 해결한다.
+   * 새 창은 현재 페이지의 모든 CSS를 공유하므로 화면과 동일한 스타일로 출력된다.
+   */
+  const handleDownload = () => {
     if (!printRef.current || downloading) return
     setDownloading(true)
 
-    const noPrintEls = printRef.current.querySelectorAll<HTMLElement>('.no-print')
-    noPrintEls.forEach(el => { el.style.display = 'none' })
-
     try {
-      const mod = await import('html2pdf.js')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const html2pdf = (mod as any).default ?? mod
-      if (typeof html2pdf !== 'function') throw new Error('html2pdf 로드 실패')
+      // 콘텐츠 클론 (no-print 요소 제거)
+      const clone = printRef.current.cloneNode(true) as HTMLElement
+      clone.querySelectorAll('.no-print').forEach(el => el.remove())
 
-      const filename  = `라이더정산시스템_사용자메뉴얼_v${MANUAL_VERSION}.pdf`
-      const printRoot = printRef.current
+      // 현재 페이지의 모든 외부 CSS 링크 수집
+      const cssLinks = Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+      ).map(l => `<link rel="stylesheet" href="${l.href}">`).join('\n')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const buildOpts = (scale: number): any => ({
-        margin:    [12, 10, 12, 10],
-        filename,
-        image:     { type: 'jpeg', quality: 0.92 },
-        html2canvas: {
-          scale,
-          useCORS: true,
-          backgroundColor: '#0f172a',
-          logging: false,
-          foreignObjectRendering: false,
-          onclone: (clonedDoc: Document, cloneContainer: HTMLElement) => {
-            if (printRoot) neutralizeModernColorsOnClone(clonedDoc, cloneContainer, printRoot)
-          },
-        },
-        jsPDF:     { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
+      const printHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>사용자 메뉴얼 v${MANUAL_VERSION}</title>
+  ${cssLinks}
+  <style>
+    html, body { background: #0f172a !important; margin: 0; padding: 0; }
+    @page { margin: 10mm 8mm; }
+    @media print {
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  ${clone.outerHTML}
+</body>
+</html>`
+
+      const win = window.open('', '_blank', 'width=960,height=800,left=40,top=40')
+      if (!win) {
+        // 팝업 차단된 경우 → 현재 창에서 인쇄 (최후 수단)
+        window.print()
+        setDownloading(false)
+        return
+      }
+
+      win.document.open()
+      win.document.write(printHtml)
+      win.document.close()
+
+      // CSS 로드 완료 후 인쇄 다이얼로그 열기
+      win.addEventListener('load', () => {
+        win.setTimeout(() => {
+          win.print()
+          setDownloading(false)
+        }, 600)
       })
 
-      await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-
-      try {
-        await html2pdf().set(buildOpts(1.5)).from(printRoot).save()
-      } catch (e1) {
-        console.warn('PDF 1차 생성 실패, scale 낮춰 재시도:', e1)
-        await html2pdf().set(buildOpts(1)).from(printRoot).save()
-      }
+      // load 이벤트가 발화하지 않는 경우를 대비한 안전 타임아웃
+      window.setTimeout(() => setDownloading(false), 12_000)
     } catch (err) {
-      console.error('PDF 생성 실패:', err)
-      // 최후 수단: 브라우저 인쇄 → Save as PDF
-      window.print()
-    } finally {
-      noPrintEls.forEach(el => { el.style.display = '' })
+      console.error('메뉴얼 다운로드 실패:', err)
       setDownloading(false)
     }
   }

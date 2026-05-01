@@ -14,7 +14,7 @@ let _lastFetched = 0
 // 구독 패턴: 모든 useRiders 인스턴스가 데이터 변경을 즉시 수신
 const _listeners = new Set<(data: Rider[]) => void>()
 
-const STALE_MS = 300_000  // 5분 이상 지나면 백그라운드 재검증
+const STALE_MS = 60_000   // 1분 이상 지나면 백그라운드 재검증
 
 function broadcast(data: Rider[]) {
   _listeners.forEach(fn => fn(data))

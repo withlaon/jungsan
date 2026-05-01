@@ -16,7 +16,7 @@ let _listLastFetched = 0
 let _listCachedUserId: string | null | undefined = undefined  // 캐시가 어떤 userId로 로드됐는지 추적 (undefined=초기 미로드)
 const _listListeners = new Set<(data: WeeklySettlement[]) => void>()
 
-const LIST_STALE_MS = 300_000  // 5분
+const LIST_STALE_MS = 60_000   // 1분
 
 function broadcastList(data: WeeklySettlement[]) {
   _listListeners.forEach(fn => fn(data))

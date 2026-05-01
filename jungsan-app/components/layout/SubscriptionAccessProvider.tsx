@@ -137,7 +137,7 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
 
   /** Sidebar route change: force-refresh module caches (fixes blank UI after long idle). */
   useEffect(() => {
-    if (!user || isAdmin || userLoading || !pathname) return
+    if (!user || userLoading || !pathname) return
     let cancelled = false
     const id = window.setTimeout(() => {
       if (cancelled) return
@@ -147,17 +147,17 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
       cancelled = true
       clearTimeout(id)
     }
-  }, [pathname, user?.id, isAdmin, userLoading])
+  }, [pathname, user?.id, userLoading])
 
   /** Browser tab visible again: refresh billing + lists. */
   useEffect(() => {
-    if (!user || isAdmin) return
+    if (!user) return
     let debounce: ReturnType<typeof setTimeout> | undefined
     const onVis = () => {
       if (document.visibilityState !== 'visible') return
       if (debounce) clearTimeout(debounce)
       debounce = setTimeout(() => {
-        void refetchSubscription({ silent: true })
+        if (!isAdmin) void refetchSubscription({ silent: true })
         void refreshMerchantDataCaches()
       }, 250)
     }
