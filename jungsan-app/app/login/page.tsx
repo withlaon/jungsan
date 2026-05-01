@@ -11,25 +11,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bike, Loader2, UserPlus } from 'lucide-react'
 import { merchantHasAppAccessFromBillingApiPayload } from '@/lib/subscription/merchant-subscription-access'
 
+/**
+ * 로그인 후 이동할 경로를 결정합니다.
+ * userId가 이미 있으면 getUser() 네트워크 호출을 건너뛰고,
+ * profiles 쿼리와 billing/status 요청을 병렬로 실행합니다.
+ */
 async function resolvePostLoginRedirect(
   supabase: ReturnType<typeof createClient>,
-  redirectTo: string
+  redirectTo: string,
+  knownUserId?: string | null
 ): Promise<string> {
   const safe = redirectTo.startsWith('/') ? redirectTo : '/dashboard'
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return safe
-  const { data: prof } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', user.id)
-    .maybeSingle()
-  if (prof?.username?.toLowerCase() === 'admin') return '/site-admin'
 
-  const res = await fetch('/api/billing/status', { credentials: 'include' })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) return '/subscription'
+  // userId가 없으면 서버 검증 필요
+  const uid = knownUserId ?? (await supabase.auth.getUser()).data.user?.id
+  if (!uid) return safe
+
+  // profiles 쿼리 + billing 상태를 병렬로 실행 (약 300ms 절약)
+  const [profRes, billingRes] = await Promise.all([
+    supabase.from('profiles').select('username').eq('id', uid).maybeSingle(),
+    fetch('/api/billing/status', { credentials: 'include' }).catch(() => null),
+  ])
+
+  if (profRes.data?.username?.toLowerCase() === 'admin') return '/site-admin'
+
+  if (!billingRes?.ok) return '/subscription'
+  const data = await billingRes.json().catch(() => ({}))
   if (
     merchantHasAppAccessFromBillingApiPayload(
       data as {
@@ -75,9 +82,19 @@ function LoginForm() {
     }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
+        const userId = session.user?.id ?? null
+        // 세션이 이미 있으면 데이터 프리페치 시작 (리다이렉트와 병렬)
+        if (userId) {
+          Promise.all([
+            import('@/hooks/useSettlements').then(m => m.prefetchSettlementsForUser(userId)),
+            import('@/hooks/useAdvancePayments').then(m => m.prefetchPaymentsForUser(userId)),
+            import('@/hooks/useRiders').then(m => m.revalidateRiders()),
+          ]).catch(() => {})
+        }
         const dest = await resolvePostLoginRedirect(
           supabase,
-          redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+          redirectTo.startsWith('/') ? redirectTo : '/dashboard',
+          userId
         )
         router.replace(dest)
       } else {
@@ -139,13 +156,15 @@ function LoginForm() {
       return
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: authError, data: authData } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
       setError('아이디 또는 비밀번호가 올바르지 않습니다.')
       setLoading(false)
       return
     }
+
+    const loggedInUserId = authData.user?.id ?? null
 
     // admin 로그인 시: 라이더 정산 시스템 전체관리자 페이지로 이동 (새창 없음)
     if (trimmedUsername.toLowerCase() === 'admin') {
@@ -154,9 +173,20 @@ function LoginForm() {
       return
     }
 
+    // 로그인 직후 데이터 프리페치 시작 (resolvePostLoginRedirect와 병렬 실행)
+    // → 대시보드 마운트 시점에 데이터가 이미 캐시되어 즉시 표시됨
+    if (loggedInUserId) {
+      Promise.all([
+        import('@/hooks/useSettlements').then(m => m.prefetchSettlementsForUser(loggedInUserId)),
+        import('@/hooks/useAdvancePayments').then(m => m.prefetchPaymentsForUser(loggedInUserId)),
+        import('@/hooks/useRiders').then(m => m.revalidateRiders()),
+      ]).catch(() => {})
+    }
+
     const dest = await resolvePostLoginRedirect(
       supabase,
-      redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+      redirectTo.startsWith('/') ? redirectTo : '/dashboard',
+      loggedInUserId
     )
     router.push(dest)
     setLoading(false)

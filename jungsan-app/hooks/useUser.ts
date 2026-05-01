@@ -32,8 +32,20 @@ async function fetchUserProfile(): Promise<UserCache> {
   _promise = (async () => {
     try {
       const supabase = createClient()
-      const { data: { user: u } } = await supabase.auth.getUser()
 
+      // getSession()은 로컬(쿠키/localStorage) 읽기 → 즉시 userId 확보
+      const { data: { session } } = await supabase.auth.getSession()
+      const quickUserId = session?.user?.id ?? null
+
+      // getUser()(서버 검증)와 profiles 쿼리를 병렬 실행 → 약 300ms 절약
+      const [userResult, profileResult] = await Promise.all([
+        supabase.auth.getUser(),
+        quickUserId
+          ? supabase.from('profiles').select('username, platform, logo_url').eq('id', quickUserId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+
+      const u = userResult.data.user
       if (!u) {
         const result: UserCache = {
           user: null, isAdmin: false, platform: 'baemin',
@@ -44,11 +56,10 @@ async function fetchUserProfile(): Promise<UserCache> {
         return result
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username, platform, logo_url')
-        .eq('id', u.id)
-        .maybeSingle()
+      // getUser()로 확인된 userId와 다른 경우(세션 불일치) 재조회
+      const profile = (u.id === quickUserId)
+        ? profileResult.data
+        : (await supabase.from('profiles').select('username, platform, logo_url').eq('id', u.id).maybeSingle()).data
 
       const result: UserCache = {
         user: u,

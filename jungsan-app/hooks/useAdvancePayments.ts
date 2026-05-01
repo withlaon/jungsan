@@ -69,6 +69,15 @@ export async function revalidatePayments(): Promise<PaymentWithRider[]> {
   return loadPayments(cached?.userId ?? null, cached?.isAdmin ?? false, true)
 }
 
+/**
+ * 로그인 직후 userId를 이용해 advance payments를 백그라운드 프리페치합니다.
+ * 이미 캐시나 진행 중인 요청이 있으면 무시합니다.
+ */
+export function prefetchPaymentsForUser(userId: string): void {
+  if (_cache || _promise) return
+  loadPayments(userId, false).catch(() => {})
+}
+
 export function applyOptimisticPayment(
   payment: PaymentWithRider,
   action: 'add' | 'remove',

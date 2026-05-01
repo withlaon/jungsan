@@ -82,6 +82,15 @@ export async function revalidateSettlements(): Promise<WeeklySettlement[]> {
 }
 
 /**
+ * 로그인 직후 userId를 이용해 settlements를 백그라운드 프리페치합니다.
+ * 이미 캐시나 진행 중인 요청이 있으면 무시합니다.
+ */
+export function prefetchSettlementsForUser(userId: string): void {
+  if (_listCache || _listPromise) return
+  loadSettlements(userId, false).catch(() => {})
+}
+
+/**
  * 서버에서 settlement_details를 최신 프로모션·관리비·선지급 등으로 재계산한 뒤
  * 목록·화면 캐시를 무효화합니다.
  */
