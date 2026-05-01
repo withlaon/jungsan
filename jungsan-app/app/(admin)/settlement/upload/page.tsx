@@ -555,6 +555,8 @@ export default function SettlementUploadPage() {
 
       toast.success('정산이 저장되었습니다.')
       void revalidateSettlements()
+      // 정산결과보기 탭이 이 주차를 자동 선택하도록 ID를 전달
+      try { sessionStorage.setItem('jungsan_last_settlement_id', settlement.id) } catch { /* ignore */ }
       router.push('/settlement/result')
     } catch (e) {
       toast.error('저장 중 오류가 발생했습니다: ' + (e instanceof Error ? e.message : String(e)))

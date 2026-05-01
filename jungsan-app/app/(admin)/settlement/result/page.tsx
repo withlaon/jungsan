@@ -26,12 +26,21 @@ export default function SettlementResultPage() {
   const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
   // 목록에 없는 선택 ID 제거·삭제 후 올바른 주차로 이동
+  // 업로드 저장 직후 이동한 경우 sessionStorage에서 최신 등록 ID를 읽어 자동 선택
   useEffect(() => {
     if (settlements.length === 0) {
       setSelectedId('')
       return
     }
     setSelectedId((prev) => {
+      // 업로드 탭에서 저장 직후 이동한 경우 → 해당 주차 강제 선택 후 키 제거
+      try {
+        const lastId = sessionStorage.getItem('jungsan_last_settlement_id')
+        if (lastId && settlements.some((s) => s.id === lastId)) {
+          sessionStorage.removeItem('jungsan_last_settlement_id')
+          return lastId
+        }
+      } catch { /* ignore */ }
       if (prev && settlements.some((s) => s.id === prev)) return prev
       return settlements[0].id
     })
