@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { useRiders } from '@/hooks/useRiders'
+import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Promotion, PromoRange, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -196,7 +197,7 @@ export default function PromotionsPage() {
   const [promotions, setPromotions] = useState<PromotionWithRider[]>(_promoCache ?? [])
   const [loading, setLoading] = useState(!_promoCache)
   const [regOpen, setRegOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useSavingGuard()
   const [form, setForm] = useState(initForm)
   const [detailGroup, setDetailGroup] = useState<PromoGroup | null>(null)
   const setF = (patch: Partial<ReturnType<typeof initForm>>) => setForm(f => ({ ...f, ...patch }))
@@ -205,7 +206,7 @@ export default function PromotionsPage() {
   const [detailTab, setDetailTab] = useState<'info' | 'add' | 'edit'>('info')
   const [detailAddIds, setDetailAddIds] = useState<string[]>([])
   const [detailEditForm, setDetailEditForm] = useState(initForm())
-  const [detailSaving, setDetailSaving] = useState(false)
+  const [detailSaving, setDetailSaving] = useSavingGuard()
   const setDE = (patch: Partial<ReturnType<typeof initForm>>) => setDetailEditForm(f => ({ ...f, ...patch }))
 
   useEffect(() => {

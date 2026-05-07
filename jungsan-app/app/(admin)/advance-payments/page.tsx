@@ -6,6 +6,9 @@ import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
 import { useAdvancePayments, revalidatePayments, applyOptimisticPayment } from '@/hooks/useAdvancePayments'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
+import { withMutationTimeout } from '@/lib/supabase/with-timeout'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
+import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -149,7 +152,7 @@ export default function AdvancePaymentsPage() {
 
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [recoveryOpen, setRecoveryOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useSavingGuard()
 
   const [advanceForm, setAdvanceForm] = useState(emptyForm)
   const [recoveryForm, setRecoveryForm] = useState(emptyForm)
@@ -188,7 +191,9 @@ export default function AdvancePaymentsPage() {
         type,
       }
       if (userId) insertRow.user_id = userId
-      const { error } = await supabase.from('advance_payments').insert(insertRow)
+      const { error } = await withMutationTimeout(
+        supabase.from('advance_payments').insert(insertRow)
+      )
 
       if (error) {
         toast.error('등록 실패: ' + error.message)
@@ -232,15 +237,17 @@ export default function AdvancePaymentsPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('advance_payments')
-        .update({
-          rider_id: editForm.rider_id,
-          amount,
-          paid_date: editForm.week,
-          memo: editForm.memo || null,
-        })
-        .eq('id', editingPayment.id)
+      const { error } = await withMutationTimeout(
+        supabase
+          .from('advance_payments')
+          .update({
+            rider_id: editForm.rider_id,
+            amount,
+            paid_date: editForm.week,
+            memo: editForm.memo || null,
+          })
+          .eq('id', editingPayment.id)
+      )
 
       if (error) {
         toast.error('수정 실패: ' + error.message)
@@ -267,10 +274,11 @@ export default function AdvancePaymentsPage() {
       : ''
     if (!confirm(`${riderName}의 ${label}을 삭제하시겠습니까?${extraWarning}`)) return
     try {
-      const res = await fetch(`/api/admin/advance-payment?id=${encodeURIComponent(p.id)}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      })
+      const res = await fetchWithTimeout(
+        `/api/admin/advance-payment?id=${encodeURIComponent(p.id)}`,
+        { method: 'DELETE', credentials: 'same-origin' },
+        15_000
+      )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast.error('삭제 실패: ' + (data?.error ?? res.statusText))

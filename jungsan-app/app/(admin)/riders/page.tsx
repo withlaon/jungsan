@@ -5,6 +5,8 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { useRiders, applyOptimisticRider } from '@/hooks/useRiders'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
+import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,7 +92,7 @@ export default function RidersPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRider, setEditingRider] = useState<Rider | null>(null)
   const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useSavingGuard()
   const [usernameError, setUsernameError] = useState('')
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'inactive'>('all')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -98,7 +100,7 @@ export default function RidersPage() {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkRows, setBulkRows] = useState<BulkRiderRow[]>([])
   const [bulkDragging, setBulkDragging] = useState(false)
-  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkSaving, setBulkSaving] = useSavingGuard()
   const [bulkFileName, setBulkFileName] = useState('')
 
   // 선택 관련 상태
@@ -167,11 +169,15 @@ export default function RidersPage() {
         status: form.status,
       }
 
-      const res = await fetch('/api/admin/rider', {
-        method: editingRider ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingRider ? { id: editingRider.id, ...payload } : payload),
-      })
+      const res = await fetchWithTimeout(
+        '/api/admin/rider',
+        {
+          method: editingRider ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editingRider ? { id: editingRider.id, ...payload } : payload),
+        },
+        15_000
+      )
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) { toast.error(data?.error ?? '저장 실패'); return }
@@ -198,22 +204,26 @@ export default function RidersPage() {
     // 즉시 낙관적 업데이트 — 버튼 클릭과 동시에 UI 반영
     applyOptimisticRider({ ...rider, status: newStatus }, 'update')
     try {
-      const res = await fetch('/api/admin/rider', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: rider.id,
-          join_date: rider.join_date ?? null,
-          name: rider.name,
-          rider_username: rider.rider_username ?? null,
-          id_number: rider.id_number ?? null,
-          phone: rider.phone ?? null,
-          bank_name: rider.bank_name ?? null,
-          bank_account: rider.bank_account ?? null,
-          account_holder: rider.account_holder ?? null,
-          status: newStatus,
-        }),
-      })
+      const res = await fetchWithTimeout(
+        '/api/admin/rider',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: rider.id,
+            join_date: rider.join_date ?? null,
+            name: rider.name,
+            rider_username: rider.rider_username ?? null,
+            id_number: rider.id_number ?? null,
+            phone: rider.phone ?? null,
+            bank_name: rider.bank_name ?? null,
+            bank_account: rider.bank_account ?? null,
+            account_holder: rider.account_holder ?? null,
+            status: newStatus,
+          }),
+        },
+        15_000
+      )
       if (!res.ok) {
         // 실패 시 롤백
         applyOptimisticRider(rider, 'update')
@@ -234,11 +244,11 @@ export default function RidersPage() {
     applyOptimisticRider(rider, 'remove')
     setDeleteConfirmId(null)
     try {
-      const res = await fetch('/api/admin/rider', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: rider.id }),
-      })
+      const res = await fetchWithTimeout(
+        '/api/admin/rider',
+        { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: rider.id }) },
+        15_000
+      )
       if (!res.ok) {
         // 실패 시 롤백
         applyOptimisticRider(rider, 'add')
@@ -369,12 +379,16 @@ export default function RidersPage() {
         status: 'active',
       }))
 
-      const res = await fetch('/api/admin/riders-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ riders: payload }),
-      })
+      const res = await fetchWithTimeout(
+        '/api/admin/riders-bulk',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ riders: payload }),
+        },
+        30_000
+      )
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {

@@ -11,6 +11,29 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+
+// ─── localStorage 구독 상태 캐시 (F5 새로고침 시 스피너 제거용) ───────────────
+const BILLING_LS_KEY = 'jts_bstat'
+const BILLING_LS_TTL = 10 * 60 * 1000  // 10분
+
+function readBillingLS(): BillingStatusPayload | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(BILLING_LS_KEY)
+    if (!raw) return null
+    const p = JSON.parse(raw) as { ts: number; data: BillingStatusPayload }
+    if (Date.now() - p.ts > BILLING_LS_TTL) return null
+    return p.data
+  } catch { return null }
+}
+
+function writeBillingLS(data: BillingStatusPayload): void {
+  try { localStorage.setItem(BILLING_LS_KEY, JSON.stringify({ ts: Date.now(), data })) } catch {}
+}
+
+function clearBillingLS(): void {
+  try { localStorage.removeItem(BILLING_LS_KEY) } catch {}
+}
 import {
   Dialog,
   DialogContent,
@@ -29,7 +52,7 @@ import {
   trialReminderDaysFromBillingApiPayload,
 } from '@/lib/subscription/merchant-subscription-access'
 
-const BILLING_STATUS_FETCH_MS = 22_000
+const BILLING_STATUS_FETCH_MS = 8_000  // 8초 (기존 22초에서 단축)
 
 async function refreshMerchantDataCaches() {
   await Promise.all([
@@ -86,12 +109,25 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
   const trialDialogDismissedRef = useRef(false)
   const [trialDialogOpen, setTrialDialogOpen] = useState(false)
   const [trialDays, setTrialDays] = useState<number | null>(null)
+  // 캐시 적용 여부 추적 (적용 시 background silent refetch 사용)
+  const hasBillingCacheRef = useRef(false)
+
+  // F5 새로고침 시: localStorage 캐시를 즉시 적용 → 스피너 없이 콘텐츠 표시
+  useEffect(() => {
+    const cached = readBillingLS()
+    if (cached) {
+      setPayload(cached)
+      setStatusLoading(false)
+      hasBillingCacheRef.current = true
+    }
+  }, [])
 
   const refetchSubscription = useCallback(
     async (opts?: { silent?: boolean }) => {
       const silent = Boolean(opts?.silent)
       if (!user || isAdmin) {
         setPayload(null)
+        clearBillingLS()  // 비정상 상태면 캐시 삭제
         if (!silent) setStatusLoading(false)
         setStatusError(null)
         return
@@ -112,6 +148,7 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
           return
         }
         setPayload(data as BillingStatusPayload)
+        writeBillingLS(data as BillingStatusPayload)  // 성공 시 캐시 저장
         setStatusError(null)
       } catch {
         if (!silent) setPayload(null)
@@ -132,9 +169,13 @@ export function SubscriptionAccessProvider({ children }: { children: ReactNode }
       setStatusLoading(false)
       setPayload(null)
       setStatusError(null)
+      hasBillingCacheRef.current = false
+      clearBillingLS()
       return
     }
-    void refetchSubscription()
+    // 캐시가 적용된 경우: silent 모드로 백그라운드 재검증 (스피너 없이)
+    void refetchSubscription({ silent: hasBillingCacheRef.current })
+    hasBillingCacheRef.current = false  // 최초 1회 silent 이후엔 일반 모드
     // user?.id: 동일 유저 재렌더 시 불필요한 구독 재조회 방지
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, userLoading, isAdmin, refetchSubscription])

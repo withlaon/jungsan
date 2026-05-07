@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { useRiders } from '@/hooks/useRiders'
+import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { InsuranceFee, ManagementFee, Rider } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -162,7 +163,7 @@ export default function SettingsPage() {
   const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>(_insCache ?? [])
   const [loading, setLoading] = useState(!_feesCache)
   const [dialogType, setDialogType] = useState<DialogType>(null)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useSavingGuard()
   const [generalForm, setGeneralForm] = useState(initGeneral)
   const [callForm, setCallForm] = useState(initCall)
   const [insuranceForm, setInsuranceForm] = useState(initInsurance)
@@ -178,7 +179,7 @@ export default function SettingsPage() {
   const [insDetailTab, setInsDetailTab] = useState<'info' | 'add' | 'edit'>('info')
   const [insAddIds, setInsAddIds] = useState<string[]>([])
   const [insEditForm, setInsEditForm] = useState({ employment_fee: '', accident_fee: '', date_mode: 'none' as 'none'|'week'|'deadline', week_start: weekOptions[0]?.value??'', deadline_date: '', memo: '' })
-  const [detailSaving, setDetailSaving] = useState(false)
+  const [detailSaving, setDetailSaving] = useSavingGuard()
 
   useEffect(()=>{
     if (userLoading) return
