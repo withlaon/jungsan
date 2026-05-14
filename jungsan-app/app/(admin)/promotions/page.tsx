@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
+import { withMutationTimeout } from '@/lib/supabase/with-timeout'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Promotion, PromoRange, Rider } from '@/types'
@@ -335,17 +336,23 @@ export default function PromotionsPage() {
     const base: Record<string, unknown> = { type: target_type, promo_kind, amount: finalAmount, ranges: finalRanges, per_count_min: finalPerCountMin, date_mode, week_start: date_mode==='week'?week_start:null, deadline_date: date_mode==='deadline'?deadline_date:null, description: description.trim(), settlement_id: null }
     if (userId) base.user_id = userId
     setSaving(true)
-    if (rider_ids.length > 0) {
-      const { error } = await supabase.from('promotions').insert(rider_ids.map(id => ({ ...base, rider_id: id })))
-      if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
-      toast.success(`${rider_ids.length}명에게 프로모션이 등록되었습니다.`)
-    } else {
-      const { error } = await supabase.from('promotions').insert({ ...base, rider_id: null })
-      if (error) { toast.error('등록 실패: ' + error.message); setSaving(false); return }
-      toast.success('프로모션이 등록되었습니다.')
+    try {
+      if (rider_ids.length > 0) {
+        const { error } = await withMutationTimeout(supabase.from('promotions').insert(rider_ids.map(id => ({ ...base, rider_id: id }))))
+        if (error) { toast.error('등록 실패: ' + error.message); return }
+        toast.success(`${rider_ids.length}명에게 프로모션이 등록되었습니다.`)
+      } else {
+        const { error } = await withMutationTimeout(supabase.from('promotions').insert({ ...base, rider_id: null }))
+        if (error) { toast.error('등록 실패: ' + error.message); return }
+        toast.success('프로모션이 등록되었습니다.')
+      }
+      bumpSettlementResults()
+      setRegOpen(false); fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
     }
-    bumpSettlementResults()
-    setSaving(false); setRegOpen(false); fetchData()
   }
 
   const handleDeleteOne = async (id: string) => {
@@ -378,14 +385,19 @@ export default function PromotionsPage() {
       description: g.description, settlement_id: null,
     }
     if (userId) base.user_id = userId
-    const { error } = await supabase.from('promotions').insert(newIds.map(id => ({ ...base, rider_id: id })))
-    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
-    bumpSettlementResults()
-    setDetailAddIds([])
-    setDetailSaving(false)
-    setDetailTab('info')
-    fetchData()
+    try {
+      const { error } = await withMutationTimeout(supabase.from('promotions').insert(newIds.map(id => ({ ...base, rider_id: id }))))
+      if (error) { toast.error('추가 실패: ' + error.message); return }
+      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      bumpSettlementResults()
+      setDetailAddIds([])
+      setDetailTab('info')
+      fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleEditGroup = async (g: PromoGroup) => {
@@ -416,14 +428,19 @@ export default function PromotionsPage() {
       deadline_date: f.date_mode === 'deadline' ? f.deadline_date : null,
       description: f.description.trim(),
     }
-    const { error } = await supabase.from('promotions').update(updates).in('id', g.promos.map(p => p.id))
-    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success('프로모션이 수정되었습니다.')
-    bumpSettlementResults()
-    setDetailTab('info')
-    setDetailSaving(false)
-    setDetailGroup(null)
-    fetchData()
+    try {
+      const { error } = await withMutationTimeout(supabase.from('promotions').update(updates).in('id', g.promos.map(p => p.id)))
+      if (error) { toast.error('수정 실패: ' + error.message); return }
+      toast.success('프로모션이 수정되었습니다.')
+      bumpSettlementResults()
+      setDetailTab('info')
+      setDetailGroup(null)
+      fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '수정 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleDeleteGroup = async (g: PromoGroup) => {

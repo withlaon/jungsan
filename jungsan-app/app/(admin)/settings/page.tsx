@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
+import { withMutationTimeout } from '@/lib/supabase/with-timeout'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { InsuranceFee, ManagementFee, Rider } from '@/types'
@@ -263,26 +264,38 @@ export default function SettingsPage() {
     if (isNaN(amount)||amount<=0){toast.error('올바른 금액을 입력해주세요.');return}
     if (generalForm.date_mode==='deadline'&&!generalForm.deadline_date){toast.error('마감일을 입력해주세요.');return}
     setSaving(true)
-    const riderIds=generalForm.rider_ids.length>0?generalForm.rider_ids:[null]
-    const rows=riderIds.map(rid=>({fee_type:'general',item_name:generalForm.item_name.trim(),rider_id:rid,amount,date_mode:generalForm.date_mode,week_start:generalForm.date_mode==='week'?generalForm.week_start:null,deadline_date:generalForm.date_mode==='deadline'?generalForm.deadline_date:null,memo:generalForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-    const {error}=await supabase.from('management_fees').insert(rows)
-    if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
-    toast.success(`일반관리비 ${rows.length}건 등록되었습니다.`)
-    bumpSettlementResults()
-    setSaving(false);setDialogType(null);setGeneralForm(initGeneral());fetchData()
+    try {
+      const riderIds=generalForm.rider_ids.length>0?generalForm.rider_ids:[null]
+      const rows=riderIds.map(rid=>({fee_type:'general',item_name:generalForm.item_name.trim(),rider_id:rid,amount,date_mode:generalForm.date_mode,week_start:generalForm.date_mode==='week'?generalForm.week_start:null,deadline_date:generalForm.date_mode==='deadline'?generalForm.deadline_date:null,memo:generalForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
+      const {error}=await withMutationTimeout(supabase.from('management_fees').insert(rows))
+      if (error){toast.error('등록 실패: '+error.message);return}
+      toast.success(`일반관리비 ${rows.length}건 등록되었습니다.`)
+      bumpSettlementResults()
+      setDialogType(null);setGeneralForm(initGeneral());fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
   const handleSaveCall = async () => {
     const amount=parseInt(callForm.amount_per_call.replace(/,/g,''))
     if (isNaN(amount)||amount<=0){toast.error('올바른 콜당 금액을 입력해주세요.');return}
     if (callForm.date_mode==='deadline'&&!callForm.deadline_date){toast.error('마감일을 입력해주세요.');return}
     setSaving(true)
-    const riderIds=callForm.rider_ids.length>0?callForm.rider_ids:[null]
-    const rows=riderIds.map(rid=>({fee_type:'call',item_name:'콜관리비',rider_id:rid,amount,date_mode:callForm.date_mode,week_start:callForm.date_mode==='week'?callForm.week_start:null,deadline_date:callForm.date_mode==='deadline'?callForm.deadline_date:null,memo:callForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-    const {error}=await supabase.from('management_fees').insert(rows)
-    if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
-    toast.success(`콜관리비 ${rows.length}건 등록되었습니다.`)
-    bumpSettlementResults()
-    setSaving(false);setDialogType(null);setCallForm(initCall());fetchData()
+    try {
+      const riderIds=callForm.rider_ids.length>0?callForm.rider_ids:[null]
+      const rows=riderIds.map(rid=>({fee_type:'call',item_name:'콜관리비',rider_id:rid,amount,date_mode:callForm.date_mode,week_start:callForm.date_mode==='week'?callForm.week_start:null,deadline_date:callForm.date_mode==='deadline'?callForm.deadline_date:null,memo:callForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
+      const {error}=await withMutationTimeout(supabase.from('management_fees').insert(rows))
+      if (error){toast.error('등록 실패: '+error.message);return}
+      toast.success(`콜관리비 ${rows.length}건 등록되었습니다.`)
+      bumpSettlementResults()
+      setDialogType(null);setCallForm(initCall());fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
   const handleSaveInsurance = async () => {
     const empFee=parseInt(insuranceForm.employment_fee.replace(/,/g,''))
@@ -291,12 +304,18 @@ export default function SettingsPage() {
     if (insuranceForm.rider_ids.length===0){toast.error('적용할 라이더를 선택해주세요.');return}
     if (insuranceForm.date_mode==='deadline'&&!insuranceForm.deadline_date){toast.error('마감일을 입력해주세요.');return}
     setSaving(true)
-    const rows=insuranceForm.rider_ids.map(rid=>({rider_id:rid,employment_fee:isNaN(empFee)?0:empFee,accident_fee:isNaN(accFee)?0:accFee,date_mode:insuranceForm.date_mode,week_start:insuranceForm.date_mode==='week'?insuranceForm.week_start:null,deadline_date:insuranceForm.date_mode==='deadline'?insuranceForm.deadline_date:null,memo:insuranceForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-    const {error}=await supabase.from('insurance_fees').insert(rows)
-    if (error){toast.error('등록 실패: '+error.message);setSaving(false);return}
-    toast.success(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
-    bumpSettlementResults()
-    setSaving(false);setDialogType(null);setInsuranceForm(initInsurance());fetchData()
+    try {
+      const rows=insuranceForm.rider_ids.map(rid=>({rider_id:rid,employment_fee:isNaN(empFee)?0:empFee,accident_fee:isNaN(accFee)?0:accFee,date_mode:insuranceForm.date_mode,week_start:insuranceForm.date_mode==='week'?insuranceForm.week_start:null,deadline_date:insuranceForm.date_mode==='deadline'?insuranceForm.deadline_date:null,memo:insuranceForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
+      const {error}=await withMutationTimeout(supabase.from('insurance_fees').insert(rows))
+      if (error){toast.error('등록 실패: '+error.message);return}
+      toast.success(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
+      bumpSettlementResults()
+      setDialogType(null);setInsuranceForm(initInsurance());fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── 단건 삭제 ──
@@ -354,15 +373,21 @@ export default function SettingsPage() {
   const handleAddRidersToFee = async (g: FeeGroup) => {
     if (feeAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
     setDetailSaving(true)
-    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
-    const newIds = feeAddIds.filter(id => !existing.has(id))
-    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
-    const rows = newIds.map(rid => ({ fee_type: g.fee_type, item_name: g.item_name, rider_id: rid, amount: g.amount, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
-    const { error } = await supabase.from('management_fees').insert(rows)
-    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
-    bumpSettlementResults()
-    setFeeAddIds([]); setFeeDetailTab('info'); setDetailSaving(false); fetchData()
+    try {
+      const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+      const newIds = feeAddIds.filter(id => !existing.has(id))
+      if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
+      const rows = newIds.map(rid => ({ fee_type: g.fee_type, item_name: g.item_name, rider_id: rid, amount: g.amount, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
+      const { error } = await withMutationTimeout(supabase.from('management_fees').insert(rows))
+      if (error) { toast.error('추가 실패: ' + error.message); return }
+      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      bumpSettlementResults()
+      setFeeAddIds([]); setFeeDetailTab('info'); fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleEditFeeGroup = async (g: FeeGroup) => {
@@ -371,26 +396,38 @@ export default function SettingsPage() {
     if (isNaN(amount) || amount <= 0) { toast.error('올바른 금액을 입력해주세요.'); return }
     if (feeEditForm.date_mode === 'deadline' && !feeEditForm.deadline_date) { toast.error('마감일을 입력해주세요.'); return }
     setDetailSaving(true)
-    const updates = { item_name: feeEditForm.item_name.trim(), amount, date_mode: feeEditForm.date_mode, week_start: feeEditForm.date_mode==='week'?feeEditForm.week_start:null, deadline_date: feeEditForm.date_mode==='deadline'?feeEditForm.deadline_date:null, memo: feeEditForm.memo.trim()||null }
-    const { error } = await supabase.from('management_fees').update(updates).in('id', g.items.map(i => i.id))
-    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success('수정되었습니다.')
-    bumpSettlementResults()
-    setFeeDetailTab('info'); setDetailSaving(false); setDetailFee(null); fetchData()
+    try {
+      const updates = { item_name: feeEditForm.item_name.trim(), amount, date_mode: feeEditForm.date_mode, week_start: feeEditForm.date_mode==='week'?feeEditForm.week_start:null, deadline_date: feeEditForm.date_mode==='deadline'?feeEditForm.deadline_date:null, memo: feeEditForm.memo.trim()||null }
+      const { error } = await withMutationTimeout(supabase.from('management_fees').update(updates).in('id', g.items.map(i => i.id)))
+      if (error) { toast.error('수정 실패: ' + error.message); return }
+      toast.success('수정되었습니다.')
+      bumpSettlementResults()
+      setFeeDetailTab('info'); setDetailFee(null); fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '수정 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleAddRidersToIns = async (g: InsuranceFeeGroup) => {
     if (insAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
     setDetailSaving(true)
-    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
-    const newIds = insAddIds.filter(id => !existing.has(id))
-    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
-    const rows = newIds.map(rid => ({ rider_id: rid, employment_fee: g.employment_fee, accident_fee: g.accident_fee, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
-    const { error } = await supabase.from('insurance_fees').insert(rows)
-    if (error) { toast.error('추가 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
-    bumpSettlementResults()
-    setInsAddIds([]); setInsDetailTab('info'); setDetailSaving(false); fetchData()
+    try {
+      const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+      const newIds = insAddIds.filter(id => !existing.has(id))
+      if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
+      const rows = newIds.map(rid => ({ rider_id: rid, employment_fee: g.employment_fee, accident_fee: g.accident_fee, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
+      const { error } = await withMutationTimeout(supabase.from('insurance_fees').insert(rows))
+      if (error) { toast.error('추가 실패: ' + error.message); return }
+      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      bumpSettlementResults()
+      setInsAddIds([]); setInsDetailTab('info'); fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleEditInsGroup = async (g: InsuranceFeeGroup) => {
@@ -399,12 +436,18 @@ export default function SettingsPage() {
     if ((isNaN(empFee)||empFee<0) && (isNaN(accFee)||accFee<0)) { toast.error('보험료를 입력해주세요.'); return }
     if (insEditForm.date_mode === 'deadline' && !insEditForm.deadline_date) { toast.error('마감일을 입력해주세요.'); return }
     setDetailSaving(true)
-    const updates = { employment_fee: isNaN(empFee)?0:empFee, accident_fee: isNaN(accFee)?0:accFee, date_mode: insEditForm.date_mode, week_start: insEditForm.date_mode==='week'?insEditForm.week_start:null, deadline_date: insEditForm.date_mode==='deadline'?insEditForm.deadline_date:null, memo: insEditForm.memo.trim()||null }
-    const { error } = await supabase.from('insurance_fees').update(updates).in('id', g.items.map(i => i.id))
-    if (error) { toast.error('수정 실패: ' + error.message); setDetailSaving(false); return }
-    toast.success('수정되었습니다.')
-    bumpSettlementResults()
-    setInsDetailTab('info'); setDetailSaving(false); setDetailIns(null); fetchData()
+    try {
+      const updates = { employment_fee: isNaN(empFee)?0:empFee, accident_fee: isNaN(accFee)?0:accFee, date_mode: insEditForm.date_mode, week_start: insEditForm.date_mode==='week'?insEditForm.week_start:null, deadline_date: insEditForm.date_mode==='deadline'?insEditForm.deadline_date:null, memo: insEditForm.memo.trim()||null }
+      const { error } = await withMutationTimeout(supabase.from('insurance_fees').update(updates).in('id', g.items.map(i => i.id)))
+      if (error) { toast.error('수정 실패: ' + error.message); return }
+      toast.success('수정되었습니다.')
+      bumpSettlementResults()
+      setInsDetailTab('info'); setDetailIns(null); fetchData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '수정 중 오류가 발생했습니다.')
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   // ── 관리비/보험비 중복 라이더 ID 계산 ──
