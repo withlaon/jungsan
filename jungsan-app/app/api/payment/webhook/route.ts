@@ -96,20 +96,38 @@ export async function POST(request: NextRequest) {
 
           const uid = paymentRow?.user_id ?? resolvedUserId;
           if (uid) {
-            await admin
+            // 웹훅 재발송 시 오래된 데이터로 덮어쓰기 방지:
+            // 현재 구독의 current_period_start보다 이 결제가 최신인 경우에만 갱신
+            const { data: currentSub } = await admin
               .from("subscriptions")
-              .update({
-                status: "active",
-                failed_count: 0,
-                last_payment_id: paymentId,
-                last_payment_at: periodStartIso,
-                current_period_start: periodStart.toISOString(),
-                current_period_end: periodEnd.toISOString(),
-                next_billing_at: nextBillingAt.toISOString(),
-              })
-              .eq("user_id", uid);
+              .select("current_period_start, next_billing_at")
+              .eq("user_id", uid)
+              .maybeSingle();
 
-            console.log(`[webhook] subscription renewed userId=${uid}`);
+            const existingPeriodStart = currentSub?.current_period_start
+              ? new Date(currentSub.current_period_start)
+              : new Date(0);
+
+            if (periodStart >= existingPeriodStart) {
+              await admin
+                .from("subscriptions")
+                .update({
+                  status: "active",
+                  failed_count: 0,
+                  last_payment_id: paymentId,
+                  last_payment_at: periodStartIso,
+                  current_period_start: periodStart.toISOString(),
+                  current_period_end: periodEnd.toISOString(),
+                  next_billing_at: nextBillingAt.toISOString(),
+                })
+                .eq("user_id", uid);
+
+              console.log(`[webhook] subscription renewed userId=${uid} nextBillingAt=${nextBillingAt.toISOString()}`);
+            } else {
+              console.log(
+                `[webhook] subscription renew skipped (stale re-delivery): paymentPeriodStart=${periodStart.toISOString()} existingPeriodStart=${existingPeriodStart.toISOString()} paymentId=${paymentId}`,
+              );
+            }
           } else {
             console.warn(
               `[webhook] subscription renew skipped: no user_id paymentId=${paymentId}`,
