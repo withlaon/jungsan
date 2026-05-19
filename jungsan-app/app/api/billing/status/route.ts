@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { reconcileSubscriptionIfPortOnePaid } from '@/lib/portone/subscription-reconcile'
+import { attemptSubscriptionCharge } from '@/lib/portone/subscription-charge'
 
 export async function GET() {
   try {
@@ -77,6 +78,28 @@ export async function GET() {
 
     if (refreshed) {
       subscription = refreshed
+    }
+
+    // ── Lazy billing: Vercel Cron이 미동작한 경우를 대비한 안전망 ──
+    // 빌링키가 있고, 결제 예정일이 지났으며, 청구 가능한 상태이면 즉시 청구 시도
+    const nowLazy = new Date()
+    const lazyDueAt = subscription.next_billing_at ? new Date(subscription.next_billing_at) : null
+    const lazyChargeable =
+      !!subscription.billing_key &&
+      ['active', 'past_due', 'trial'].includes(subscription.status) &&
+      lazyDueAt !== null &&
+      lazyDueAt <= nowLazy
+
+    if (lazyChargeable) {
+      const chargeResult = await attemptSubscriptionCharge(admin, user.id, nowLazy)
+      if (chargeResult.ok) {
+        const { data: afterCharge } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (afterCharge) subscription = afterCharge
+      }
     }
 
     const now = new Date()

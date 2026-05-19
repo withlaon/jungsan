@@ -33,12 +33,23 @@ export async function attemptSubscriptionCharge(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { data: sub, error } = await admin
     .from('subscriptions')
-    .select('user_id, billing_key, failed_count')
+    .select('user_id, billing_key, failed_count, next_billing_at, status')
     .eq('user_id', userId)
     .single()
 
   if (error || !sub?.billing_key) {
     return { ok: false, reason: error?.message ?? '빌링키 없음' }
+  }
+
+  // 결제 예정일이 아직 도래하지 않은 경우 중복 청구 방지
+  const dueAt = sub.next_billing_at ? new Date(sub.next_billing_at) : null
+  if (dueAt && dueAt > now) {
+    return { ok: false, reason: '결제 예정일 미도래' }
+  }
+
+  // 청구 불가 상태(cancelled 등)는 건너뜀
+  if (sub.status && !['active', 'past_due', 'trial'].includes(sub.status)) {
+    return { ok: false, reason: `결제 불가 상태: ${sub.status}` }
   }
 
   const paymentId = generateSubscriptionPaymentId(userId)

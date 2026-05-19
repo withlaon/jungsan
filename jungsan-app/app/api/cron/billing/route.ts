@@ -16,12 +16,21 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { attemptSubscriptionCharge } from '@/lib/portone/subscription-charge'
 
 const CRON_SECRET = process.env.CRON_SECRET ?? ''
+// Vercel 배포 환경 여부 (VERCEL=1 은 Vercel이 자동으로 설정)
+const IS_VERCEL = process.env.VERCEL === '1'
 
 export async function POST(req: NextRequest) {
   // 보안 검증
+  // - CRON_SECRET이 설정된 경우: Bearer 토큰 일치 여부 확인
+  // - CRON_SECRET 미설정 + Vercel 환경: Vercel Cron 내부 호출로 간주하여 허용
+  // - CRON_SECRET 미설정 + 로컬/외부: 차단
   const authHeader = req.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (CRON_SECRET) {
+    if (authHeader !== `Bearer ${CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  } else if (!IS_VERCEL) {
+    return NextResponse.json({ error: 'Unauthorized (CRON_SECRET not configured)' }, { status: 401 })
   }
 
   const admin = createAdminClient()
