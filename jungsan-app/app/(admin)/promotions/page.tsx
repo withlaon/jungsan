@@ -225,10 +225,15 @@ export default function PromotionsPage() {
   }, [userId, isAdmin, userLoading])
 
   const fetchData = async (silent = false) => {
-    if (!userId && !isAdmin) return
+    if (!userId && !isAdmin) {
+      if (!silent) setLoading(false)
+      return
+    }
     if (!silent) setLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15_000)
     try {
-      let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false })
+      let q = supabase.from('promotions').select('*, riders(*)').order('created_at', { ascending: false }).abortSignal(controller.signal)
       if (userId) q = q.eq('user_id', userId)
       const promoRes = await q
       if (promoRes.data) {
@@ -239,6 +244,7 @@ export default function PromotionsPage() {
     } catch (e) {
       console.error('[PromotionsPage] 로드 실패:', e)
     } finally {
+      clearTimeout(timer)
       if (!silent) setLoading(false)
     }
   }

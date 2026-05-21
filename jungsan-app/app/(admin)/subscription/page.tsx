@@ -27,6 +27,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/hooks/useUser'
 import {
   loadBillingIssueConfig,
   requestIssueBillingKeyWithConfig,
@@ -220,6 +221,7 @@ function subscriptionCardUiConfig(sub: SubscriptionStatus | null) {
 
 export default function SubscriptionPage() {
   const { refetchSubscription } = useSubscriptionAccess()
+  const { userId: cachedUserId, loading: userLoading } = useUser()
   const [sub, setSub] = useState<SubscriptionStatus | null>(null)
   const [history, setHistory] = useState<PaymentHistory[]>([])
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -227,7 +229,7 @@ export default function SubscriptionPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
-  const [userId, setUserId] = useState<string>('')
+  const [userId, setUserId] = useState<string>(cachedUserId ?? '')
   const [userName, setUserName] = useState<string>('')
   const [userEmail, setUserEmail] = useState<string>('')
   const [userPhone, setUserPhone] = useState<string>('')
@@ -318,27 +320,29 @@ export default function SubscriptionPage() {
   }, [])
 
   useEffect(() => {
+    if (userLoading) return
     let alive = true
     const init = async () => {
       setLoading(true)
       try {
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user && alive) {
-          setUserId(user.id)
+        // useUser 캐시 우선 사용 → 인증 API 호출 절감
+        const uid = cachedUserId ?? null
+        if (uid && alive) {
+          setUserId(uid)
+          const { data: { user: authUser } } = await supabase.auth.getUser()
+          if (!alive) return
 
           const { data: profile } = await supabase
             .from('profiles')
             .select('manager_name, phone, email')
-            .eq('id', user.id)
+            .eq('id', uid)
             .maybeSingle()
           if (!alive) return
           setUserName(profile?.manager_name ?? '')
           setUserPhone(profile?.phone ?? '')
-          /** KCP customer.email: 로그인 이메일 우선, 없으면 프로필 email */
-          setUserEmail((user.email ?? profile?.email ?? '').trim())
+          setUserEmail(((authUser?.email ?? '') || profile?.email || '').trim())
         }
-        // 결제 내역(Supabase)이 지연되어도 구독 화면은 먼저 표시
         if (alive) await fetchStatus()
       } finally {
         if (alive) setLoading(false)
@@ -349,7 +353,7 @@ export default function SubscriptionPage() {
     return () => {
       alive = false
     }
-  }, [fetchStatus, fetchHistory])
+  }, [fetchStatus, fetchHistory, cachedUserId, userLoading])
 
   /** PG 리디렉션 복귀(모바일 KCP 등): URL 쿼리로 빌링키·오류 전달 */
   useEffect(() => {

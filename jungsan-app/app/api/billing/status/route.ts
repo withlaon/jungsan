@@ -81,7 +81,7 @@ export async function GET() {
     }
 
     // ── Lazy billing: Vercel Cron이 미동작한 경우를 대비한 안전망 ──
-    // 빌링키가 있고, 결제 예정일이 지났으며, 청구 가능한 상태이면 즉시 청구 시도
+    // 응답 속도 보장을 위해 fire-and-forget으로 실행 (await 하지 않음)
     const nowLazy = new Date()
     const lazyDueAt = subscription.next_billing_at ? new Date(subscription.next_billing_at) : null
     const lazyChargeable =
@@ -91,15 +91,9 @@ export async function GET() {
       lazyDueAt <= nowLazy
 
     if (lazyChargeable) {
-      const chargeResult = await attemptSubscriptionCharge(admin, user.id, nowLazy)
-      if (chargeResult.ok) {
-        const { data: afterCharge } = await admin
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (afterCharge) subscription = afterCharge
-      }
+      void attemptSubscriptionCharge(admin, user.id, nowLazy).catch((e) =>
+        console.error('[billing/status] lazy charge error:', e)
+      )
     }
 
     const now = new Date()

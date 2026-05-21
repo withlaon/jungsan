@@ -197,12 +197,17 @@ export default function SettingsPage() {
   }, [userId, isAdmin, userLoading])
 
   const fetchData = async (silent = false) => {
-    if (!userId && !isAdmin) return
+    if (!userId && !isAdmin) {
+      if (!silent) setLoading(false)
+      return
+    }
     if (!silent) setLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15_000)
     try {
       const [feesRes, insRes] = await Promise.all([
-        (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
-        (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}); if (userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('management_fees').select('*, riders(*)').order('created_at',{ascending:false}).abortSignal(controller.signal); if (userId) q = q.eq('user_id', userId); return q })(),
+        (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}).abortSignal(controller.signal); if (userId) q = q.eq('user_id', userId); return q })(),
       ])
       if (feesRes.data) {
         _feesCache = feesRes.data as FeeWithRider[]
@@ -215,6 +220,7 @@ export default function SettingsPage() {
     } catch (e) {
       console.error('[SettingsPage] 로드 실패:', e)
     } finally {
+      clearTimeout(timer)
       if (!silent) setLoading(false)
     }
   }
