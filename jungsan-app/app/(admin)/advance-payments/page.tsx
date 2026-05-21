@@ -147,7 +147,7 @@ export default function AdvancePaymentsPage() {
   const supabase = createClient()
   const { userId } = useUser()
   const { riders: allRiders } = useRiders()
-  const riders = allRiders.filter(r => r.status === 'active')
+  const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const { payments, loading } = useAdvancePayments()
 
   const [advanceOpen, setAdvanceOpen] = useState(false)

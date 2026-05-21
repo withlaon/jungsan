@@ -93,7 +93,7 @@ export default function SettlementUploadPage() {
   // preview
   const [parsedRows, setParsedRows] = useState<ParsedRiderRow[]>([])
   const [summaryData, setSummaryData] = useState<ExcelSummary | null>(null)
-  const riders = allRiders.filter(r => r.status === 'active')
+  const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const [riderMapping, setRiderMapping] = useState<Record<string, string>>({})
   const [settings, setSettings] = useState<FeeSettings | null>(null)
   const [managementFees, setManagementFees] = useState<ManagementFee[]>([])

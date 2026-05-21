@@ -110,7 +110,7 @@ export function applyOptimisticRider(rider: Rider, action: 'add' | 'update' | 'r
   if (action === 'add') {
     newCache = [...(_cache ?? []), rider].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   } else if (action === 'update') {
-    newCache = (_cache ?? []).map(r => r.id === rider.id ? rider : r)
+    newCache = (_cache ?? []).map(r => r.id === rider.id ? rider : r).sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   } else {
     newCache = (_cache ?? []).filter(r => r.id !== rider.id)
   }

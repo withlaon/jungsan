@@ -194,7 +194,7 @@ export default function PromotionsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
-  const riders = allRiders.filter(r => r.status === 'active')
+  const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const [promotions, setPromotions] = useState<PromotionWithRider[]>(_promoCache ?? [])
   const [loading, setLoading] = useState(!_promoCache)
   const [regOpen, setRegOpen] = useState(false)

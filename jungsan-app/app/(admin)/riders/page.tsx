@@ -520,7 +520,7 @@ export default function RidersPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={() => downloadRiderList(filtered, activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성')}
+            onClick={() => downloadRiderList(sorted, activeTab === 'all' ? '전체' : activeTab === 'active' ? '활성' : '비활성')}
             variant="outline"
             className="border-slate-600 text-slate-300 hover:bg-slate-800"
             disabled={filtered.length === 0}

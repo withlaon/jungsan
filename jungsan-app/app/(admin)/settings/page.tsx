@@ -159,7 +159,7 @@ export default function SettingsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
-  const riders = allRiders.filter(r => r.status === 'active')
+  const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const [fees, setFees] = useState<FeeWithRider[]>(_feesCache ?? [])
   const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>(_insCache ?? [])
   const [loading, setLoading] = useState(!_feesCache)
