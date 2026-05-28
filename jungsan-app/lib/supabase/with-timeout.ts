@@ -7,12 +7,18 @@ export const MUTATION_TIMEOUT_MS = 15_000
 const ERR_TIMEOUT = '저장 시간이 초과되었습니다. 네트워크 상태를 확인 후 다시 시도해 주세요.'
 
 export async function withMutationTimeout<T>(
-  query: PromiseLike<T>
+  query: PromiseLike<T>,
+  timeoutMs = MUTATION_TIMEOUT_MS
 ): Promise<T> {
-  return Promise.race([
-    Promise.resolve(query),
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(ERR_TIMEOUT)), MUTATION_TIMEOUT_MS)
-    ),
-  ])
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      Promise.resolve(query),
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(ERR_TIMEOUT)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId)
+  }
 }

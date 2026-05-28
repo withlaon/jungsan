@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { withMutationTimeout } from '@/lib/supabase/with-timeout'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Promotion, PromoRange, Rider } from '@/types'
@@ -207,7 +208,7 @@ export default function PromotionsPage() {
   const [detailTab, setDetailTab] = useState<'info' | 'add' | 'edit'>('info')
   const [detailAddIds, setDetailAddIds] = useState<string[]>([])
   const [detailEditForm, setDetailEditForm] = useState(initForm())
-  const [detailSaving, setDetailSaving] = useSavingGuard()
+  const [detailSaving, setDetailSaving] = useSavingGuard(45_000)
   const setDE = (patch: Partial<ReturnType<typeof initForm>>) => setDetailEditForm(f => ({ ...f, ...patch }))
 
   useEffect(() => {
@@ -380,27 +381,43 @@ export default function PromotionsPage() {
 
   const handleAddRidersToGroup = async (g: PromoGroup) => {
     if (detailAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
-    setDetailSaving(true)
     const existing = new Set(g.promos.map(p => p.rider_id).filter(Boolean))
     const newIds = detailAddIds.filter(id => !existing.has(id))
-    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); setDetailSaving(false); return }
-    const base: Record<string, unknown> = {
-      type: g.type, promo_kind: g.promo_kind, amount: g.amount, ranges: g.ranges,
-      per_count_min: g.per_count_min, date_mode: g.date_mode,
-      week_start: g.week_start, deadline_date: g.deadline_date,
-      description: g.description, settlement_id: null,
-    }
-    if (userId) base.user_id = userId
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
+
+    setDetailSaving(true)
     try {
-      const { error } = await withMutationTimeout(supabase.from('promotions').insert(newIds.map(id => ({ ...base, rider_id: id }))))
-      if (error) { toast.error('추가 실패: ' + error.message); return }
-      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      const res = await fetchWithTimeout(
+        '/api/admin/promotions/add-riders',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourcePromoId: g.promos[0]?.id,
+            riderIds: newIds,
+          }),
+        },
+        30_000
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string; inserted?: number }
+      if (!res.ok) {
+        toast.error(data.error ?? '추가 실패')
+        return
+      }
+      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
       setDetailAddIds([])
       setDetailTab('info')
-      fetchData()
+      await fetchData(true)
+      setDetailGroup(prev => {
+        if (!prev) return null
+        const fresh = (_promoCache ?? []).filter(p => groupKey(p) === prev.key)
+        return fresh.length > 0 ? { ...prev, promos: fresh } : null
+      })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+      const msg = e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.'
+      toast.error(msg.includes('abort') ? '저장 시간이 초과되었습니다. 네트워크 상태를 확인 후 다시 시도해 주세요.' : msg)
     } finally {
       setDetailSaving(false)
     }
