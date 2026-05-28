@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
 import { withMutationTimeout } from '@/lib/supabase/with-timeout'
+import { fetchWithTimeout } from '@/lib/fetch-utils'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { InsuranceFee, ManagementFee, Rider } from '@/types'
@@ -180,7 +181,7 @@ export default function SettingsPage() {
   const [insDetailTab, setInsDetailTab] = useState<'info' | 'add' | 'edit'>('info')
   const [insAddIds, setInsAddIds] = useState<string[]>([])
   const [insEditForm, setInsEditForm] = useState({ employment_fee: '', accident_fee: '', date_mode: 'none' as 'none'|'week'|'deadline', week_start: weekOptions[0]?.value??'', deadline_date: '', memo: '' })
-  const [detailSaving, setDetailSaving] = useSavingGuard()
+  const [detailSaving, setDetailSaving] = useSavingGuard(45_000)
 
   useEffect(()=>{
     if (userLoading) return
@@ -378,19 +379,43 @@ export default function SettingsPage() {
 
   const handleAddRidersToFee = async (g: FeeGroup) => {
     if (feeAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
+    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+    const newIds = feeAddIds.filter(id => !existing.has(id))
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
+
     setDetailSaving(true)
     try {
-      const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
-      const newIds = feeAddIds.filter(id => !existing.has(id))
-      if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
-      const rows = newIds.map(rid => ({ fee_type: g.fee_type, item_name: g.item_name, rider_id: rid, amount: g.amount, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
-      const { error } = await withMutationTimeout(supabase.from('management_fees').insert(rows))
-      if (error) { toast.error('추가 실패: ' + error.message); return }
-      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      const res = await fetchWithTimeout(
+        '/api/admin/management-fees/add-riders',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourceFeeId: g.items[0]?.id,
+            riderIds: newIds,
+          }),
+        },
+        30_000
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string; inserted?: number }
+      if (!res.ok) {
+        toast.error(data.error ?? '추가 실패')
+        return
+      }
+      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
-      setFeeAddIds([]); setFeeDetailTab('info'); fetchData()
+      setFeeAddIds([])
+      setFeeDetailTab('info')
+      await fetchData(true)
+      setDetailFee(prev => {
+        if (!prev) return null
+        const fresh = (_feesCache ?? []).filter(f => feeGroupKey(f) === prev.key)
+        return fresh.length > 0 ? { ...prev, items: fresh } : null
+      })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+      const msg = e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.'
+      toast.error(msg.includes('abort') ? '저장 시간이 초과되었습니다. 네트워크 상태를 확인 후 다시 시도해 주세요.' : msg)
     } finally {
       setDetailSaving(false)
     }
@@ -418,19 +443,43 @@ export default function SettingsPage() {
 
   const handleAddRidersToIns = async (g: InsuranceFeeGroup) => {
     if (insAddIds.length === 0) { toast.error('추가할 라이더를 선택해주세요.'); return }
+    const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
+    const newIds = insAddIds.filter(id => !existing.has(id))
+    if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
+
     setDetailSaving(true)
     try {
-      const existing = new Set(g.items.map(i => i.rider_id).filter(Boolean))
-      const newIds = insAddIds.filter(id => !existing.has(id))
-      if (newIds.length === 0) { toast.error('선택한 라이더는 이미 모두 적용되어 있습니다.'); return }
-      const rows = newIds.map(rid => ({ rider_id: rid, employment_fee: g.employment_fee, accident_fee: g.accident_fee, date_mode: g.date_mode, week_start: g.week_start, deadline_date: g.deadline_date, memo: g.memo, ...(userId?{user_id:userId}:{}) }))
-      const { error } = await withMutationTimeout(supabase.from('insurance_fees').insert(rows))
-      if (error) { toast.error('추가 실패: ' + error.message); return }
-      toast.success(`${newIds.length}명 라이더가 추가되었습니다.`)
+      const res = await fetchWithTimeout(
+        '/api/admin/insurance-fees/add-riders',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourceFeeId: g.items[0]?.id,
+            riderIds: newIds,
+          }),
+        },
+        30_000
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string; inserted?: number }
+      if (!res.ok) {
+        toast.error(data.error ?? '추가 실패')
+        return
+      }
+      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
-      setInsAddIds([]); setInsDetailTab('info'); fetchData()
+      setInsAddIds([])
+      setInsDetailTab('info')
+      await fetchData(true)
+      setDetailIns(prev => {
+        if (!prev) return null
+        const fresh = (_insCache ?? []).filter(f => insGroupKey(f) === prev.key)
+        return fresh.length > 0 ? { ...prev, items: fresh } : null
+      })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.')
+      const msg = e instanceof Error ? e.message : '추가 중 오류가 발생했습니다.'
+      toast.error(msg.includes('abort') ? '저장 시간이 초과되었습니다. 네트워크 상태를 확인 후 다시 시도해 주세요.' : msg)
     } finally {
       setDetailSaving(false)
     }
