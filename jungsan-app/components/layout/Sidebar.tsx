@@ -24,12 +24,9 @@ import {
   EyeOff,
   UserX,
   AlertTriangle,
-  BookOpen,
   Package,
   ImagePlus,
   Trash2,
-  Megaphone,
-  MessageSquare,
   Menu,
   X,
 } from 'lucide-react'
@@ -73,14 +70,10 @@ const navItems = [
   { href: '/settings',           label: '관리비 설정',    icon: Settings   },
   { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload     },
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
-  { href: '/notice',             label: '공지사항 생성',  icon: Megaphone  },
   { href: '/rider-site',         label: '라이더사이트',      icon: Globe      },
 ]
 
-const bottomNavItems = [
-  { href: '/manual',   label: '사용자 메뉴얼', icon: BookOpen    },
-  { href: '/inquiry',  label: '문의하기',       icon: MessageSquare },
-]
+const bottomNavItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = []
 
 interface Profile {
   username: string

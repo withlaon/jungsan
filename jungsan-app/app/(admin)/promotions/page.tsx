@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
-import { withMutationTimeout } from '@/lib/supabase/with-timeout'
 import { fetchWithTimeout } from '@/lib/fetch-utils'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
@@ -225,6 +224,19 @@ export default function PromotionsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isAdmin, userLoading])
 
+  // 탭 전환 후 돌아왔을 때 자동 재조회
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && (userId || isAdmin)) {
+        _promoCache = null
+        fetchData(true)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isAdmin])
+
   const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) {
       if (!silent) setLoading(false)
@@ -341,18 +353,17 @@ export default function PromotionsPage() {
     }
 
     const base: Record<string, unknown> = { type: target_type, promo_kind, amount: finalAmount, ranges: finalRanges, per_count_min: finalPerCountMin, date_mode, week_start: date_mode==='week'?week_start:null, deadline_date: date_mode==='deadline'?deadline_date:null, description: description.trim(), settlement_id: null }
-    if (userId) base.user_id = userId
     setSaving(true)
     try {
+      let res: Response
       if (rider_ids.length > 0) {
-        const { error } = await withMutationTimeout(supabase.from('promotions').insert(rider_ids.map(id => ({ ...base, rider_id: id }))))
-        if (error) { toast.error('등록 실패: ' + error.message); return }
-        toast.success(`${rider_ids.length}명에게 프로모션이 등록되었습니다.`)
+        res = await fetchWithTimeout('/api/admin/promotions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows: rider_ids.map(id => ({ ...base, rider_id: id })) }), credentials: 'same-origin' }, 30_000)
       } else {
-        const { error } = await withMutationTimeout(supabase.from('promotions').insert({ ...base, rider_id: null }))
-        if (error) { toast.error('등록 실패: ' + error.message); return }
-        toast.success('프로모션이 등록되었습니다.')
+        res = await fetchWithTimeout('/api/admin/promotions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ row: { ...base, rider_id: null } }), credentials: 'same-origin' }, 30_000)
       }
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error('등록 실패: ' + (data?.error ?? res.statusText)); return }
+      toast.success(rider_ids.length > 0 ? `${rider_ids.length}명에게 프로모션이 등록되었습니다.` : '프로모션이 등록되었습니다.')
       bumpSettlementResults()
       setRegOpen(false); fetchData()
     } catch (e) {
@@ -452,8 +463,9 @@ export default function PromotionsPage() {
       description: f.description.trim(),
     }
     try {
-      const { error } = await withMutationTimeout(supabase.from('promotions').update(updates).in('id', g.promos.map(p => p.id)))
-      if (error) { toast.error('수정 실패: ' + error.message); return }
+      const res = await fetchWithTimeout('/api/admin/promotions', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.promos.map(p => p.id), updates }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
       toast.success('프로모션이 수정되었습니다.')
       bumpSettlementResults()
       setDetailTab('info')

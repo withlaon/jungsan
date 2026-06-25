@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/cleanup-advance-payments",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-old-settlements",
+      "schedule": "0 3 * * *"
     }
   ]
 }

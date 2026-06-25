@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
-import { withMutationTimeout } from '@/lib/supabase/with-timeout'
 import { fetchWithTimeout } from '@/lib/fetch-utils'
 import { useRiders } from '@/hooks/useRiders'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
@@ -197,6 +196,20 @@ export default function SettingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isAdmin, userLoading])
 
+  // 탭 전환 후 돌아왔을 때 자동 재조회
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && (userId || isAdmin)) {
+        _feesCache = null
+        _insCache = null
+        fetchData(true)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isAdmin])
+
   const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) {
       if (!silent) setLoading(false)
@@ -273,9 +286,10 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       const riderIds=generalForm.rider_ids.length>0?generalForm.rider_ids:[null]
-      const rows=riderIds.map(rid=>({fee_type:'general',item_name:generalForm.item_name.trim(),rider_id:rid,amount,date_mode:generalForm.date_mode,week_start:generalForm.date_mode==='week'?generalForm.week_start:null,deadline_date:generalForm.date_mode==='deadline'?generalForm.deadline_date:null,memo:generalForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-      const {error}=await withMutationTimeout(supabase.from('management_fees').insert(rows))
-      if (error){toast.error('등록 실패: '+error.message);return}
+      const rows=riderIds.map(rid=>({fee_type:'general',item_name:generalForm.item_name.trim(),rider_id:rid,amount,date_mode:generalForm.date_mode,week_start:generalForm.date_mode==='week'?generalForm.week_start:null,deadline_date:generalForm.date_mode==='deadline'?generalForm.deadline_date:null,memo:generalForm.memo.trim()||null}))
+      const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
       toast.success(`일반관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setGeneralForm(initGeneral());fetchData()
@@ -292,9 +306,10 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       const riderIds=callForm.rider_ids.length>0?callForm.rider_ids:[null]
-      const rows=riderIds.map(rid=>({fee_type:'call',item_name:'콜관리비',rider_id:rid,amount,date_mode:callForm.date_mode,week_start:callForm.date_mode==='week'?callForm.week_start:null,deadline_date:callForm.date_mode==='deadline'?callForm.deadline_date:null,memo:callForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-      const {error}=await withMutationTimeout(supabase.from('management_fees').insert(rows))
-      if (error){toast.error('등록 실패: '+error.message);return}
+      const rows=riderIds.map(rid=>({fee_type:'call',item_name:'콜관리비',rider_id:rid,amount,date_mode:callForm.date_mode,week_start:callForm.date_mode==='week'?callForm.week_start:null,deadline_date:callForm.date_mode==='deadline'?callForm.deadline_date:null,memo:callForm.memo.trim()||null}))
+      const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
       toast.success(`콜관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setCallForm(initCall());fetchData()
@@ -312,9 +327,10 @@ export default function SettingsPage() {
     if (insuranceForm.date_mode==='deadline'&&!insuranceForm.deadline_date){toast.error('마감일을 입력해주세요.');return}
     setSaving(true)
     try {
-      const rows=insuranceForm.rider_ids.map(rid=>({rider_id:rid,employment_fee:isNaN(empFee)?0:empFee,accident_fee:isNaN(accFee)?0:accFee,date_mode:insuranceForm.date_mode,week_start:insuranceForm.date_mode==='week'?insuranceForm.week_start:null,deadline_date:insuranceForm.date_mode==='deadline'?insuranceForm.deadline_date:null,memo:insuranceForm.memo.trim()||null,...(userId?{user_id:userId}:{})}))
-      const {error}=await withMutationTimeout(supabase.from('insurance_fees').insert(rows))
-      if (error){toast.error('등록 실패: '+error.message);return}
+      const rows=insuranceForm.rider_ids.map(rid=>({rider_id:rid,employment_fee:isNaN(empFee)?0:empFee,accident_fee:isNaN(accFee)?0:accFee,date_mode:insuranceForm.date_mode,week_start:insuranceForm.date_mode==='week'?insuranceForm.week_start:null,deadline_date:insuranceForm.date_mode==='deadline'?insuranceForm.deadline_date:null,memo:insuranceForm.memo.trim()||null}))
+      const res = await fetchWithTimeout('/api/admin/insurance-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
       toast.success(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setInsuranceForm(initInsurance());fetchData()
@@ -429,8 +445,9 @@ export default function SettingsPage() {
     setDetailSaving(true)
     try {
       const updates = { item_name: feeEditForm.item_name.trim(), amount, date_mode: feeEditForm.date_mode, week_start: feeEditForm.date_mode==='week'?feeEditForm.week_start:null, deadline_date: feeEditForm.date_mode==='deadline'?feeEditForm.deadline_date:null, memo: feeEditForm.memo.trim()||null }
-      const { error } = await withMutationTimeout(supabase.from('management_fees').update(updates).in('id', g.items.map(i => i.id)))
-      if (error) { toast.error('수정 실패: ' + error.message); return }
+      const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.items.map(i => i.id), updates }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
       toast.success('수정되었습니다.')
       bumpSettlementResults()
       setFeeDetailTab('info'); setDetailFee(null); fetchData()
@@ -493,8 +510,9 @@ export default function SettingsPage() {
     setDetailSaving(true)
     try {
       const updates = { employment_fee: isNaN(empFee)?0:empFee, accident_fee: isNaN(accFee)?0:accFee, date_mode: insEditForm.date_mode, week_start: insEditForm.date_mode==='week'?insEditForm.week_start:null, deadline_date: insEditForm.date_mode==='deadline'?insEditForm.deadline_date:null, memo: insEditForm.memo.trim()||null }
-      const { error } = await withMutationTimeout(supabase.from('insurance_fees').update(updates).in('id', g.items.map(i => i.id)))
-      if (error) { toast.error('수정 실패: ' + error.message); return }
+      const res = await fetchWithTimeout('/api/admin/insurance-fees', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.items.map(i => i.id), updates }), credentials: 'same-origin' }, 30_000)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
       toast.success('수정되었습니다.')
       bumpSettlementResults()
       setInsDetailTab('info'); setDetailIns(null); fetchData()
