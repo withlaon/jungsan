@@ -63,38 +63,38 @@ export async function GET() {
       return NextResponse.json({ error: '구독 정보를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    await reconcileSubscriptionIfPortOnePaid(admin, user.id, {
-      status: subscription.status,
-      failed_count: subscription.failed_count,
-      billing_key: subscription.billing_key,
-      last_payment_id: subscription.last_payment_id,
-    })
+    // ── reconcile / lazy billing: 모두 fire-and-forget (응답 속도 최우선) ──
+    // PortOne 외부 API 호출이 포함되어 있으므로 await 하지 않음.
+    // 결과는 다음 billing/status 호출 시 반영됩니다.
+    void (async () => {
+      try {
+        await reconcileSubscriptionIfPortOnePaid(admin, user.id, {
+          status: subscription.status,
+          failed_count: subscription.failed_count,
+          billing_key: subscription.billing_key,
+          last_payment_id: subscription.last_payment_id,
+        })
 
-    const { data: refreshed } = await admin
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (refreshed) {
-      subscription = refreshed
-    }
-
-    // ── Lazy billing: Vercel Cron이 미동작한 경우를 대비한 안전망 ──
-    // 응답 속도 보장을 위해 fire-and-forget으로 실행 (await 하지 않음)
-    const nowLazy = new Date()
-    const lazyDueAt = subscription.next_billing_at ? new Date(subscription.next_billing_at) : null
-    const lazyChargeable =
-      !!subscription.billing_key &&
-      ['active', 'past_due', 'trial'].includes(subscription.status) &&
-      lazyDueAt !== null &&
-      lazyDueAt <= nowLazy
-
-    if (lazyChargeable) {
-      void attemptSubscriptionCharge(admin, user.id, nowLazy).catch((e) =>
-        console.error('[billing/status] lazy charge error:', e)
-      )
-    }
+        const { data: afterReconcile } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        const sub = afterReconcile ?? subscription
+        const nowLazy = new Date()
+        const lazyDueAt = sub.next_billing_at ? new Date(sub.next_billing_at) : null
+        const lazyChargeable =
+          !!sub.billing_key &&
+          ['active', 'past_due', 'trial'].includes(sub.status) &&
+          lazyDueAt !== null &&
+          lazyDueAt <= nowLazy
+        if (lazyChargeable) {
+          await attemptSubscriptionCharge(admin, user.id, nowLazy)
+        }
+      } catch (e) {
+        console.error('[billing/status] background reconcile/charge error:', e)
+      }
+    })()
 
     const now = new Date()
     const trialEndsAt = new Date(subscription.trial_ends_at)

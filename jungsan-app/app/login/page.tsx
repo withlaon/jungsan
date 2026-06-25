@@ -11,10 +11,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bike, Loader2, UserPlus } from 'lucide-react'
 import { merchantHasAppAccessFromBillingApiPayload } from '@/lib/subscription/merchant-subscription-access'
 
+const LOGIN_STEP_TIMEOUT_MS = 6_000   // 개별 단계 타임아웃
+const BILLING_FETCH_TIMEOUT_MS = 5_000 // billing/status 타임아웃
+
+/** 타임아웃이 되면 undefined 반환 */
+function raceTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([
+    Promise.resolve(promise).then((v) => v as T | undefined).catch((): undefined => undefined),
+    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+  ])
+}
+
 /**
  * 로그인 후 이동할 경로를 결정합니다.
  * userId가 이미 있으면 getUser() 네트워크 호출을 건너뛰고,
  * profiles 쿼리와 billing/status 요청을 병렬로 실행합니다.
+ * 각 단계에 타임아웃을 적용해 느린 네트워크에서도 빠르게 진행합니다.
  */
 async function resolvePostLoginRedirect(
   supabase: ReturnType<typeof createClient>,
@@ -23,20 +35,39 @@ async function resolvePostLoginRedirect(
 ): Promise<string> {
   const safe = redirectTo.startsWith('/') ? redirectTo : '/dashboard'
 
-  // userId가 없으면 서버 검증 필요
-  const uid = knownUserId ?? (await supabase.auth.getUser()).data.user?.id
+  // userId가 없으면 서버 검증 필요 (타임아웃 적용)
+  let uid = knownUserId
+  if (!uid) {
+    const userResult = await raceTimeout(supabase.auth.getUser(), LOGIN_STEP_TIMEOUT_MS)
+    uid = userResult?.data?.user?.id ?? null
+  }
   if (!uid) return safe
 
-  // profiles 쿼리 + billing 상태를 병렬로 실행 (약 300ms 절약)
+  // profiles 쿼리 + billing 상태를 병렬로 실행 (타임아웃 각각 적용)
   const [profRes, billingRes] = await Promise.all([
-    supabase.from('profiles').select('username').eq('id', uid).maybeSingle(),
-    fetch('/api/billing/status', { credentials: 'include' }).catch(() => null),
+    raceTimeout(
+      supabase.from('profiles').select('username').eq('id', uid).maybeSingle(),
+      LOGIN_STEP_TIMEOUT_MS
+    ),
+    raceTimeout(
+      fetch('/api/billing/status', {
+        credentials: 'include',
+        signal: AbortSignal.timeout?.(BILLING_FETCH_TIMEOUT_MS),
+      }).catch(() => null),
+      BILLING_FETCH_TIMEOUT_MS + 500
+    ),
   ])
 
-  if (profRes.data?.username?.toLowerCase() === 'admin') return '/site-admin'
+  if (profRes?.data?.username?.toLowerCase() === 'admin') return '/site-admin'
 
-  if (!billingRes?.ok) return '/subscription'
-  const data = await billingRes.json().catch(() => ({}))
+  const billingResponse = billingRes ?? null
+  if (!billingResponse?.ok) return '/subscription'
+
+  const data = await raceTimeout(
+    billingResponse.json().catch(() => ({})) as Promise<Record<string, unknown>>,
+    2_000
+  ) ?? {}
+
   if (
     merchantHasAppAccessFromBillingApiPayload(
       data as {
@@ -80,27 +111,29 @@ function LoginForm() {
       })
       return
     }
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const userId = session.user?.id ?? null
-        // 세션이 이미 있으면 데이터 프리페치 시작 (리다이렉트와 병렬)
-        if (userId) {
-          Promise.all([
-            import('@/hooks/useSettlements').then(m => m.prefetchSettlementsForUser(userId)),
-            import('@/hooks/useAdvancePayments').then(m => m.prefetchPaymentsForUser(userId)),
-            import('@/hooks/useRiders').then(m => m.revalidateRiders()),
-          ]).catch(() => {})
+    raceTimeout(supabase.auth.getSession(), LOGIN_STEP_TIMEOUT_MS)
+      .then(async (result) => {
+        const session = result?.data?.session ?? null
+        if (session) {
+          const userId = session.user?.id ?? null
+          if (userId) {
+            Promise.all([
+              import('@/hooks/useSettlements').then(m => m.prefetchSettlementsForUser(userId)),
+              import('@/hooks/useAdvancePayments').then(m => m.prefetchPaymentsForUser(userId)),
+              import('@/hooks/useRiders').then(m => m.revalidateRiders()),
+            ]).catch(() => {})
+          }
+          const dest = await resolvePostLoginRedirect(
+            supabase,
+            redirectTo.startsWith('/') ? redirectTo : '/dashboard',
+            userId
+          )
+          router.replace(dest)
+        } else {
+          setCheckingSession(false)
         }
-        const dest = await resolvePostLoginRedirect(
-          supabase,
-          redirectTo.startsWith('/') ? redirectTo : '/dashboard',
-          userId
-        )
-        router.replace(dest)
-      } else {
-        setCheckingSession(false)
-      }
-    })
+      })
+      .catch(() => setCheckingSession(false))
   }, [router, searchParams, redirectTo])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -133,15 +166,18 @@ function LoginForm() {
         return
       }
     } else {
-      // 일반 회원: username으로 email 조회
-      const { data: rpcEmail, error: rpcError } = await supabase.rpc('get_email_by_username', {
-        p_username: trimmedUsername,
-      })
-      if (rpcError) {
+      // 일반 회원: username으로 email 조회 (타임아웃 6초)
+      const rpcResult = await raceTimeout(
+        supabase.rpc('get_email_by_username', { p_username: trimmedUsername }),
+        LOGIN_STEP_TIMEOUT_MS
+      )
+      // undefined = 타임아웃, error = RPC 오류
+      if (!rpcResult || rpcResult.error) {
         setError('아이디 또는 비밀번호가 올바르지 않습니다.')
         setLoading(false)
         return
       }
+      const rpcEmail = rpcResult.data
       // RPC 반환: 단일 문자열 또는 [{email: "..."}]
       if (typeof rpcEmail === 'string') email = rpcEmail
       else if (Array.isArray(rpcEmail) && rpcEmail[0]) {
@@ -156,7 +192,17 @@ function LoginForm() {
       return
     }
 
-    const { error: authError, data: authData } = await supabase.auth.signInWithPassword({ email, password })
+    // signInWithPassword 타임아웃 10초
+    const signInResult = await raceTimeout(
+      supabase.auth.signInWithPassword({ email, password }),
+      10_000
+    )
+    if (!signInResult) {
+      setError('로그인 요청 시간이 초과되었습니다. 다시 시도해 주세요.')
+      setLoading(false)
+      return
+    }
+    const { error: authError, data: authData } = signInResult
 
     if (authError) {
       setError('아이디 또는 비밀번호가 올바르지 않습니다.')
