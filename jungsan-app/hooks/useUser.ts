@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 
-export type Platform = 'baemin' | 'coupang'
+export type Platform = 'baemin'
 
 interface UserCache {
   user: User | null

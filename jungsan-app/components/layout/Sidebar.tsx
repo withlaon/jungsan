@@ -24,7 +24,6 @@ import {
   EyeOff,
   UserX,
   AlertTriangle,
-  Package,
   ImagePlus,
   Trash2,
   Menu,
@@ -42,13 +41,6 @@ const PLATFORM_CONFIG = {
     accent: 'bg-teal-600',
     activeNav: 'bg-teal-600 text-white shadow-lg',
     icon: Bike,
-  },
-  coupang: {
-    label: '쿠팡 라이더 정산',
-    sub: '쿠팡이츠',
-    accent: 'bg-violet-600',
-    activeNav: 'bg-violet-600 text-white shadow-lg',
-    icon: Package,
   },
 } as const
 import { Button } from '@/components/ui/button'

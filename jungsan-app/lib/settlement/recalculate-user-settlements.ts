@@ -101,13 +101,6 @@ export async function recalculateAllSettlementsForUser(
   const errors: string[] = []
   let recalculated = 0
 
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('platform')
-    .eq('id', userId)
-    .maybeSingle()
-  const platform = profile?.platform === 'coupang' ? 'coupang' : 'baemin'
-
   const feeSettings = await loadFeeSettings(admin, userId)
 
   let mq = admin.from('management_fees').select('*')
@@ -164,8 +157,7 @@ export async function recalculateAllSettlementsForUser(
         (managementFees ?? []) as ManagementFee[],
         ws.week_start,
         ws.week_end,
-        (insuranceFees ?? []) as InsuranceFee[],
-        platform
+        (insuranceFees ?? []) as InsuranceFee[]
       )
 
       const byRider = new Map(results.map((r) => [r.riderId, r]))

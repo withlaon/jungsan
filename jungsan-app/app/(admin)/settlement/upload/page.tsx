@@ -212,10 +212,6 @@ export default function SettlementUploadPage() {
       const res  = await fetchWithTimeout('/api/parse-excel', { method: 'POST', body: formData }, 90_000)
       const data = await res.json()
       if (data.success) {
-        // 디버그: 실제 파일 시트/헤더 구조 콘솔 출력 (쿠팡이츠 파싱 문제 분석용)
-        console.log('[parse-excel] detectedPlatform:', data.detectedPlatform)
-        console.log('[parse-excel] rows:', data.rows?.length)
-        console.log('[parse-excel] debugAllSheets:', JSON.stringify(data.debugAllSheets, null, 2))
         return {
           success: true, rows: data.rows, summary: data.summary,
           detectedPlatform: data.detectedPlatform,
@@ -366,7 +362,7 @@ export default function SettlementUploadPage() {
         const rNameNorm = r.name.replace(/\s/g, '').toLowerCase()
         const rUserNorm = (r.rider_username ?? '').replace(/\s/g, '').toLowerCase()
 
-        // 1) 파일 userId(라이선스ID) ↔ 사이트 rider_username 일치 (쿠팡이츠 핵심 매핑)
+        // 1) 파일 userId ↔ 사이트 rider_username 일치
         if (rowUidNorm && rUserNorm && rUserNorm === rowUidNorm) return true
         // 2) 파일 기사이름 ↔ 사이트 라이더명 일치
         if (rNameNorm === rowNameNorm) return true
@@ -462,11 +458,7 @@ export default function SettlementUploadPage() {
       }
       const inputs = Array.from(mergedMap.values())
 
-      // 업로드된 파일 중 쿠팡이츠로 감지된 파일이 있으면 platform을 'coupang'으로 override
-      const hasCoupangFile = uploadedFiles.some(f => f.detectedPlatform === 'coupang')
-      const effectivePlatform = hasCoupangFile ? 'coupang' : (platform ?? 'baemin')
-
-      const calc = calculateSettlement(inputs, effectiveSettings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees, effectivePlatform)
+      const calc = calculateSettlement(inputs, effectiveSettings, promotions, advances, managementFees, weekStart, weekEnd, insuranceFees)
       setResults(calc)
       setStep('confirm')
     } catch (err) {

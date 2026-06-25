@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bike, Loader2, CheckCircle, XCircle, ArrowLeft, Package } from 'lucide-react'
+import { Bike, Loader2, CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken'
 type BizStatus = 'idle' | 'checking' | 'available' | 'taken'
-type Platform = 'baemin' | 'coupang'
+type Platform = 'baemin'
 
 const PLATFORMS: { id: Platform; label: string; desc: string; color: string; border: string; icon: React.ReactNode }[] = [
   {
@@ -22,14 +22,6 @@ const PLATFORMS: { id: Platform; label: string; desc: string; color: string; bor
     color: 'text-teal-300',
     border: 'border-teal-500 bg-teal-900/30',
     icon: <Bike className="h-6 w-6 text-teal-400" />,
-  },
-  {
-    id: 'coupang',
-    label: '쿠팡이츠',
-    desc: '쿠팡 라이더 정산',
-    color: 'text-red-300',
-    border: 'border-red-500 bg-red-900/30',
-    icon: <Package className="h-6 w-6 text-red-400" />,
   },
 ]
 
