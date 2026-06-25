@@ -158,6 +158,12 @@ function LoginForm() {
       const trimmedUsername = username.trim()
       let email: string | null = null
 
+      // windcall 계정만 허용
+      if (trimmedUsername.toLowerCase() !== 'windcall') {
+        setError('아이디 또는 비밀번호가 올바르지 않습니다.')
+        return
+      }
+
       // admin: API로 사용자 생성/확인 + 비밀번호 동기화 후 로그인
       if (trimmedUsername.toLowerCase() === 'admin') {
         email = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@jungsan.local'
@@ -292,6 +298,7 @@ function LoginForm() {
             <Bike className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">라이더 정산 시스템</h1>
+          <p className="mt-2 text-red-400 text-lg font-bold text-center">이 사이트는 폐쇄되었습니다. 불편드려 죄송합니다.</p>
           <p className="text-slate-400 mt-1 text-sm">관리자 전용 페이지</p>
         </div>
 
