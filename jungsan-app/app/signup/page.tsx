@@ -213,6 +213,10 @@ export default function SignupPage() {
         <Card className="border-slate-700 bg-slate-800/50 backdrop-blur shadow-2xl">
           <CardHeader>
             <CardTitle className="text-white text-xl">회원가입</CardTitle>
+            <div className="mt-2 mb-1 rounded-md border border-amber-600/60 bg-amber-900/20 px-3 py-2.5 text-xs leading-relaxed text-amber-300">
+              무료사용기간 후 1개월 이내에 구독을 하지 않으시거나, 구독 해제 후 1개월간 재구독을 하지 않으시면 저장된 데이터는 전부 삭제됩니다.<br />
+              또한, 자동 회원탈퇴됩니다. 참고해 주세요.
+            </div>
             <CardDescription className="text-slate-400">
               <span className="text-red-400">*</span> 표시는 필수 입력 항목입니다
             </CardDescription>
