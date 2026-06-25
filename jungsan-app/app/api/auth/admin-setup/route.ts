@@ -30,12 +30,11 @@ export async function POST(request: NextRequest) {
     const existing = listData?.users?.find((u) => u.email === adminEmail)
 
     if (existing) {
-      // 이메일 확인 처리 (미확인 시)
-      if (!existing.email_confirmed_at) {
-        await supabase.auth.admin.updateUserById(existing.id, {
-          email_confirm: true,
-        })
-      }
+      // 이메일 확인 + 비밀번호 업데이트 (매 로그인 시 입력한 비밀번호로 동기화)
+      await supabase.auth.admin.updateUserById(existing.id, {
+        email_confirm: true,
+        password: trimmedPassword,
+      })
       // profiles에 username=admin 확인 (사이트관리자 접근용)
       const { data: profile } = await supabase.from('profiles').select('id').eq('id', existing.id).maybeSingle()
       if (!profile) {

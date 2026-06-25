@@ -158,41 +158,63 @@ function LoginForm() {
       const trimmedUsername = username.trim()
       let email: string | null = null
 
-      // admin: API로 사용자 생성/확인 후 로그인
+      // admin: API로 사용자 생성/확인 + 비밀번호 동기화 후 로그인
       if (trimmedUsername.toLowerCase() === 'admin') {
         email = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@jungsan.local'
         try {
-          const res = await fetch('/api/auth/admin-setup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: trimmedUsername, password }),
-          })
-          const data = await res.json().catch(() => ({}))
-          if (!res.ok) {
-            setError(data?.error || 'admin 계정 설정 실패. SUPABASE_SERVICE_ROLE_KEY를 .env.local에 추가해주세요.')
-            return
+          const res = await raceTimeout(
+            fetch('/api/auth/admin-setup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: trimmedUsername, password }),
+            }),
+            LOGIN_STEP_TIMEOUT_MS
+          )
+          if (res && !res.ok) {
+            const data = await res.json().catch(() => ({}))
+            console.warn('[admin-setup] failed:', data?.error)
+            // admin-setup 실패해도 이미 계정이 있을 수 있으므로 signIn 계속 시도
           }
         } catch {
-          setError('admin 계정 준비 중 오류가 발생했습니다.')
-          return
+          // admin-setup 예외 시에도 signIn 시도 (이미 admin 계정이 있는 경우)
+          console.warn('[admin-setup] exception, proceeding to signIn')
         }
       } else {
-        // 일반 회원: username으로 email 조회 (타임아웃 6초)
-        const rpcResult = await raceTimeout(
-          supabase.rpc('get_email_by_username', { p_username: trimmedUsername }),
-          LOGIN_STEP_TIMEOUT_MS
-        )
-        // undefined = 타임아웃, error = RPC 오류
-        if (!rpcResult || rpcResult.error) {
-          setError('아이디 또는 비밀번호가 올바르지 않습니다.')
-          return
+        // 일반 회원: 서버 API로 email 조회 (Admin Client 사용, RPC 의존 없음)
+        let emailFromApi: string | null = null
+        try {
+          const apiRes = await raceTimeout(
+            fetch('/api/auth/email-by-username', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: trimmedUsername }),
+            }),
+            LOGIN_STEP_TIMEOUT_MS
+          )
+          if (apiRes?.ok) {
+            const apiData = await apiRes.json().catch(() => ({}))
+            emailFromApi = typeof apiData?.email === 'string' ? apiData.email : null
+          }
+        } catch {
+          // API 실패 시 RPC fallback
         }
-        const rpcEmail = rpcResult.data
-        // RPC 반환: 단일 문자열 또는 [{email: "..."}]
-        if (typeof rpcEmail === 'string') email = rpcEmail
-        else if (Array.isArray(rpcEmail) && rpcEmail[0]) {
-          const first = rpcEmail[0]
-          email = typeof first === 'string' ? first : (first as { email?: string }).email ?? null
+
+        if (emailFromApi) {
+          email = emailFromApi
+        } else {
+          // Fallback: RPC (DB에 get_email_by_username 함수가 있는 경우)
+          const rpcResult = await raceTimeout(
+            supabase.rpc('get_email_by_username', { p_username: trimmedUsername }),
+            LOGIN_STEP_TIMEOUT_MS
+          )
+          if (rpcResult && !rpcResult.error) {
+            const rpcEmail = rpcResult.data
+            if (typeof rpcEmail === 'string') email = rpcEmail
+            else if (Array.isArray(rpcEmail) && rpcEmail[0]) {
+              const first = rpcEmail[0]
+              email = typeof first === 'string' ? first : (first as { email?: string }).email ?? null
+            }
+          }
         }
       }
 
