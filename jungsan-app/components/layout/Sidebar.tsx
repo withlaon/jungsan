@@ -22,8 +22,6 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  UserX,
-  AlertTriangle,
   ImagePlus,
   Trash2,
   Menu,
@@ -87,7 +85,6 @@ function AdminSidebarPanel({
   onCloseMobile,
   onLogout,
   onOpenProfile,
-  onOpenWithdraw,
 }: {
   pathname: string
   config: PlatformConfig
@@ -96,7 +93,6 @@ function AdminSidebarPanel({
   onCloseMobile: () => void
   onLogout: () => void
   onOpenProfile: () => void
-  onOpenWithdraw: () => void
 }) {
   return (
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
@@ -191,15 +187,6 @@ function AdminSidebarPanel({
           <Pencil className="h-4 w-4" />
           정보수정
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onOpenWithdraw}
-          className="w-full justify-start text-rose-500 hover:text-rose-400 hover:bg-rose-900/20 gap-3"
-        >
-          <UserX className="h-4 w-4" />
-          회원탈퇴
-        </Button>
       </div>
     </aside>
   )
@@ -229,10 +216,6 @@ export function Sidebar() {
   const [logoUploading, setLogoUploading] = useState(false)
   // useUser 캐시에서 로고 URL 즉시 사용 (별도 DB 요청 없음)
   const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string>(cachedLogoUrl ?? '')
-
-  const [withdrawOpen, setWithdrawOpen] = useState(false)
-  const [withdrawing, setWithdrawing] = useState(false)
-  const [withdrawMsg, setWithdrawMsg] = useState('')
 
   // cachedLogoUrl이 useUser 로딩 후 업데이트되면 반영
   useEffect(() => {
@@ -379,38 +362,6 @@ export function Sidebar() {
     window.location.href = 'https://jungsan-time.com/'
   }
 
-  const handleWithdraw = async () => {
-    setWithdrawing(true)
-    setWithdrawMsg('')
-    try {
-      // 클라이언트에서 최신 토큰을 직접 가져와 헤더로 전달
-      // → 서버 쿠키가 만료된 경우에도 탈퇴 처리 가능
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token ?? ''
-
-      const res = await fetch('/api/auth/withdraw', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setWithdrawMsg('탈퇴 처리 실패: ' + (json?.error ?? res.statusText))
-        setWithdrawing(false)
-        return
-      }
-      // auth.users 삭제 완료 → 쿠키 정리 후 랜딩 페이지로 이동
-      try {
-        await fetch('/api/auth/signout', { method: 'POST', keepalive: true })
-      } catch { /* 무시 */ }
-      window.location.href = 'https://jungsan-time.com/'
-    } catch {
-      setWithdrawMsg('탈퇴 처리 중 오류가 발생했습니다.')
-      setWithdrawing(false)
-    }
-  }
-
   // 모바일에서 경로 변경 시 드로어 닫기
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
@@ -422,10 +373,6 @@ export function Sidebar() {
     onCloseMobile: () => setMobileOpen(false),
     onLogout: handleLogout,
     onOpenProfile: () => setProfileOpen(true),
-    onOpenWithdraw: () => {
-      setWithdrawMsg('')
-      setWithdrawOpen(true)
-    },
   }
 
 
@@ -651,52 +598,6 @@ export function Sidebar() {
               {(saving || logoUploading)
                 ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />{logoUploading ? '로고 업로드 중' : '저장 중'}</>
                 : '저장'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-    {/* 회원탈퇴 확인 다이얼로그 */}
-    <Dialog open={withdrawOpen} onOpenChange={v => { if (!withdrawing) setWithdrawOpen(v) }}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-rose-400" />
-            회원탈퇴
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-1">
-          <div className="bg-rose-900/20 border border-rose-700/40 rounded-lg p-4 space-y-2">
-            <p className="text-rose-300 text-sm font-medium">탈퇴 시 다음 데이터가 모두 삭제됩니다.</p>
-            <ul className="text-rose-400/80 text-xs space-y-1 list-disc list-inside">
-              <li>관리자 계정 및 프로필 정보</li>
-              <li>라이더 정보 및 정산 내역</li>
-              <li>프로모션, 관리비, 선지급금 설정</li>
-            </ul>
-          </div>
-          <p className="text-slate-400 text-sm">이 작업은 되돌릴 수 없습니다. 정말 탈퇴하시겠습니까?</p>
-
-          {withdrawMsg && (
-            <p className="text-rose-400 text-sm text-center">{withdrawMsg}</p>
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setWithdrawOpen(false)}
-              disabled={withdrawing}
-              className="flex-1 border border-slate-700 text-slate-400 hover:text-white"
-            >
-              취소
-            </Button>
-            <Button
-              onClick={handleWithdraw}
-              disabled={withdrawing}
-              className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
-            >
-              {withdrawing
-                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />탈퇴 중...</>
-                : <><UserX className="h-4 w-4 mr-1" />탈퇴하기</>}
             </Button>
           </div>
         </div>

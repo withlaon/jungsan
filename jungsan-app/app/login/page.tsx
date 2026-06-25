@@ -2,13 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bike, Loader2, UserPlus } from 'lucide-react'
+import { Bike, Loader2 } from 'lucide-react'
 
 const LOGIN_STEP_TIMEOUT_MS = 6_000
 
@@ -220,25 +219,6 @@ function LoginForm() {
                 )}
               </Button>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-slate-700" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-slate-800/50 px-2 text-slate-500">또는</span>
-                </div>
-              </div>
-
-              <Link href="/signup">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white h-11"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  회원가입
-                </Button>
-              </Link>
             </form>
           </CardContent>
         </Card>
