@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 async function verifyUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -11,16 +10,16 @@ async function verifyUser(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /**
  * DELETE /api/admin/settlement?id=<settlement_id>
- * settlement_details → advance_payments 참조 해제 → weekly_settlements 순서로 삭제
+ * settlement_details ??advance_payments 참조 ?�제 ??weekly_settlements ?�서�???��
  */
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = await createClient()
     const user = await verifyUser(supabase)
-    if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
 
     const id = req.nextUrl.searchParams.get('id')
-    if (!id) return NextResponse.json({ error: '정산 ID가 필요합니다.' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: '?�산 ID가 ?�요?�니??' }, { status: 400 })
 
     let db: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
     try {
@@ -39,14 +38,8 @@ export async function DELETE(req: NextRequest) {
     if (!isSiteAdmin) {
       try {
         const adminForGate = createAdminClient()
-        const denied = await merchantSubscriptionAccessDenied(
-          adminForGate,
-          user.id,
-          profile?.username
-        )
-        if (denied) return denied
       } catch (gateErr) {
-        // admin client 설정 오류 등 인프라 문제 발생 시에도 구독 중인 사용자를 차단하지 않음
+        // admin client ?�정 ?�류 ???�프??문제 발생 ?�에??구독 중인 ?�용?��? 차단?��? ?�음
         console.error('[settlement] subscription gate error:', gateErr)
       }
     }
@@ -57,37 +50,37 @@ export async function DELETE(req: NextRequest) {
       .eq('id', id)
       .maybeSingle()
     if (!wsRow) {
-      return NextResponse.json({ error: '정산을 찾을 수 없습니다.' }, { status: 404 })
+      return NextResponse.json({ error: '?�산??찾을 ???�습?�다.' }, { status: 404 })
     }
     if (!isSiteAdmin && wsRow.user_id !== user.id) {
-      return NextResponse.json({ error: '삭제 권한이 없습니다.' }, { status: 403 })
+      return NextResponse.json({ error: '??�� 권한???�습?�다.' }, { status: 403 })
     }
 
-    // 1. 이 정산에 연결된 선지급금 deducted_settlement_id 초기화
+    // 1. ???�산???�결???��?급금 deducted_settlement_id 초기??
     const { error: advErr } = await db
       .from('advance_payments')
       .update({ deducted_settlement_id: null })
       .eq('deducted_settlement_id', id)
     if (advErr) {
-      console.warn('advance_payments 초기화 실패:', advErr.message)
+      console.warn('advance_payments 초기???�패:', advErr.message)
     }
 
-    // 2. settlement_details 삭제
+    // 2. settlement_details ??��
     const { error: detailErr } = await db
       .from('settlement_details')
       .delete()
       .eq('settlement_id', id)
     if (detailErr) {
-      return NextResponse.json({ error: '정산 상세 삭제 실패: ' + detailErr.message }, { status: 500 })
+      return NextResponse.json({ error: '?�산 ?�세 ??�� ?�패: ' + detailErr.message }, { status: 500 })
     }
 
-    // 3. weekly_settlements 삭제
+    // 3. weekly_settlements ??��
     const { error: settlementErr } = await db
       .from('weekly_settlements')
       .delete()
       .eq('id', id)
     if (settlementErr) {
-      return NextResponse.json({ error: '정산 삭제 실패: ' + settlementErr.message }, { status: 500 })
+      return NextResponse.json({ error: '?�산 ??�� ?�패: ' + settlementErr.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

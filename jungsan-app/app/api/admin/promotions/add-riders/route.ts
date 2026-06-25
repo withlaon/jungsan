@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 type AddRidersBody = {
   sourcePromoId?: string
@@ -27,7 +26,7 @@ function promoGroupMatches(
 
 /**
  * POST /api/admin/promotions/add-riders
- * 기존 프로모션 설정을 복사해 라이더별 프로모션 행을 추가합니다.
+ * 기존 ?�로모션 ?�정??복사???�이?�별 ?�로모션 ?�을 추�??�니??
  */
 export async function POST(req: NextRequest) {
   try {
@@ -36,14 +35,14 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+      return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
     }
 
     let body: AddRidersBody
     try {
       body = (await req.json()) as AddRidersBody
     } catch {
-      return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
+      return NextResponse.json({ error: '?�청 ?�식???�바르�? ?�습?�다.' }, { status: 400 })
     }
 
     const sourcePromoId = typeof body.sourcePromoId === 'string' ? body.sourcePromoId.trim() : ''
@@ -52,10 +51,10 @@ export async function POST(req: NextRequest) {
       : []
 
     if (!sourcePromoId) {
-      return NextResponse.json({ error: '프로모션 ID가 필요합니다.' }, { status: 400 })
+      return NextResponse.json({ error: '?�로모션 ID가 ?�요?�니??' }, { status: 400 })
     }
     if (riderIds.length === 0) {
-      return NextResponse.json({ error: '추가할 라이더를 선택해주세요.' }, { status: 400 })
+      return NextResponse.json({ error: '추�????�이?��? ?�택?�주?�요.' }, { status: 400 })
     }
 
     let db: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>
@@ -75,8 +74,6 @@ export async function POST(req: NextRequest) {
     if (!isGlobalAdmin) {
       try {
         const adminForGate = createAdminClient()
-        const denied = await merchantSubscriptionAccessDenied(adminForGate, user.id, profile?.username)
-        if (denied) return denied
       } catch (gateErr) {
         console.error('[promotions/add-riders] subscription gate error:', gateErr)
       }
@@ -92,10 +89,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: sourceErr.message }, { status: 500 })
     }
     if (!source) {
-      return NextResponse.json({ error: '프로모션을 찾을 수 없습니다.' }, { status: 404 })
+      return NextResponse.json({ error: '?�로모션??찾을 ???�습?�다.' }, { status: 404 })
     }
     if (!isGlobalAdmin && source.user_id != null && source.user_id !== user.id) {
-      return NextResponse.json({ error: '추가 권한이 없습니다.' }, { status: 403 })
+      return NextResponse.json({ error: '추�? 권한???�습?�다.' }, { status: 403 })
     }
 
     const ownerUserId = source.user_id ?? user.id
@@ -111,7 +108,7 @@ export async function POST(req: NextRequest) {
     const validIds = new Set((validRiders ?? []).map((r) => r.id))
     const allowedRiderIds = riderIds.filter((id) => validIds.has(id))
     if (allowedRiderIds.length === 0) {
-      return NextResponse.json({ error: '선택한 라이더를 추가할 수 없습니다.' }, { status: 400 })
+      return NextResponse.json({ error: '?�택???�이?��? 추�??????�습?�다.' }, { status: 400 })
     }
 
     const { data: userPromos, error: groupErr } = await db
@@ -132,7 +129,7 @@ export async function POST(req: NextRequest) {
     const newRiderIds = allowedRiderIds.filter((id) => !existingRiderIds.has(id))
     if (newRiderIds.length === 0) {
       return NextResponse.json(
-        { error: '선택한 라이더는 이미 모두 적용되어 있습니다.' },
+        { error: '?�택???�이?�는 ?��? 모두 ?�용?�어 ?�습?�다.' },
         { status: 409 }
       )
     }

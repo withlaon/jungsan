@@ -1,12 +1,11 @@
-/**
+﻿/**
  * POST /api/settlement/recalculate
- * 로그인한 사업자(user_id) 기준 주간 정산 상세를 최신 설정으로 재계산합니다.
+ * 로그?�한 ?�업??user_id) 기�? 주간 ?�산 ?�세�?최신 ?�정?�로 ?�계?�합?�다.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recalculateAllSettlementsForUser } from '@/lib/settlement/recalculate-user-settlements'
-import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +14,7 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+      return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
     }
 
     const adminGate = createAdminClient()
@@ -24,8 +23,6 @@ export async function POST(req: NextRequest) {
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
-    const denied = await merchantSubscriptionAccessDenied(adminGate, user.id, profile?.username)
-    if (denied) return denied
 
     let onlySettlementId: string | undefined
     try {
@@ -34,7 +31,7 @@ export async function POST(req: NextRequest) {
         onlySettlementId = body.settlementId
       }
     } catch {
-      /* body 없음 */
+      /* body ?�음 */
     }
 
     const { recalculated, errors } = await recalculateAllSettlementsForUser(
@@ -47,7 +44,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[settlement/recalculate]', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : '재계산 중 오류가 발생했습니다.' },
+      { error: err instanceof Error ? err.message : '?�계??�??�류가 발생?�습?�다.' },
       { status: 500 }
     )
   }

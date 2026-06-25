@@ -9,10 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bike, Loader2, UserPlus } from 'lucide-react'
-import { merchantHasAppAccessFromBillingApiPayload } from '@/lib/subscription/merchant-subscription-access'
 
-const LOGIN_STEP_TIMEOUT_MS = 6_000   // 개별 단계 타임아웃
-const BILLING_FETCH_TIMEOUT_MS = 5_000 // billing/status 타임아웃
+const LOGIN_STEP_TIMEOUT_MS = 6_000
 
 /** 타임아웃이 되면 undefined 반환 */
 function raceTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T | undefined> {
@@ -20,81 +18,6 @@ function raceTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T | undefi
     Promise.resolve(promise).then((v) => v as T | undefined).catch((): undefined => undefined),
     new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
   ])
-}
-
-/**
- * 로그인 후 이동할 경로를 결정합니다.
- * - 각 단계에 타임아웃 적용 (네트워크 지연 방어)
- * - billing/status 타임아웃 시에는 '/subscription' 대신 safe URL(대시보드)로 이동
- *   (이미 인증이 완료된 사용자를 불필요하게 구독 페이지로 보내지 않음)
- */
-async function resolvePostLoginRedirect(
-  supabase: ReturnType<typeof createClient>,
-  redirectTo: string,
-  knownUserId?: string | null
-): Promise<string> {
-  const safe = redirectTo.startsWith('/') ? redirectTo : '/dashboard'
-
-  try {
-    // userId가 없으면 서버 검증 필요 (타임아웃 적용)
-    let uid = knownUserId
-    if (!uid) {
-      const userResult = await raceTimeout(supabase.auth.getUser(), LOGIN_STEP_TIMEOUT_MS)
-      uid = userResult?.data?.user?.id ?? null
-    }
-    if (!uid) return safe
-
-    // profiles 쿼리 + billing 상태를 병렬로 실행 (타임아웃 각각 적용)
-    // billing fetch용 AbortController (구형 브라우저 AbortSignal.timeout 미지원 대비)
-    const billingAbort = new AbortController()
-    const billingAbortTimer = setTimeout(() => billingAbort.abort(), BILLING_FETCH_TIMEOUT_MS)
-
-    const [profRes, billingRes] = await Promise.all([
-      raceTimeout(
-        supabase.from('profiles').select('username').eq('id', uid).maybeSingle(),
-        LOGIN_STEP_TIMEOUT_MS
-      ),
-      raceTimeout(
-        fetch('/api/billing/status', {
-          credentials: 'include',
-          signal: billingAbort.signal,
-        }).catch(() => null).finally(() => clearTimeout(billingAbortTimer)),
-        BILLING_FETCH_TIMEOUT_MS + 500
-      ),
-    ])
-
-    if (profRes?.data?.username?.toLowerCase() === 'admin') return '/site-admin'
-
-    // billingRes === undefined: 타임아웃 → 이미 로그인 완료이므로 대시보드로 이동
-    // billingRes === null: fetch 자체가 실패 → 마찬가지로 대시보드로 이동
-    if (billingRes === undefined || billingRes === null) return safe
-
-    const billingResponse = billingRes
-    if (!billingResponse.ok) return '/subscription'
-
-    const data = await raceTimeout(
-      billingResponse.json().catch(() => ({})) as Promise<Record<string, unknown>>,
-      2_000
-    ) ?? {}
-
-    if (
-      merchantHasAppAccessFromBillingApiPayload(
-        data as {
-          is_trial_active: boolean
-          grace_access_active?: boolean
-          status: string
-          has_card: boolean
-          failed_count?: number
-        }
-      )
-    ) {
-      return safe
-    }
-    return '/subscription'
-  } catch {
-    // 예상치 못한 예외 시에도 대시보드로 이동 (로그인은 성공했으므로)
-    return safe
-  }
 }
 
 function LoginForm() {
@@ -136,12 +59,7 @@ function LoginForm() {
               import('@/hooks/useRiders').then(m => m.revalidateRiders()),
             ]).catch(() => {})
           }
-          const dest = await resolvePostLoginRedirect(
-            supabase,
-            redirectTo.startsWith('/') ? redirectTo : '/dashboard',
-            userId
-          )
-          router.replace(dest)
+          router.replace(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
         } else {
           setCheckingSession(false)
         }
@@ -164,64 +82,22 @@ function LoginForm() {
         return
       }
 
-      // admin: API로 사용자 생성/확인 + 비밀번호 동기화 후 로그인
-      if (trimmedUsername.toLowerCase() === 'admin') {
-        email = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@jungsan.local'
-        try {
-          const res = await raceTimeout(
-            fetch('/api/auth/admin-setup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: trimmedUsername, password }),
-            }),
-            LOGIN_STEP_TIMEOUT_MS
-          )
-          if (res && !res.ok) {
-            const data = await res.json().catch(() => ({}))
-            console.warn('[admin-setup] failed:', data?.error)
-            // admin-setup 실패해도 이미 계정이 있을 수 있으므로 signIn 계속 시도
-          }
-        } catch {
-          // admin-setup 예외 시에도 signIn 시도 (이미 admin 계정이 있는 경우)
-          console.warn('[admin-setup] exception, proceeding to signIn')
+      // email 조회: 서버 API 사용
+      try {
+        const apiRes = await raceTimeout(
+          fetch('/api/auth/email-by-username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: trimmedUsername }),
+          }),
+          LOGIN_STEP_TIMEOUT_MS
+        )
+        if (apiRes?.ok) {
+          const apiData = await apiRes.json().catch(() => ({}))
+          email = typeof apiData?.email === 'string' ? apiData.email : null
         }
-      } else {
-        // 일반 회원: 서버 API로 email 조회 (Admin Client 사용, RPC 의존 없음)
-        let emailFromApi: string | null = null
-        try {
-          const apiRes = await raceTimeout(
-            fetch('/api/auth/email-by-username', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: trimmedUsername }),
-            }),
-            LOGIN_STEP_TIMEOUT_MS
-          )
-          if (apiRes?.ok) {
-            const apiData = await apiRes.json().catch(() => ({}))
-            emailFromApi = typeof apiData?.email === 'string' ? apiData.email : null
-          }
-        } catch {
-          // API 실패 시 RPC fallback
-        }
-
-        if (emailFromApi) {
-          email = emailFromApi
-        } else {
-          // Fallback: RPC (DB에 get_email_by_username 함수가 있는 경우)
-          const rpcResult = await raceTimeout(
-            supabase.rpc('get_email_by_username', { p_username: trimmedUsername }),
-            LOGIN_STEP_TIMEOUT_MS
-          )
-          if (rpcResult && !rpcResult.error) {
-            const rpcEmail = rpcResult.data
-            if (typeof rpcEmail === 'string') email = rpcEmail
-            else if (Array.isArray(rpcEmail) && rpcEmail[0]) {
-              const first = rpcEmail[0]
-              email = typeof first === 'string' ? first : (first as { email?: string }).email ?? null
-            }
-          }
-        }
+      } catch {
+        // 무시
       }
 
       if (!email) {
@@ -229,7 +105,7 @@ function LoginForm() {
         return
       }
 
-      // signInWithPassword 타임아웃 10초
+      // signInWithPassword
       const signInResult = await raceTimeout(
         supabase.auth.signInWithPassword({ email, password }),
         10_000
@@ -246,14 +122,6 @@ function LoginForm() {
       }
 
       const loggedInUserId = authData.user?.id ?? null
-
-      // admin 로그인 시: 라이더 정산 시스템 전체관리자 페이지로 이동
-      if (trimmedUsername.toLowerCase() === 'admin') {
-        router.push('/site-admin')
-        return
-      }
-
-      // 로그인 직후 데이터 프리페치 시작 (resolvePostLoginRedirect와 병렬 실행)
       if (loggedInUserId) {
         Promise.all([
           import('@/hooks/useSettlements').then(m => m.prefetchSettlementsForUser(loggedInUserId)),
@@ -262,14 +130,7 @@ function LoginForm() {
         ]).catch(() => {})
       }
 
-      // resolvePostLoginRedirect 전체에도 12초 타임아웃 적용
-      const safeRedirect = redirectTo.startsWith('/') ? redirectTo : '/dashboard'
-      const dest = await raceTimeout(
-        resolvePostLoginRedirect(supabase, safeRedirect, loggedInUserId),
-        12_000
-      ) ?? safeRedirect
-
-      router.push(dest)
+      router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
     } catch (err) {
       console.error('[handleLogin] unexpected error:', err)
       setError('로그인 중 오류가 발생했습니다. 다시 시도해 주세요.')

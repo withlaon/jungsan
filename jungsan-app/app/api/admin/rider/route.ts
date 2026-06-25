@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 async function getAuthUser() {
   const supabase = await createClient()
@@ -10,12 +9,12 @@ async function getAuthUser() {
 }
 
 /**
- * 라이더 개별 등록
+ * ?�이??개별 ?�록
  */
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser()
-    if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
 
     const admin = createAdminClient()
     const { data: profile } = await admin
@@ -23,13 +22,11 @@ export async function POST(request: NextRequest) {
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
-    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
-    if (denied) return denied
 
     const body = await request.json()
     const { join_date, name, rider_username, id_number, phone, bank_name, bank_account, account_holder, status = 'active' } = body ?? {}
 
-    if (!name?.trim()) return NextResponse.json({ error: '라이더명을 입력해주세요.' }, { status: 400 })
+    if (!name?.trim()) return NextResponse.json({ error: '?�이?�명???�력?�주?�요.' }, { status: 400 })
 
     const row = {
       user_id: user.id,
@@ -46,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const { data: inserted, error } = await admin.from('riders').insert(row).select().single()
     if (error) {
-      const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : error.message
+      const msg = /unique|duplicate/i.test(error.message) ? '?��? ?�용 중인 ?�이?�입?�다.' : error.message
       return NextResponse.json({ error: msg }, { status: 500 })
     }
     return NextResponse.json({ success: true, rider: inserted })
@@ -57,12 +54,12 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 라이더 수정
+ * ?�이???�정
  */
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getAuthUser()
-    if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
 
     const admin = createAdminClient()
     const { data: profile } = await admin
@@ -70,14 +67,12 @@ export async function PATCH(request: NextRequest) {
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
-    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
-    if (denied) return denied
 
     const body = await request.json()
     const { id, join_date, name, rider_username, id_number, phone, bank_name, bank_account, account_holder, status } = body ?? {}
 
-    if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
-    if (!name?.trim()) return NextResponse.json({ error: '라이더명을 입력해주세요.' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: 'id가 ?�요?�니??' }, { status: 400 })
+    if (!name?.trim()) return NextResponse.json({ error: '?�이?�명???�력?�주?�요.' }, { status: 400 })
 
   const trim = (v: unknown) => (v != null && String(v).trim()) || null
 
@@ -94,7 +89,7 @@ export async function PATCH(request: NextRequest) {
     }).eq('id', id).select().single()
 
     if (error) {
-      const msg = /unique|duplicate/i.test(error.message) ? '이미 사용 중인 아이디입니다.' : error.message
+      const msg = /unique|duplicate/i.test(error.message) ? '?��? ?�용 중인 ?�이?�입?�다.' : error.message
       return NextResponse.json({ error: msg }, { status: 500 })
     }
     return NextResponse.json({ success: true, rider: updated })
@@ -105,12 +100,12 @@ export async function PATCH(request: NextRequest) {
 }
 
 /**
- * 라이더 삭제
+ * ?�이????��
  */
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getAuthUser()
-    if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
 
     const admin = createAdminClient()
     const { data: profile } = await admin
@@ -118,11 +113,9 @@ export async function DELETE(request: NextRequest) {
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
-    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
-    if (denied) return denied
 
     const { id } = await request.json()
-    if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: 'id가 ?�요?�니??' }, { status: 400 })
 
     const { error } = await admin.from('riders').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

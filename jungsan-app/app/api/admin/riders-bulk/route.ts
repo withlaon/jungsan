@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { merchantSubscriptionAccessDenied } from '@/lib/subscription/merchant-subscription-access'
 
 interface RiderRow {
   join_date: string | null
@@ -16,16 +15,16 @@ interface RiderRow {
 }
 
 /**
- * 라이더 엑셀 대량등록 API
- * - admin client로 직접 삽입 (SUPABASE_SERVICE_ROLE_KEY 필요)
- * - 없으면 RPC fallback
+ * ??? ?? ???? API
+ * - admin client? ?? ?? (SUPABASE_SERVICE_ROLE_KEY ??)
+ * - ??? RPC fallback
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+      return NextResponse.json({ error: '???? ?????.' }, { status: 401 })
     }
 
     const admin = createAdminClient()
@@ -34,13 +33,11 @@ export async function POST(request: NextRequest) {
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
-    const denied = await merchantSubscriptionAccessDenied(admin, user.id, profile?.username)
-    if (denied) return denied
 
     const body = await request.json()
     const riders = body?.riders as RiderRow[] | undefined
     if (!Array.isArray(riders) || riders.length === 0) {
-      return NextResponse.json({ error: '등록할 라이더 데이터가 없습니다.' }, { status: 400 })
+      return NextResponse.json({ error: '??? ??? ???? ????.' }, { status: 400 })
     }
 
     const rows = riders.map((r) => ({
@@ -57,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     const validRows = rows.filter((r) => r.name.length > 0)
     if (validRows.length === 0) {
-      return NextResponse.json({ error: '유효한 라이더 데이터가 없습니다. (라이더명 필수)' }, { status: 400 })
+      return NextResponse.json({ error: '??? ??? ???? ????. (???? ??)' }, { status: 400 })
     }
 
     let error: { message: string } | null = null
@@ -72,7 +69,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (/SUPABASE_SERVICE_ROLE_KEY|설정되지 않았습니다/i.test(msg)) {
+      if (/SUPABASE_SERVICE_ROLE_KEY/i.test(msg)) {
         const { error: rpcErr } = await supabase.rpc('insert_riders_bulk', {
           p_user_id: user.id,
           p_riders: validRows,
@@ -89,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       const msg = /unique|duplicate/i.test(error.message)
-        ? '아이디 중복이 있습니다. 기존 라이더 또는 파일 내 중복을 확인해주세요.'
+        ? '??? ??? ????. ?? ??? ?? ?? ? ??? ??????.'
         : error.message
       return NextResponse.json({ error: msg }, { status: 500 })
     }
