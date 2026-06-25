@@ -33,14 +33,6 @@ export async function DELETE(req: NextRequest) {
       .maybeSingle()
     const isGlobalAdmin = profile?.username?.toLowerCase() === 'admin'
 
-    if (!isGlobalAdmin) {
-      try {
-        const adminForGate = createAdminClient()
-      } catch (gateErr) {
-        // admin client ?�정 ?�류 ???�프??문제 발생 ?�에??구독 중인 ?�용?��? 차단?��? ?�음
-        console.error('[advance-payment] subscription gate error:', gateErr)
-      }
-    }
 
     const { data: row, error: selErr } = await db
       .from('advance_payments')

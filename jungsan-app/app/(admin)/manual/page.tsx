@@ -10,7 +10,6 @@ import {
   BookOpen, Download, BarChart3, Users, Wallet, Gift, Settings,
   Upload, FileText, Globe, ChevronRight, Info, AlertTriangle,
   CheckCircle, Megaphone, MessageSquare, LogOut, ImagePlus, Loader2,
-  CreditCard,
 } from 'lucide-react'
 
 const MANUAL_VERSION       = '4.0'
@@ -625,61 +624,7 @@ export default function ManualPage() {
     },
 
     /* ══════════════════════════════════════════
-       12. 구독 · 자동결제
-    ══════════════════════════════════════════ */
-    {
-      id: 'subscription', title: '구독 · 자동결제', icon: CreditCard,
-      badge: '결제 · 이용권', badgeColor: 'bg-indigo-700',
-      content: (
-        <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-          <p>
-            <strong className="text-white">정산타임</strong>은 월 구독 형태로 제공됩니다.
-            사이드바 메뉴 <strong className="text-white">구독 · 자동결제</strong>에서 무료 체험 기간, 결제 수단, 결제 내역을 확인할 수 있습니다.
-          </p>
-
-          <div className="space-y-2">
-            <p className="text-white font-medium">무료 체험</p>
-            <ul className="space-y-1 ml-2 text-xs">
-              <li>신규 계정은 제한된 기간 동안 무료로 기능을 이용할 수 있습니다.</li>
-              <li>화면에 <strong className="text-white">남은 체험 일수</strong>와 종료 예정일이 표시됩니다.</li>
-              <li>체험이 끝나기 전에 <strong className="text-white">카드를 등록</strong>하면 체험 종료 후 자동으로 월 구독 결제가 진행됩니다.</li>
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-white font-medium">카드 등록</p>
-            <ol className="space-y-1 list-decimal list-inside ml-2 text-xs">
-              <li><strong className="text-white">카드 등록</strong> 버튼을 누르면 결제창에서 카드 정보를 입력합니다.</li>
-              <li>등록이 완료되면 마스킹된 카드번호·카드사가 화면에 표시됩니다.</li>
-              <li>빌링키는 서버에 안전하게 저장되며, 매월 동일 수단으로 자동 청구됩니다.</li>
-            </ol>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-white font-medium">구독 상태</p>
-            <div className="flex flex-col gap-2 ml-2 text-xs">
-              <span className="flex items-center gap-1.5"><Badge className="bg-blue-800 text-blue-300 text-xs">무료 체험</Badge> 체험 기간 중</span>
-              <span className="flex items-center gap-1.5"><Badge className="bg-emerald-800 text-emerald-300 text-xs">구독 중</Badge> 정상 결제·이용 중 (다음 결제일·금액 표시)</span>
-              <span className="flex items-center gap-1.5"><Badge className="bg-red-800 text-red-300 text-xs">결제 실패</Badge> 카드 한도·정보 확인 후 재등록 필요</span>
-              <span className="flex items-center gap-1.5"><Badge className="bg-slate-700 text-slate-400 text-xs">해지됨</Badge> 구독 해지 후 — 재이용 시 카드 등록부터 진행</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-white font-medium">구독 해지 및 결제 내역</p>
-            <ul className="space-y-1 ml-2 text-xs">
-              <li>화면 안내에 따라 <strong className="text-white">구독 해지</strong>를 요청할 수 있습니다.</li>
-              <li>하단 <strong className="text-white">결제 내역</strong>에서 최근 결제 건별 금액·상태·일시를 확인할 수 있습니다.</li>
-            </ul>
-          </div>
-
-          {warn('무료 체험이 종료된 뒤 카드가 없으면 서비스 이용이 제한될 수 있습니다. 종료 일정을 미리 확인하세요.')}
-        </div>
-      ),
-    },
-
-    /* ══════════════════════════════════════════
-       13. 문의하기
+       12. 문의하기
     ══════════════════════════════════════════ */
     {
       id: 'inquiry', title: '문의하기', icon: MessageSquare,

@@ -35,14 +35,6 @@ export async function DELETE(req: NextRequest) {
       .maybeSingle()
     const isSiteAdmin = profile?.username?.toLowerCase() === 'admin'
 
-    if (!isSiteAdmin) {
-      try {
-        const adminForGate = createAdminClient()
-      } catch (gateErr) {
-        // admin client ?�정 ?�류 ???�프??문제 발생 ?�에??구독 중인 ?�용?��? 차단?��? ?�음
-        console.error('[settlement] subscription gate error:', gateErr)
-      }
-    }
 
     const { data: wsRow } = await db
       .from('weekly_settlements')

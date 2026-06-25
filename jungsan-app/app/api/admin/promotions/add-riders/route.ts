@@ -71,13 +71,6 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     const isGlobalAdmin = profile?.username?.toLowerCase() === 'admin'
 
-    if (!isGlobalAdmin) {
-      try {
-        const adminForGate = createAdminClient()
-      } catch (gateErr) {
-        console.error('[promotions/add-riders] subscription gate error:', gateErr)
-      }
-    }
 
     const { data: source, error: sourceErr } = await db
       .from('promotions')
