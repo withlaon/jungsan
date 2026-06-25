@@ -1,12 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
 import { useAdvancePayments, revalidatePayments, applyOptimisticPayment } from '@/hooks/useAdvancePayments'
 import { recalculateSettlementsAndRefreshViews } from '@/hooks/useSettlements'
-import { withMutationTimeout } from '@/lib/supabase/with-timeout'
 import { fetchWithTimeout } from '@/lib/fetch-utils'
 import { useSavingGuard } from '@/hooks/useSavingGuard'
 import { Rider } from '@/types'
@@ -144,7 +142,6 @@ function RiderSearchSelect({
 }
 
 export default function AdvancePaymentsPage() {
-  const supabase = createClient()
   const { userId } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -152,7 +149,7 @@ export default function AdvancePaymentsPage() {
 
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [recoveryOpen, setRecoveryOpen] = useState(false)
-  const [saving, setSaving] = useSavingGuard()
+  const [saving, setSaving] = useSavingGuard(45_000)
 
   const [advanceForm, setAdvanceForm] = useState(emptyForm)
   const [recoveryForm, setRecoveryForm] = useState(emptyForm)
@@ -183,20 +180,19 @@ export default function AdvancePaymentsPage() {
 
     setSaving(true)
     try {
-      const insertRow: Record<string, unknown> = {
-        rider_id: form.rider_id,
-        amount,
-        paid_date: form.week,
-        memo: form.memo || null,
-        type,
-      }
-      if (userId) insertRow.user_id = userId
-      const { error } = await withMutationTimeout(
-        supabase.from('advance_payments').insert(insertRow)
+      const res = await fetchWithTimeout(
+        '/api/admin/advance-payment',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rider_id: form.rider_id, amount, paid_date: form.week, memo: form.memo || null, type }),
+          credentials: 'same-origin',
+        },
+        30_000
       )
-
-      if (error) {
-        toast.error('등록 실패: ' + error.message)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('등록 실패: ' + (data?.error ?? res.statusText))
         return
       }
 
@@ -237,20 +233,19 @@ export default function AdvancePaymentsPage() {
 
     setSaving(true)
     try {
-      const { error } = await withMutationTimeout(
-        supabase
-          .from('advance_payments')
-          .update({
-            rider_id: editForm.rider_id,
-            amount,
-            paid_date: editForm.week,
-            memo: editForm.memo || null,
-          })
-          .eq('id', editingPayment.id)
+      const res = await fetchWithTimeout(
+        `/api/admin/advance-payment?id=${encodeURIComponent(editingPayment.id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rider_id: editForm.rider_id, amount, paid_date: editForm.week, memo: editForm.memo || null }),
+          credentials: 'same-origin',
+        },
+        30_000
       )
-
-      if (error) {
-        toast.error('수정 실패: ' + error.message)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('수정 실패: ' + (data?.error ?? res.statusText))
         return
       }
 
