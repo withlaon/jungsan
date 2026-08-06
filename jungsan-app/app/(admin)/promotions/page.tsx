@@ -34,6 +34,7 @@ interface PromoGroup {
   week_start: string | null
   deadline_date: string | null
   description: string | null
+  display_name: string | null
   type: 'global' | 'individual'
   created_at: string
 }
@@ -167,7 +168,7 @@ function groupKey(p: PromotionWithRider): string {
   return [
     p.promo_kind, p.amount, p.per_count_min ?? '',
     p.date_mode, p.week_start ?? '', p.deadline_date ?? '',
-    p.description ?? '', JSON.stringify(p.ranges ?? []),
+    p.description ?? '', p.display_name ?? '', JSON.stringify(p.ranges ?? []),
     p.type,
   ].join('||')
 }
@@ -185,6 +186,7 @@ const initForm = () => ({
   rider_id: '',
   rider_ids: [] as string[],
   description: '',
+  display_name: '',
 })
 
 // 탭 재방문 시 로딩 없애기 위한 모듈 레벨 캐시
@@ -298,6 +300,7 @@ export default function PromotionsPage() {
         week_start: rep.week_start ?? null,
         deadline_date: rep.deadline_date ?? null,
         description: rep.description ?? null,
+        display_name: rep.display_name ?? null,
         type: rep.type as 'global' | 'individual',
         created_at: rep.created_at,
       }
@@ -321,6 +324,7 @@ export default function PromotionsPage() {
         ? g.ranges.map(r => ({ min_count: String(r.min_count), max_count: r.max_count !== null ? String(r.max_count) : '', amount: String(r.amount) }))
         : [{ min_count: '', max_count: '', amount: '' }],
       description: g.description ?? '',
+      display_name: g.display_name ?? '',
       rider_ids: [],
       rider_id: '',
     })
@@ -329,7 +333,7 @@ export default function PromotionsPage() {
   }
 
   const handleSave = async () => {
-    const { target_type, promo_kind, date_mode, week_start, deadline_date, amount, per_count_amount, per_count_min, ranges, rider_ids, description } = form
+    const { target_type, promo_kind, date_mode, week_start, deadline_date, amount, per_count_amount, per_count_min, ranges, rider_ids, description, display_name } = form
     if (target_type === 'individual' && rider_ids.length === 0) { toast.error('라이더를 선택해주세요.'); return }
     if (date_mode === 'deadline' && !deadline_date) { toast.error('마감일을 입력해주세요.'); return }
     if (!description.trim()) { toast.error('프로모션 이름(설명)을 입력해주세요.'); return }
@@ -352,7 +356,7 @@ export default function PromotionsPage() {
       finalRanges = parsed
     }
 
-    const base: Record<string, unknown> = { type: target_type, promo_kind, amount: finalAmount, ranges: finalRanges, per_count_min: finalPerCountMin, date_mode, week_start: date_mode==='week'?week_start:null, deadline_date: date_mode==='deadline'?deadline_date:null, description: description.trim(), settlement_id: null }
+    const base: Record<string, unknown> = { type: target_type, promo_kind, amount: finalAmount, ranges: finalRanges, per_count_min: finalPerCountMin, date_mode, week_start: date_mode==='week'?week_start:null, deadline_date: date_mode==='deadline'?deadline_date:null, description: description.trim(), display_name: display_name.trim() || null, settlement_id: null }
     setSaving(true)
     try {
       let res: Response
@@ -461,6 +465,7 @@ export default function PromotionsPage() {
       week_start: f.date_mode === 'week' ? f.week_start : null,
       deadline_date: f.date_mode === 'deadline' ? f.deadline_date : null,
       description: f.description.trim(),
+      display_name: f.display_name.trim() || null,
     }
     try {
       const res = await fetchWithTimeout('/api/admin/promotions', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.promos.map(p => p.id), updates }), credentials: 'same-origin' }, 30_000)
@@ -556,6 +561,9 @@ export default function PromotionsPage() {
                     <h3 className="text-white font-semibold text-sm truncate">
                       {g.description || promoAutoName(g.promos[0])}
                     </h3>
+                    {g.display_name && (
+                      <span className="text-violet-400 text-xs truncate">정산서: {g.display_name}</span>
+                    )}
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
                 </div>
@@ -654,6 +662,8 @@ export default function PromotionsPage() {
                   <div className="space-y-5 py-2">
                     <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
                       <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-3">프로모션 내용</p>
+                      <InfoRow label="프로모션 이름" value={<span className="text-white text-sm">{g.description || promoAutoName(g.promos[0])}</span>} />
+                      {g.display_name && <InfoRow label="정산서 표기명" value={<span className="text-violet-300 text-sm">{g.display_name}</span>} />}
                       <InfoRow label="종류" value={<Badge className={`text-xs ${kindColor(g.promo_kind)}`}>{kindLabel(g.promo_kind)}</Badge>} />
                       <InfoRow label="금액/조건" value={<span className="text-violet-300 font-medium text-sm">{amountText(g)}</span>} />
                       <InfoRow label="대상 기간" value={
@@ -745,6 +755,11 @@ export default function PromotionsPage() {
                       <Label className="text-slate-300">프로모션 이름 <span className="text-red-400">*</span></Label>
                       <input value={detailEditForm.description} onChange={e => setDE({ description: e.target.value })}
                         placeholder="프로모션 이름" className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">정산서 표기 프로모션명 <span className="text-slate-500 text-xs">(미입력 시 프로모션 이름 사용)</span></Label>
+                      <input value={detailEditForm.display_name} onChange={e => setDE({ display_name: e.target.value })}
+                        placeholder="정산서에 표기될 이름" className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-sm text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-slate-300">프로모션 종류</Label>
@@ -841,6 +856,13 @@ export default function PromotionsPage() {
               <Label className="text-slate-300">프로모션 이름 <span className="text-red-400">*</span></Label>
               <Input value={form.description} onChange={e => setF({ description: e.target.value })}
                 placeholder="예: 이벤트 프로모션, 신규 라이더 특별 보너스" className="bg-slate-800 border-slate-600 text-white" />
+            </div>
+
+            {/* 정산서 표기 프로모션명 */}
+            <div className="space-y-1.5">
+              <Label className="text-slate-300">정산서 표기 프로모션명 <span className="text-slate-500 text-xs">(미입력 시 프로모션 이름 사용)</span></Label>
+              <Input value={form.display_name} onChange={e => setF({ display_name: e.target.value })}
+                placeholder="예: 특별보너스" className="bg-slate-800 border-slate-600 text-white" />
             </div>
 
             {/* 적용 대상 */}

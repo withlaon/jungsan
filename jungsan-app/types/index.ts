@@ -90,6 +90,7 @@ export interface Promotion {
   deadline_date: string | null
   date_mode: 'week' | 'deadline' | 'none'
   description: string | null
+  display_name: string | null
   created_at: string
   riders?: Rider
   weekly_settlements?: WeeklySettlement

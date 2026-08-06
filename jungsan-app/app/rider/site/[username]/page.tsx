@@ -23,6 +23,21 @@ interface AdvanceItem {
   deducted_settlement_id: string | null
 }
 
+interface PromoItem {
+  id: string
+  type: 'global' | 'individual'
+  promo_kind: 'fixed' | 'range' | 'per_count'
+  rider_id: string | null
+  amount: number
+  ranges: { min_count: number; max_count: number | null; amount: number }[] | null
+  per_count_min: number | null
+  date_mode: 'week' | 'deadline' | 'none'
+  week_start: string | null
+  deadline_date: string | null
+  description: string | null
+  display_name: string | null
+}
+
 type Step = 'login' | 'portal'
 
 function normalizeIdNumber(idNumber: string) {
@@ -41,6 +56,7 @@ export default function RiderSiteByUserPage() {
   const [rider, setRider] = useState<Rider | null>(null)
   const [details, setDetails] = useState<DetailWithSettlement[]>([])
   const [advanceItems, setAdvanceItems] = useState<AdvanceItem[]>([])
+  const [promoList, setPromoList] = useState<PromoItem[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [dataLoading, setDataLoading] = useState(false)
 
@@ -79,10 +95,12 @@ export default function RiderSiteByUserPage() {
 
     const res = await fetch(`/api/rider/settlements?rider_id=${riderData.id}`)
       .then(r => r.json())
-      .catch(() => ({ details: [], advances: [] }))
+      .catch(() => ({ details: [], advances: [], promotions: [] }))
 
     const detailData: DetailWithSettlement[] = Array.isArray(res.details) ? res.details : []
     const advData: AdvanceItem[] = Array.isArray(res.advances) ? res.advances : []
+    const promoData: PromoItem[] = Array.isArray(res.promotions) ? res.promotions : []
+    if (promoData.length > 0) setPromoList(promoData)
 
     if (detailData.length > 0) {
       const sorted = [...detailData].sort((a, b) => {
@@ -103,12 +121,47 @@ export default function RiderSiteByUserPage() {
     setRider(null)
     setDetails([])
     setAdvanceItems([])
+    setPromoList([])
     setSelectedId('')
     setLoginError('')
   }
 
   const selectedDetail = details.find(d => d.id === selectedId)
   const currentSettlement = selectedDetail?.weekly_settlements
+
+  // 선택된 정산의 주차에 적용된 프로모션 항목 계산
+  const appliedPromoItems: { name: string; amount: number }[] = (() => {
+    if (!selectedDetail || !currentSettlement || promoList.length === 0) return []
+    const weekStart = currentSettlement.week_start ?? ''
+    const deliveryCount = selectedDetail.delivery_count ?? 0
+    const riderId = selectedDetail.rider_id ?? ''
+
+    return promoList
+      .filter(p => {
+        // 라이더 필터
+        if (p.type === 'individual' && p.rider_id !== riderId) return false
+        // 날짜 모드 필터
+        if (p.date_mode === 'week' && p.week_start !== weekStart) return false
+        if (p.date_mode === 'deadline' && p.deadline_date && p.deadline_date < weekStart) return false
+        return true
+      })
+      .map(p => {
+        let calcAmount = 0
+        if (p.promo_kind === 'fixed') {
+          calcAmount = p.amount
+        } else if (p.promo_kind === 'per_count') {
+          const min = p.per_count_min ?? 0
+          if (deliveryCount > min) calcAmount = (deliveryCount - min) * p.amount
+        } else if (p.promo_kind === 'range' && p.ranges) {
+          const matched = p.ranges
+            .filter(r => deliveryCount >= r.min_count && (r.max_count === null || deliveryCount <= r.max_count))
+          calcAmount = matched.reduce((sum, r) => sum + r.amount, 0)
+        }
+        if (calcAmount <= 0) return null
+        return { name: p.display_name || p.description || '프로모션', amount: calcAmount }
+      })
+      .filter((item): item is { name: string; amount: number } => item !== null)
+  })()
 
   const employmentTotal =
     (selectedDetail?.excel_employment_insurance ?? 0) +
@@ -269,6 +322,12 @@ export default function RiderSiteByUserPage() {
                       <span className="text-slate-400 text-sm">지사프로모션</span>
                       <span className="text-sm font-medium text-violet-400">+{formatKRW(selectedDetail.promotion_amount ?? 0)}</span>
                     </div>
+                    {appliedPromoItems.map((item, idx) => (
+                      <div key={idx} className="flex justify-between py-1 border-b border-slate-700/20 pl-4">
+                        <span className="text-slate-500 text-xs">ㄴ {item.name}</span>
+                        <span className="text-violet-300 text-xs">+{formatKRW(item.amount)}</span>
+                      </div>
+                    ))}
                     <hr className="border-slate-700 my-2" />
                     {/* 고용/산재보험 = 고용보험 + 산재보험 */}
                     <div className="flex justify-between py-1.5 border-b border-slate-700/40">

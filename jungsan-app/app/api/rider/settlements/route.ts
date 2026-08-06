@@ -24,6 +24,21 @@ type AdvanceRow = {
   deducted_settlement_id: string | null
 }
 
+type PromoRow = {
+  id: string
+  type: 'global' | 'individual'
+  promo_kind: 'fixed' | 'range' | 'per_count'
+  rider_id: string | null
+  amount: number
+  ranges: { min_count: number; max_count: number | null; amount: number }[] | null
+  per_count_min: number | null
+  date_mode: 'week' | 'deadline' | 'none'
+  week_start: string | null
+  deadline_date: string | null
+  description: string | null
+  display_name: string | null
+}
+
 function weekRank(d: DetailRow): number {
   const t = d.weekly_settlements?.created_at
   return t ? new Date(t).getTime() : 0
@@ -72,7 +87,15 @@ export async function GET(req: NextRequest) {
       db = await createClient()
     }
 
-    const [detailsRes, advanceRes] = await Promise.all([
+    // 라이더 정보에서 user_id 가져오기 (프로모션 조회용)
+    const riderRes = await db
+      .from('riders')
+      .select('user_id')
+      .eq('id', riderId)
+      .single()
+    const userId = riderRes.data?.user_id as string | null
+
+    const [detailsRes, advanceRes, promoRes] = await Promise.all([
       db
         .from('settlement_details')
         .select('*, weekly_settlements(*)')
@@ -82,6 +105,13 @@ export async function GET(req: NextRequest) {
         .select('id, amount, memo, type, deducted_settlement_id')
         .eq('rider_id', riderId)
         .not('deducted_settlement_id', 'is', null),
+      userId
+        ? db
+            .from('promotions')
+            .select('id, type, promo_kind, rider_id, amount, ranges, per_count_min, date_mode, week_start, deadline_date, description, display_name')
+            .eq('user_id', userId)
+            .or(`rider_id.is.null,rider_id.eq.${riderId}`)
+        : Promise.resolve({ data: [] }),
     ])
 
     const rawDetails = (detailsRes.data ?? []) as DetailRow[]
@@ -93,9 +123,12 @@ export async function GET(req: NextRequest) {
       (a) => a.deducted_settlement_id && settlementIds.has(a.deducted_settlement_id),
     )
 
+    const promotions = (promoRes.data ?? []) as PromoRow[]
+
     return NextResponse.json({
       details,
       advances,
+      promotions,
     })
   } catch (err) {
     console.error('rider settlements error:', err)
