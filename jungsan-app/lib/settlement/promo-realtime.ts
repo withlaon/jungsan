@@ -4,6 +4,9 @@
  * 데이터가 없거나 구버전 데이터인 경우에도 올바른 값을 반환
  */
 
+/** is_call_promo 컬럼이 없거나 null인 구버전 데이터 fallback용 이름 목록 */
+const CALL_PROMO_NAMES = ['1000원 프로모션', '호걸,영실 100건이상 프로모션']
+
 export type PromoRow = {
   id: string
   type: 'global' | 'individual'
@@ -15,11 +18,20 @@ export type PromoRow = {
   date_mode: 'week' | 'deadline' | 'none'
   week_start: string | null
   deadline_date: string | null
-  is_call_promo: boolean
+  description: string | null
+  is_call_promo: boolean | null
 }
 
 export const PROMO_SELECT =
-  'id, type, promo_kind, rider_id, amount, ranges, per_count_min, date_mode, week_start, deadline_date, is_call_promo'
+  'id, type, promo_kind, rider_id, amount, ranges, per_count_min, date_mode, week_start, deadline_date, description, is_call_promo'
+
+/** is_call_promo 컬럼 우선, null이면 description 기반 fallback */
+function isCallPromo(p: PromoRow): boolean {
+  if (p.is_call_promo === true) return true
+  if (p.is_call_promo === false) return false
+  // is_call_promo가 null (컬럼 미적용 또는 구버전) → description으로 판별
+  return CALL_PROMO_NAMES.includes(p.description ?? '')
+}
 
 function calcOnePromo(p: PromoRow, deliveryCount: number): number {
   if (p.promo_kind === 'fixed') return p.amount
@@ -69,7 +81,7 @@ export function calcPromoSplit(
     if (!applies) continue
 
     const amt = calcOnePromo(p, deliveryCount)
-    if (p.is_call_promo) call += amt
+    if (isCallPromo(p)) call += amt
     else gen += amt
   }
   return { call, gen }
