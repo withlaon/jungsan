@@ -1,12 +1,14 @@
 import { FeeSettings, ManagementFee, InsuranceFee, Promotion, AdvancePayment } from '@/types'
 
-/** 콜프로모션으로 분류할 프로모션 이름 목록 (description 기준) */
+/** 콜프로모션으로 분류할 프로모션 이름 목록 (is_call_promo 컬럼이 없는 구버전 데이터 fallback용) */
 export const CALL_PROMO_NAMES: string[] = [
   '1000원 프로모션',
   '호걸,영실 100건이상 프로모션',
 ]
 
 function isCallPromo(p: Promotion): boolean {
+  // is_call_promo 컬럼 우선, 없으면 이름 기반 fallback
+  if (typeof p.is_call_promo === 'boolean') return p.is_call_promo
   return CALL_PROMO_NAMES.includes(p.description ?? '')
 }
 

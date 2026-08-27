@@ -21,6 +21,7 @@ function promoGroupMatches(
     (source.deadline_date ?? null) === (row.deadline_date ?? null) &&
     (source.description ?? '') === (row.description ?? '') &&
     (source.display_name ?? null) === (row.display_name ?? null) &&
+    (source.is_call_promo ?? false) === (row.is_call_promo ?? false) &&
     JSON.stringify(source.ranges ?? []) === JSON.stringify(row.ranges ?? [])
   )
 }
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     const { data: userPromos, error: groupErr } = await db
       .from('promotions')
-      .select('id, rider_id, type, promo_kind, amount, per_count_min, date_mode, week_start, deadline_date, description, display_name, ranges')
+      .select('id, rider_id, type, promo_kind, amount, per_count_min, date_mode, week_start, deadline_date, description, display_name, is_call_promo, ranges')
       .eq('user_id', ownerUserId)
       .is('settlement_id', null)
 
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
       deadline_date: source.deadline_date,
       description: source.description,
       display_name: source.display_name ?? null,
+      is_call_promo: source.is_call_promo ?? false,
       settlement_id: null,
       rider_id: riderId,
     }))

@@ -93,6 +93,7 @@ export interface Promotion {
   date_mode: 'week' | 'deadline' | 'none'
   description: string | null
   display_name: string | null
+  is_call_promo: boolean
   created_at: string
   riders?: Rider
   weekly_settlements?: WeeklySettlement

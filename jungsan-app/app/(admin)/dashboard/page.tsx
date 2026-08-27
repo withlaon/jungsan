@@ -117,7 +117,9 @@ export default function DashboardPage() {
   const empInsurance   = currentSettlement?.employer_employment_insurance ?? 0
   const accInsurance   = currentSettlement?.employer_accident_insurance   ?? 0
 
-  const promotionTotal   = details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0)
+  const callPromoTotal    = details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0)
+  const genPromoTotal     = details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0)
+  const promotionTotal    = callPromoTotal + genPromoTotal
   const callFeeTotal     = details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0)
   const riderPayTotal    = details.reduce((s, d) => s + (d.final_amount ?? 0), 0)
   const incomeTaxTotal   = details.reduce((s, d) => s + (d.income_tax_deduction ?? 0), 0)
@@ -132,7 +134,8 @@ export default function DashboardPage() {
     { label: '부가세',            value: vatAmount,        icon: Percent,     color: 'text-amber-400',  bg: 'border-amber-700/40 bg-amber-900/10', sign: '-' },
     { label: '고용보험사업주',    value: empInsurance,     icon: ShieldCheck, color: 'text-cyan-400',   bg: 'border-cyan-700/40 bg-cyan-900/10',   sign: '-' },
     { label: '산재보험사업주',    value: accInsurance,     icon: ShieldCheck, color: 'text-purple-400', bg: 'border-purple-700/40 bg-purple-900/10',sign: '-' },
-    { label: '프로모션비',        value: promotionTotal,   icon: Gift,        color: 'text-rose-400',   bg: 'border-rose-700/40 bg-rose-900/10',   sign: '-' },
+    { label: '콜프로모션비',      value: callPromoTotal,   icon: Gift,        color: 'text-rose-400',   bg: 'border-rose-700/40 bg-rose-900/10',   sign: '-' },
+    { label: '일반프로모션비',    value: genPromoTotal,    icon: Gift,        color: 'text-fuchsia-400', bg: 'border-fuchsia-700/40 bg-fuchsia-900/10', sign: '-' },
     { label: '콜관리비',          value: callFeeTotal,     icon: Phone,       color: 'text-orange-400', bg: 'border-orange-700/40 bg-orange-900/10',sign: '+' },
     { label: '원천세',            value: incomeTaxTotal,   icon: Receipt,     color: 'text-red-400',    bg: 'border-red-700/40 bg-red-900/10',     sign: '-' },
     { label: '고용산재관리비',    value: insAdditionTotal, icon: ShieldCheck, color: 'text-teal-400',   bg: 'border-teal-700/40 bg-teal-900/10',   sign: '+' },
@@ -219,7 +222,7 @@ export default function DashboardPage() {
                     {branchProfit >= 0 ? '+' : ''}{formatKRW(branchProfit)}
                   </p>
                   <p className="text-slate-500 text-xs mt-2">
-                    지사관리비 - 고용보험사업주 - 산재보험사업주 - 프로모션비 + 콜관리비 + 고용산재관리비
+                    지사관리비 - 고용보험사업주 - 산재보험사업주 - 콜프로모션비 - 일반프로모션비 + 콜관리비 + 고용산재관리비
                   </p>
                 </div>
                 <div className={`rounded-2xl p-4 ${branchProfit >= 0 ? 'bg-emerald-900/30' : 'bg-rose-900/30'}`}>
