@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useSettlements, revalidateSettlements, removeSettlementFromCache } from '@/hooks/useSettlements'
 import { readDetailsCache, writeDetailsCache, deleteDetailsCacheEntry } from '@/hooks/settlementViewCache'
 import { SettlementDetail, Rider } from '@/types'
+import { calcPromoSplit, type PromoRow, PROMO_SELECT } from '@/lib/settlement/promo-realtime'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -23,6 +24,7 @@ export default function SettlementResultPage() {
   const { settlements, loading: settlementsLoading } = useSettlements()
   const [selectedId, setSelectedId] = useState<string>('')
   const [details, setDetails] = useState<DetailWithRider[]>([])
+  const [promoList, setPromoList] = useState<PromoRow[]>([])
   const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
 
   // 목록에 없는 선택 ID 제거·삭제 후 올바른 주차로 이동
@@ -81,6 +83,36 @@ export default function SettlementResultPage() {
     return () => { cancelled = true }
   }, [selectedId])
 
+  // promotions 조회 (is_call_promo 기반 콜/일반 실시간 계산용)
+  useEffect(() => {
+    if (!selectedId) return
+    const sb = createClient()
+    ;(async () => {
+      try {
+        const { data } = await sb
+          .from('promotions')
+          .select(PROMO_SELECT)
+          .is('settlement_id', null)
+        if (data) setPromoList(data as PromoRow[])
+      } catch { /* ignore */ }
+    })()
+  }, [selectedId])
+
+  const weekStart = useMemo(
+    () => settlements.find((s) => s.id === selectedId)?.week_start ?? '',
+    [settlements, selectedId],
+  )
+
+  // 각 라이더의 콜/일반 프로모션 금액을 실시간 재계산하여 override
+  const enrichedDetails = useMemo((): DetailWithRider[] => {
+    if (!details.length) return details
+    if (!promoList.length) return details
+    return details.map((d) => {
+      const { call, gen } = calcPromoSplit(promoList, d.rider_id, d.delivery_count ?? 0, weekStart)
+      return { ...d, call_promotion_amount: call, general_promotion_amount: gen }
+    })
+  }, [details, promoList, weekStart])
+
   const handleConfirm = async (id: string) => {
     const { error } = await supabase
       .from('weekly_settlements')
@@ -117,8 +149,8 @@ export default function SettlementResultPage() {
   }
 
   const handleExportAll = () => {
-    if (!currentSettlement || details.length === 0) return
-    exportSettlementExcel(currentSettlement, details)
+    if (!currentSettlement || enrichedDetails.length === 0) return
+    exportSettlementExcel(currentSettlement, enrichedDetails)
     toast.success('전체 정산 엑셀이 다운로드되었습니다.')
   }
 
@@ -137,21 +169,21 @@ export default function SettlementResultPage() {
   const incomeTax = (d: DetailWithRider) => d.income_tax_deduction
 
   const summary = {
-    total_base:       details.reduce((s, d) => s + d.base_amount, 0),
-    total_delivery:   details.reduce((s, d) => s + (d.delivery_fee ?? 0), 0),
-    total_add:        details.reduce((s, d) => s + (d.additional_pay ?? 0), 0),
-    total_hourly:     details.reduce((s, d) => s + (d.hourly_insurance ?? 0), 0),
-    total_emp:        details.reduce((s, d) => s + totalEmp(d), 0),
-    total_acc:        details.reduce((s, d) => s + totalAcc(d), 0),
-    total_promo:      details.reduce((s, d) => s + d.promotion_amount, 0),
-    total_call_promo: details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0),
-    total_gen_promo:  details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0),
-    total_call:       details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0),
-    total_tax_base:   details.reduce((s, d) => s + taxBase(d), 0),
-    total_income_tax: details.reduce((s, d) => s + incomeTax(d), 0),
-    total_advance:    details.reduce((s, d) => s + d.advance_deduction, 0),
-    total_recovery:   details.reduce((s, d) => s + (d.advance_recovery ?? 0), 0),
-    total_final:      details.reduce((s, d) => s + d.final_amount, 0),
+    total_base:       enrichedDetails.reduce((s, d) => s + d.base_amount, 0),
+    total_delivery:   enrichedDetails.reduce((s, d) => s + (d.delivery_fee ?? 0), 0),
+    total_add:        enrichedDetails.reduce((s, d) => s + (d.additional_pay ?? 0), 0),
+    total_hourly:     enrichedDetails.reduce((s, d) => s + (d.hourly_insurance ?? 0), 0),
+    total_emp:        enrichedDetails.reduce((s, d) => s + totalEmp(d), 0),
+    total_acc:        enrichedDetails.reduce((s, d) => s + totalAcc(d), 0),
+    total_promo:      enrichedDetails.reduce((s, d) => s + d.promotion_amount, 0),
+    total_call_promo: enrichedDetails.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0),
+    total_gen_promo:  enrichedDetails.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0),
+    total_call:       enrichedDetails.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0),
+    total_tax_base:   enrichedDetails.reduce((s, d) => s + taxBase(d), 0),
+    total_income_tax: enrichedDetails.reduce((s, d) => s + incomeTax(d), 0),
+    total_advance:    enrichedDetails.reduce((s, d) => s + d.advance_deduction, 0),
+    total_recovery:   enrichedDetails.reduce((s, d) => s + (d.advance_recovery ?? 0), 0),
+    total_final:      enrichedDetails.reduce((s, d) => s + d.final_amount, 0),
   }
 
   return (
@@ -168,11 +200,11 @@ export default function SettlementResultPage() {
             </Button>
           )}
           <Button onClick={handleExportAll} variant="outline"
-            className="border-blue-600 text-blue-400 hover:bg-blue-900/20" disabled={details.length === 0}>
+            className="border-blue-600 text-blue-400 hover:bg-blue-900/20" disabled={enrichedDetails.length === 0}>
             <Download className="h-4 w-4 mr-2" />전체 엑셀 다운로드
           </Button>
           <Button onClick={handlePrint} variant="outline"
-            className="border-slate-600 text-slate-300 hover:bg-slate-800" disabled={details.length === 0}>
+            className="border-slate-600 text-slate-300 hover:bg-slate-800" disabled={enrichedDetails.length === 0}>
             <Printer className="h-4 w-4 mr-2" />인쇄
           </Button>
         </div>
@@ -254,7 +286,7 @@ export default function SettlementResultPage() {
           <Card className="border-slate-700 bg-slate-900 print:shadow-none">
             <CardHeader>
               <CardTitle className="text-white text-base">
-                라이더별 정산 내역 ({details.length}명)
+                라이더별 정산 내역 ({enrichedDetails.length}명)
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -282,7 +314,7 @@ export default function SettlementResultPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {details.map(d => (
+                    {enrichedDetails.map(d => (
                       <TableRow key={d.id} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="text-white font-medium whitespace-nowrap">{d.riders?.name}</TableCell>
                         <TableCell className="text-slate-300 text-right whitespace-nowrap">{d.delivery_count.toLocaleString()}</TableCell>
@@ -313,7 +345,7 @@ export default function SettlementResultPage() {
                     {/* 합계 행 */}
                     <TableRow className="border-slate-700 bg-slate-800/30 font-bold">
                       <TableCell className="text-white">합계</TableCell>
-                      <TableCell className="text-slate-300 text-right">{details.reduce((s, d) => s + d.delivery_count, 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-slate-300 text-right">{enrichedDetails.reduce((s, d) => s + d.delivery_count, 0).toLocaleString()}</TableCell>
                       <TableCell className="text-blue-400 text-right">{formatKRW(summary.total_base)}</TableCell>
                       <TableCell className="text-slate-400 text-right text-xs">{formatKRW(summary.total_delivery)}</TableCell>
                       <TableCell className="text-slate-400 text-right text-xs">{formatKRW(summary.total_add)}</TableCell>

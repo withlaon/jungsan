@@ -10,39 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CalendarDays, TrendingUp, Building2, Percent, ShieldCheck, Gift, Phone, Users, Receipt, BarChart2, Wallet } from 'lucide-react'
 import { SettlementDetail } from '@/types'
 import { formatKRW } from '@/lib/utils'
-import { CALL_PROMO_NAMES } from '@/lib/settlement/calculator'
+import { calcPromoSplit, type PromoRow, PROMO_SELECT } from '@/lib/settlement/promo-realtime'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid,
 } from 'recharts'
-
-type PromoRow = {
-  id: string
-  type: 'global' | 'individual'
-  promo_kind: 'fixed' | 'range' | 'per_count'
-  rider_id: string | null
-  amount: number
-  ranges: { min_count: number; max_count: number | null; amount: number }[] | null
-  per_count_min: number | null
-  date_mode: 'week' | 'deadline' | 'none'
-  week_start: string | null
-  deadline_date: string | null
-  is_call_promo: boolean
-}
-
-function isCallPromo(p: PromoRow): boolean {
-  return p.is_call_promo === true
-}
-
-function calcOnePromo(p: PromoRow, deliveryCount: number): number {
-  if (p.promo_kind === 'fixed') return p.amount
-  if (p.promo_kind === 'per_count' && p.per_count_min !== null)
-    return Math.max(0, deliveryCount - p.per_count_min) * p.amount
-  if (p.promo_kind === 'range' && p.ranges) {
-    const r = p.ranges.find(r => deliveryCount >= r.min_count && (r.max_count === null || deliveryCount <= r.max_count))
-    return r?.amount ?? 0
-  }
-  return 0
-}
 
 export default function DashboardPage() {
   const { settlements, loading: settlementsLoading } = useSettlements()
@@ -117,7 +88,7 @@ export default function DashboardPage() {
         // promotions 조회 (is_call_promo 기반 콜/일반 분류)
         const { data: promos } = await supabase
           .from('promotions')
-          .select('id, type, promo_kind, rider_id, amount, ranges, per_count_min, date_mode, week_start, deadline_date, is_call_promo')
+          .select(PROMO_SELECT)
           .is('settlement_id', null)
         if (promos) setPromoList(promos as PromoRow[])
       } catch { /* ignore */ }
@@ -159,36 +130,20 @@ export default function DashboardPage() {
 
   // promotions에서 is_call_promo 기반 실시간 계산
   const { callPromoTotal, genPromoTotal } = useMemo(() => {
-    if (promoList.length === 0 || details.length === 0) {
-      // fallback: DB 저장값 사용 (기존 데이터)
-      const call = details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0)
-      const gen  = details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0)
-      if (call + gen > 0) return { callPromoTotal: call, genPromoTotal: gen }
-      // 둘 다 0이면 전체 promotion_amount를 일반프로모션으로 fallback 표시
-      return { callPromoTotal: 0, genPromoTotal: details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0) }
-    }
-
-    const applicablePromos = promoList.filter(p => {
-      if (p.date_mode === 'week' && p.week_start !== weekStart) return false
-      if (p.date_mode === 'deadline' && p.deadline_date && p.deadline_date < weekStart) return false
-      return true
-    })
-
-    let call = 0, gen = 0
-    for (const d of details) {
-      const riderId = d.rider_id
-      const deliveryCount = d.delivery_count ?? 0
-      for (const p of applicablePromos) {
-        const applies =
-          (p.type === 'global' && (p.rider_id === null || p.rider_id === riderId)) ||
-          (p.type === 'individual' && p.rider_id === riderId)
-        if (!applies) continue
-        const amt = calcOnePromo(p, deliveryCount)
-        if (isCallPromo(p)) call += amt
-        else gen += amt
+    if (promoList.length > 0 && details.length > 0) {
+      let call = 0, gen = 0
+      for (const d of details) {
+        const { call: c, gen: g } = calcPromoSplit(promoList, d.rider_id, d.delivery_count ?? 0, weekStart)
+        call += c
+        gen  += g
       }
+      return { callPromoTotal: call, genPromoTotal: gen }
     }
-    return { callPromoTotal: call, genPromoTotal: gen }
+    // fallback: DB 저장값 사용
+    const call = details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0)
+    const gen  = details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0)
+    if (call + gen > 0) return { callPromoTotal: call, genPromoTotal: gen }
+    return { callPromoTotal: 0, genPromoTotal: details.reduce((s, d) => s + (d.promotion_amount ?? 0), 0) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promoList, details, weekStart])
 
