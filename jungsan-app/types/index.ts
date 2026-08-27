@@ -43,6 +43,8 @@ export interface SettlementDetail {
   excel_employment_insurance: number  // 고용보험 from Excel (L열)
   excel_accident_insurance: number    // 산재보험 from Excel (M열)
   promotion_amount: number
+  call_promotion_amount: number | null
+  general_promotion_amount: number | null
   insurance_deduction: number     // 구 보험 공제 (미사용, 하위호환용)
   income_tax_deduction: number    // 원천세 (세금신고금액 × 3.3%)
   management_fee_deduction: number

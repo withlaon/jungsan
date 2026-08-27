@@ -84,7 +84,7 @@ export function exportSettlementExcel(
   const headers = [
     '라이더명', '은행', '은행코드', '계좌번호', '예금주',
     '배달건수', '배달료', '추가지급', '기본정산금액',
-    '시간제보험료', '고용보험', '산재보험', '프로모션', '콜관리비',
+    '시간제보험료', '고용보험', '산재보험', '콜프로모션', '일반프로모션', '콜관리비',
     '세금신고금액', '소득세', '선지급금', '선지급금회수', '최종정산금액',
   ]
 
@@ -103,7 +103,8 @@ export function exportSettlementExcel(
       d.hourly_insurance ?? 0,
       totalEmp(d),
       totalAcc(d),
-      d.promotion_amount,
+      d.call_promotion_amount ?? 0,
+      d.general_promotion_amount ?? 0,
       d.call_fee_deduction ?? 0,
       tb,
       d.income_tax_deduction,
@@ -123,7 +124,8 @@ export function exportSettlementExcel(
     details.reduce((s, d) => s + (d.hourly_insurance ?? 0), 0),
     details.reduce((s, d) => s + totalEmp(d), 0),
     details.reduce((s, d) => s + totalAcc(d), 0),
-    details.reduce((s, d) => s + d.promotion_amount, 0),
+    details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0),
+    details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0),
     details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0),
     details.reduce((s, d) => s + taxBase(d), 0),
     details.reduce((s, d) => s + d.income_tax_deduction, 0),
@@ -146,7 +148,7 @@ export function exportSettlementExcel(
   summarySheet['!cols'] = [
     { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 10 },
     { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
-    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
     { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
   ]
   XLSX.utils.book_append_sheet(wb, summarySheet, '전체정산')
@@ -181,7 +183,8 @@ export function exportSettlementExcel(
       ...(d.hourly_insurance ? [['시간제보험료', -(d.hourly_insurance ?? 0), '']] : []),
       ...(emp > 0 ? [['고용보험', -emp, '']] : []),
       ...(acc > 0 ? [['산재보험', -acc, '']] : []),
-      ...(d.promotion_amount > 0 ? [['프로모션', d.promotion_amount, '']] : []),
+      ...((d.call_promotion_amount ?? 0) > 0 ? [['콜프로모션', d.call_promotion_amount ?? 0, '']] : []),
+      ...((d.general_promotion_amount ?? 0) > 0 ? [['일반프로모션', d.general_promotion_amount ?? 0, '']] : []),
       ...(callFee > 0 ? [['콜관리비', -callFee, `${d.delivery_count}건 × 단가`]] : []),
       [],
       ['세금신고금액', tb, '= 기본정산금액 + 프로모션 (배민 기준)'],
@@ -237,7 +240,8 @@ export function exportSingleRiderExcel(
     ...(d.hourly_insurance ? [['시간제보험료', -(d.hourly_insurance ?? 0), '']] : []),
     ...(emp > 0 ? [['고용보험', -emp, '']] : []),
     ...(acc > 0 ? [['산재보험', -acc, '']] : []),
-    ...(d.promotion_amount > 0 ? [['프로모션', d.promotion_amount, '']] : []),
+    ...((d.call_promotion_amount ?? 0) > 0 ? [['콜프로모션', d.call_promotion_amount ?? 0, '']] : []),
+    ...((d.general_promotion_amount ?? 0) > 0 ? [['일반프로모션', d.general_promotion_amount ?? 0, '']] : []),
     ...(callFee > 0 ? [['콜관리비', -callFee, `${d.delivery_count}건 × 단가`]] : []),
     [],
     ['세금신고금액', tb, '= 기본정산금액 + 프로모션 (배민 기준)'],

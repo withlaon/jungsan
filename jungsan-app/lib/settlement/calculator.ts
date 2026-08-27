@@ -1,5 +1,15 @@
 import { FeeSettings, ManagementFee, InsuranceFee, Promotion, AdvancePayment } from '@/types'
 
+/** 콜프로모션으로 분류할 프로모션 이름 목록 (description 기준) */
+export const CALL_PROMO_NAMES: string[] = [
+  '1000원 프로모션',
+  '호걸,영실 100건이상 프로모션',
+]
+
+function isCallPromo(p: Promotion): boolean {
+  return CALL_PROMO_NAMES.includes(p.description ?? '')
+}
+
 export interface RiderSettlementInput {
   riderId: string
   riderName: string
@@ -26,7 +36,9 @@ export interface RiderSettlementResult {
   excelAccidentInsurance: number      // Excel 산재보험
   employmentInsuranceAddition: number // 추가분
   accidentInsuranceAddition: number   // 추가분
-  promotionAmount: number             // 프로모션
+  promotionAmount: number             // 프로모션 합계
+  callPromotionAmount: number         // 콜프로모션
+  generalPromotionAmount: number      // 일반프로모션
   callFeeDeduction: number            // 콜관리비
   managementFeeDeduction: number      // 일반관리비 (보관용)
   taxBaseAmount: number               // 세금신고금액
@@ -89,9 +101,13 @@ export function calculateSettlement(
         return s
       }, 0)
 
-    const promotionAmount =
-      calcPromo(applicablePromos.filter(p => p.type === 'global' && (p.rider_id === null || p.rider_id === riderId))) +
-      calcPromo(applicablePromos.filter(p => p.type === 'individual' && p.rider_id === riderId))
+    const applyPromoForRider = (promos: Promotion[]) =>
+      calcPromo(promos.filter(p => p.type === 'global' && (p.rider_id === null || p.rider_id === riderId))) +
+      calcPromo(promos.filter(p => p.type === 'individual' && p.rider_id === riderId))
+
+    const callPromotionAmount    = applyPromoForRider(applicablePromos.filter(isCallPromo))
+    const generalPromotionAmount = applyPromoForRider(applicablePromos.filter(p => !isCallPromo(p)))
+    const promotionAmount        = callPromotionAmount + generalPromotionAmount
 
     // ── 관리비 계산 ──
     const applicableFees = managementFees.filter(fee =>
@@ -158,7 +174,8 @@ export function calculateSettlement(
       excelEmploymentInsurance: baseEmploymentInsurance,
       excelAccidentInsurance:   baseAccidentInsurance,
       employmentInsuranceAddition, accidentInsuranceAddition,
-      promotionAmount, callFeeDeduction, managementFeeDeduction,
+      promotionAmount, callPromotionAmount, generalPromotionAmount,
+      callFeeDeduction, managementFeeDeduction,
       taxBaseAmount, incomeTaxDeduction,
       advanceDeduction, advanceRecovery, finalAmount,
       grossAmount, insuranceDeduction, totalDeduction,

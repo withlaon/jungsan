@@ -74,6 +74,8 @@ function buildInputs(
 function rowUpdateFromResult(r: RiderSettlementResult): Record<string, number> {
   return {
     promotion_amount: r.promotionAmount,
+    call_promotion_amount: r.callPromotionAmount,
+    general_promotion_amount: r.generalPromotionAmount,
     insurance_deduction: r.insuranceDeduction,
     income_tax_deduction: r.incomeTaxDeduction,
     management_fee_deduction: r.managementFeeDeduction,

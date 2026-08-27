@@ -144,6 +144,8 @@ export default function SettlementResultPage() {
     total_emp:        details.reduce((s, d) => s + totalEmp(d), 0),
     total_acc:        details.reduce((s, d) => s + totalAcc(d), 0),
     total_promo:      details.reduce((s, d) => s + d.promotion_amount, 0),
+    total_call_promo: details.reduce((s, d) => s + (d.call_promotion_amount ?? 0), 0),
+    total_gen_promo:  details.reduce((s, d) => s + (d.general_promotion_amount ?? 0), 0),
     total_call:       details.reduce((s, d) => s + (d.call_fee_deduction ?? 0), 0),
     total_tax_base:   details.reduce((s, d) => s + taxBase(d), 0),
     total_income_tax: details.reduce((s, d) => s + incomeTax(d), 0),
@@ -268,7 +270,8 @@ export default function SettlementResultPage() {
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                      <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">콜프로모션</TableHead>
+                      <TableHead className="text-slate-400 text-right whitespace-nowrap">일반프로모션</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
                       <TableHead className="text-slate-400 text-right whitespace-nowrap">소득세</TableHead>
@@ -289,7 +292,8 @@ export default function SettlementResultPage() {
                         <TableCell className="text-amber-400 text-right whitespace-nowrap">{(d.hourly_insurance ?? 0) > 0 ? `-${formatKRW(d.hourly_insurance ?? 0)}` : '-'}</TableCell>
                         <TableCell className="text-cyan-400 text-right whitespace-nowrap">{totalEmp(d) > 0 ? `-${formatKRW(totalEmp(d))}` : '-'}</TableCell>
                         <TableCell className="text-purple-400 text-right whitespace-nowrap">{totalAcc(d) > 0 ? `-${formatKRW(totalAcc(d))}` : '-'}</TableCell>
-                        <TableCell className="text-violet-400 text-right whitespace-nowrap">{d.promotion_amount > 0 ? `+${formatKRW(d.promotion_amount)}` : '-'}</TableCell>
+                        <TableCell className="text-violet-400 text-right whitespace-nowrap">{(d.call_promotion_amount ?? 0) > 0 ? `+${formatKRW(d.call_promotion_amount ?? 0)}` : '-'}</TableCell>
+                        <TableCell className="text-fuchsia-400 text-right whitespace-nowrap">{(d.general_promotion_amount ?? 0) > 0 ? `+${formatKRW(d.general_promotion_amount ?? 0)}` : '-'}</TableCell>
                         <TableCell className="text-orange-400 text-right whitespace-nowrap">{(d.call_fee_deduction ?? 0) > 0 ? `-${formatKRW(d.call_fee_deduction ?? 0)}` : '-'}</TableCell>
                         <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(taxBase(d))}</TableCell>
                         <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(incomeTax(d))}</TableCell>
@@ -316,7 +320,8 @@ export default function SettlementResultPage() {
                       <TableCell className="text-amber-400 text-right">{summary.total_hourly > 0 ? `-${formatKRW(summary.total_hourly)}` : '-'}</TableCell>
                       <TableCell className="text-cyan-400 text-right">{summary.total_emp > 0 ? `-${formatKRW(summary.total_emp)}` : '-'}</TableCell>
                       <TableCell className="text-purple-400 text-right">{summary.total_acc > 0 ? `-${formatKRW(summary.total_acc)}` : '-'}</TableCell>
-                      <TableCell className="text-violet-400 text-right">{summary.total_promo > 0 ? `+${formatKRW(summary.total_promo)}` : '-'}</TableCell>
+                      <TableCell className="text-violet-400 text-right">{summary.total_call_promo > 0 ? `+${formatKRW(summary.total_call_promo)}` : '-'}</TableCell>
+                      <TableCell className="text-fuchsia-400 text-right">{summary.total_gen_promo > 0 ? `+${formatKRW(summary.total_gen_promo)}` : '-'}</TableCell>
                       <TableCell className="text-orange-400 text-right">{summary.total_call > 0 ? `-${formatKRW(summary.total_call)}` : '-'}</TableCell>
                       <TableCell className="text-emerald-400 text-right">{formatKRW(summary.total_tax_base)}</TableCell>
                       <TableCell className="text-rose-400 text-right">-{formatKRW(summary.total_income_tax)}</TableCell>
@@ -374,7 +379,8 @@ export default function SettlementResultPage() {
                     { label: '시간제보험료',  value: `-${formatKRW(d.hourly_insurance ?? 0)}`,       color: 'text-amber-400',  skip: !d.hourly_insurance },
                     { label: '고용보험',      value: `-${formatKRW(empTotal)}`,                      color: 'text-cyan-400',   skip: empTotal === 0 },
                     { label: '산재보험',      value: `-${formatKRW(accTotal)}`,                      color: 'text-purple-400', skip: accTotal === 0 },
-                    { label: '지사프로모션',  value: `+${formatKRW(d.promotion_amount)}`,            color: 'text-violet-400', skip: d.promotion_amount === 0 },
+                    { label: '콜프로모션',    value: `+${formatKRW(d.call_promotion_amount ?? 0)}`,    color: 'text-violet-400', skip: (d.call_promotion_amount ?? 0) === 0 },
+                    { label: '일반프로모션',  value: `+${formatKRW(d.general_promotion_amount ?? 0)}`,  color: 'text-fuchsia-400', skip: (d.general_promotion_amount ?? 0) === 0 },
                     { label: '콜관리비',      value: `-${formatKRW(d.call_fee_deduction ?? 0)}`,     color: 'text-orange-400', skip: !d.call_fee_deduction },
                     { label: '세금신고금액',  value: formatKRW(tb),                                  color: 'text-emerald-400' },
                     { label: '소득세',        value: `-${formatKRW(it)}`,                            color: 'text-rose-400' },

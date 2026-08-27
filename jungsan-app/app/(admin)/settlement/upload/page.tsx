@@ -505,6 +505,8 @@ export default function SettlementUploadPage() {
         excel_employment_insurance:   r.excelEmploymentInsurance,
         excel_accident_insurance:     r.excelAccidentInsurance,
         promotion_amount:             r.promotionAmount,
+        call_promotion_amount:        r.callPromotionAmount,
+        general_promotion_amount:     r.generalPromotionAmount,
         insurance_deduction:          r.insuranceDeduction,
         income_tax_deduction:         r.incomeTaxDeduction,
         management_fee_deduction:     r.managementFeeDeduction,
@@ -1022,7 +1024,8 @@ export default function SettlementUploadPage() {
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">시간제보험료</TableHead>
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">고용보험</TableHead>
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">산재보험</TableHead>
-                          <TableHead className="text-slate-400 text-right whitespace-nowrap">지사프로모션</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">콜프로모션</TableHead>
+                          <TableHead className="text-slate-400 text-right whitespace-nowrap">일반프로모션</TableHead>
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">콜관리비</TableHead>
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">세금신고금액</TableHead>
                           <TableHead className="text-slate-400 text-right whitespace-nowrap">원천세(3.3%)</TableHead>
@@ -1042,7 +1045,8 @@ export default function SettlementUploadPage() {
                             <TableCell className="text-amber-400 text-right whitespace-nowrap">{r.hourlyInsurance > 0 ? `-${formatKRW(r.hourlyInsurance)}` : '-'}</TableCell>
                             <TableCell className="text-cyan-400 text-right whitespace-nowrap">{r.totalEmploymentInsurance > 0 ? `-${formatKRW(r.totalEmploymentInsurance)}` : '-'}</TableCell>
                             <TableCell className="text-purple-400 text-right whitespace-nowrap">{r.totalAccidentInsurance > 0 ? `-${formatKRW(r.totalAccidentInsurance)}` : '-'}</TableCell>
-                            <TableCell className="text-violet-400 text-right whitespace-nowrap">{r.promotionAmount > 0 ? `+${formatKRW(r.promotionAmount)}` : '-'}</TableCell>
+                            <TableCell className="text-violet-400 text-right whitespace-nowrap">{r.callPromotionAmount > 0 ? `+${formatKRW(r.callPromotionAmount)}` : '-'}</TableCell>
+                            <TableCell className="text-fuchsia-400 text-right whitespace-nowrap">{r.generalPromotionAmount > 0 ? `+${formatKRW(r.generalPromotionAmount)}` : '-'}</TableCell>
                             <TableCell className="text-orange-400 text-right whitespace-nowrap">{r.callFeeDeduction > 0 ? `-${formatKRW(r.callFeeDeduction)}` : '-'}</TableCell>
                             <TableCell className="text-emerald-400 text-right font-medium whitespace-nowrap">{formatKRW(r.taxBaseAmount)}</TableCell>
                             <TableCell className="text-rose-400 text-right whitespace-nowrap">-{formatKRW(r.incomeTaxDeduction)}</TableCell>
