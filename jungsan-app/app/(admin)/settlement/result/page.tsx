@@ -107,12 +107,43 @@ export default function SettlementResultPage() {
   )
 
   // 각 라이더의 콜/일반 프로모션 금액을 실시간 재계산하여 override
+  // promotion_amount, tax_base_amount, income_tax_deduction, final_amount 도 재계산
   const enrichedDetails = useMemo((): DetailWithRider[] => {
     if (!details.length) return details
     if (!promoList.length) return details
     return details.map((d) => {
       const { call, gen } = calcPromoSplit(promoList, d.rider_id, d.delivery_count ?? 0, weekStart)
-      return { ...d, call_promotion_amount: call, general_promotion_amount: gen }
+      const newPromoTotal = call + gen
+
+      // 보험 합계
+      const emp = (d.excel_employment_insurance ?? 0) + (d.employment_insurance_addition ?? 0)
+      const acc = (d.excel_accident_insurance ?? 0)   + (d.accident_insurance_addition   ?? 0)
+
+      // 세금신고금액 재계산
+      const newTaxBase = Math.max(
+        0,
+        d.base_amount + newPromoTotal
+          - (d.hourly_insurance ?? 0) - emp - acc - (d.call_fee_deduction ?? 0)
+      )
+
+      // 소득세율 = DB 저장값 역산 (없으면 3.3% 기본)
+      const oldTaxBase = d.tax_base_amount ?? 0
+      const incomeRate = oldTaxBase > 0 ? d.income_tax_deduction / oldTaxBase : 0.033
+      const newIncomeTax = Math.floor(newTaxBase * incomeRate)
+
+      // 최종정산금액 재계산
+      const newFinalAmount =
+        newTaxBase - newIncomeTax - d.advance_deduction + (d.advance_recovery ?? 0)
+
+      return {
+        ...d,
+        call_promotion_amount:  call,
+        general_promotion_amount: gen,
+        promotion_amount:       newPromoTotal,
+        tax_base_amount:        newTaxBase,
+        income_tax_deduction:   newIncomeTax,
+        final_amount:           newFinalAmount,
+      }
     })
   }, [details, promoList, weekStart])
 
