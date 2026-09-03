@@ -16,15 +16,13 @@ const CRON_SECRET = process.env.CRON_SECRET ?? ''
 const IS_VERCEL = process.env.VERCEL === '1'
 const KEEP_WEEKS = 4
 
-export async function POST(req: NextRequest) {
+function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization')
-  if (CRON_SECRET) {
-    if (authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  } else if (!IS_VERCEL) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (CRON_SECRET) return authHeader === `Bearer ${CRON_SECRET}`
+  return IS_VERCEL
+}
+
+async function runCleanup() {
 
   try {
     const admin = createAdminClient()
@@ -88,4 +86,16 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Vercel cron은 GET으로 요청
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return runCleanup()
+}
+
+// 수동 테스트용 POST
+export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return runCleanup()
 }

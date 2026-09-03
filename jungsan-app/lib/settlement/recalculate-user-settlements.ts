@@ -113,9 +113,25 @@ export async function recalculateAllSettlementsForUser(
   iq = iq.eq('user_id', userId)
   const { data: insuranceFees } = await iq
 
-  let pq = admin.from('promotions').select('*').is('settlement_id', null)
-  pq = pq.eq('user_id', userId)
-  const { data: promotions } = await pq
+  // 재계산용 프로모션 로드
+  // - 특정 정산 재계산 시: settlement_id IS NULL (신규) + settlement_id = 해당정산 (기존 연결된 것) 모두 포함
+  // - 전체 재계산 시: settlement_id IS NULL 만 포함 (일괄 적용 기준)
+  let allPromotions: Promotion[] = []
+  if (onlySettlementId) {
+    const { data: promos } = await admin
+      .from('promotions')
+      .select('*')
+      .eq('user_id', userId)
+      .or(`settlement_id.is.null,settlement_id.eq.${onlySettlementId}`)
+    allPromotions = (promos ?? []) as Promotion[]
+  } else {
+    const { data: promos } = await admin
+      .from('promotions')
+      .select('*')
+      .eq('user_id', userId)
+      .is('settlement_id', null)
+    allPromotions = (promos ?? []) as Promotion[]
+  }
 
   let sq = admin
     .from('weekly_settlements')
@@ -154,7 +170,7 @@ export async function recalculateAllSettlementsForUser(
       const results = calculateSettlement(
         inputs,
         feeSettings,
-        (promotions ?? []) as Promotion[],
+        allPromotions,
         advances,
         (managementFees ?? []) as ManagementFee[],
         ws.week_start,

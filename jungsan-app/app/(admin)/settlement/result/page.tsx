@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { FileText, Download, Trash2, CheckCircle, Eye, FileDown, CalendarDays, Printer } from 'lucide-react'
+import { FileText, Download, Trash2, CheckCircle, Eye, FileDown, CalendarDays, Printer, RefreshCw } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import { exportSettlementExcel, exportSingleRiderExcel } from '@/lib/excel/export'
 import { toast } from 'sonner'
@@ -26,6 +26,8 @@ export default function SettlementResultPage() {
   const [details, setDetails] = useState<DetailWithRider[]>([])
   const [promoList, setPromoList] = useState<PromoRow[]>([])
   const [previewDetail, setPreviewDetail] = useState<DetailWithRider | null>(null)
+  const [recalculating, setRecalculating] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // 목록에 없는 선택 ID 제거·삭제 후 올바른 주차로 이동
   // 업로드 저장 직후 이동한 경우 sessionStorage에서 최신 등록 ID를 읽어 자동 선택
@@ -81,7 +83,8 @@ export default function SettlementResultPage() {
     })()
 
     return () => { cancelled = true }
-  }, [selectedId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, refreshKey])
 
   // promotions 조회 (is_call_promo 기반 콜/일반 실시간 계산용)
   useEffect(() => {
@@ -112,6 +115,31 @@ export default function SettlementResultPage() {
       return { ...d, call_promotion_amount: call, general_promotion_amount: gen }
     })
   }, [details, promoList, weekStart])
+
+  const handleRecalculate = async () => {
+    if (!selectedId) return
+    setRecalculating(true)
+    try {
+      const res = await fetch('/api/settlement/recalculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settlementId: selectedId }),
+        credentials: 'same-origin',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('재계산 실패: ' + (json?.error ?? res.statusText))
+        return
+      }
+      toast.success(`재계산 완료 (${json.recalculated ?? 0}건 업데이트)`)
+      deleteDetailsCacheEntry(selectedId)
+      setRefreshKey(k => k + 1)
+    } catch {
+      toast.error('재계산 중 오류가 발생했습니다.')
+    } finally {
+      setRecalculating(false)
+    }
+  }
 
   const handleConfirm = async (id: string) => {
     const { error } = await supabase
@@ -199,6 +227,11 @@ export default function SettlementResultPage() {
               <CheckCircle className="h-4 w-4 mr-2" />정산 확정
             </Button>
           )}
+          <Button onClick={handleRecalculate} variant="outline" disabled={!selectedId || recalculating}
+            className="border-violet-600 text-violet-400 hover:bg-violet-900/20">
+            <RefreshCw className={`h-4 w-4 mr-2 ${recalculating ? 'animate-spin' : ''}`} />
+            {recalculating ? '재계산 중...' : '프로모션 재계산 저장'}
+          </Button>
           <Button onClick={handleExportAll} variant="outline"
             className="border-blue-600 text-blue-400 hover:bg-blue-900/20" disabled={enrichedDetails.length === 0}>
             <Download className="h-4 w-4 mr-2" />전체 엑셀 다운로드
