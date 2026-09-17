@@ -87,6 +87,7 @@ export default function SettlementResultPage() {
   }, [selectedId, refreshKey])
 
   // promotions 조회 (is_call_promo 기반 콜/일반 실시간 계산용)
+  // settlement_id IS NULL (미사용) + settlement_id = selectedId (이 정산에 연결된 것) 모두 포함
   useEffect(() => {
     if (!selectedId) return
     const sb = createClient()
@@ -95,7 +96,7 @@ export default function SettlementResultPage() {
         const { data } = await sb
           .from('promotions')
           .select(PROMO_SELECT)
-          .is('settlement_id', null)
+          .or(`settlement_id.is.null,settlement_id.eq.${selectedId}`)
         if (data) setPromoList(data as PromoRow[])
       } catch { /* ignore */ }
     })()
@@ -115,7 +116,17 @@ export default function SettlementResultPage() {
       const { call, gen } = calcPromoSplit(promoList, d.rider_id, d.delivery_count ?? 0, weekStart)
       const newPromoTotal = call + gen
 
-      // 보험 합계
+      // promoList가 로드됐지만 이 라이더에 해당하는 프로모션이 없으면 DB 원본 유지
+      // (DB 값이 이미 정확한 경우 덮어쓰지 않음)
+      const dbPromoTotal = d.promotion_amount ?? 0
+      const promoChanged = newPromoTotal !== dbPromoTotal
+
+      if (!promoChanged) {
+        // 프로모션 금액이 같으면 콜/일반 분류만 override
+        return { ...d, call_promotion_amount: call, general_promotion_amount: gen }
+      }
+
+      // 프로모션 금액이 달라졌을 때만 파생값 전체 재계산
       const emp = (d.excel_employment_insurance ?? 0) + (d.employment_insurance_addition ?? 0)
       const acc = (d.excel_accident_insurance ?? 0)   + (d.accident_insurance_addition   ?? 0)
 
@@ -137,12 +148,12 @@ export default function SettlementResultPage() {
 
       return {
         ...d,
-        call_promotion_amount:  call,
+        call_promotion_amount:    call,
         general_promotion_amount: gen,
-        promotion_amount:       newPromoTotal,
-        tax_base_amount:        newTaxBase,
-        income_tax_deduction:   newIncomeTax,
-        final_amount:           newFinalAmount,
+        promotion_amount:         newPromoTotal,
+        tax_base_amount:          newTaxBase,
+        income_tax_deduction:     newIncomeTax,
+        final_amount:             newFinalAmount,
       }
     })
   }, [details, promoList, weekStart])

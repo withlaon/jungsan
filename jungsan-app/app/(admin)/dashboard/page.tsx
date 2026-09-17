@@ -86,10 +86,11 @@ export default function DashboardPage() {
           }
         }
         // promotions 조회 (is_call_promo 기반 콜/일반 분류)
+        // settlement_id IS NULL (미사용) + settlement_id = selectedId (이 정산에 연결된 것) 모두 포함
         const { data: promos } = await supabase
           .from('promotions')
           .select(PROMO_SELECT)
-          .is('settlement_id', null)
+          .or(`settlement_id.is.null,settlement_id.eq.${selectedId}`)
         if (promos) setPromoList(promos as PromoRow[])
       } catch { /* ignore */ }
     })()
