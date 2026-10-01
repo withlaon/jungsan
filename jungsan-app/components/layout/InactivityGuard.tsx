@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { clearUserCache } from '@/hooks/useUser'
+import { clearUserCache, useUser } from '@/hooks/useUser'
 import { clearSettlementsCache, revalidateSettlements } from '@/hooks/useSettlements'
 import { revalidateRiders } from '@/hooks/useRiders'
 import { revalidatePayments } from '@/hooks/useAdvancePayments'
@@ -30,6 +30,8 @@ export function InactivityGuard() {
   const supabase = useMemo(() => createClient(), [])
   const redirectingRef = useRef(false)
   const hiddenAtRef = useRef<number>(0)
+  // useUser 훅으로 인증 상태 수신 (F5 후 쿠키 초기화 race condition 방지)
+  const { user, loading: userLoading } = useUser()
 
   const doLogout = useCallback(
     async (reason: string) => {
@@ -38,7 +40,7 @@ export function InactivityGuard() {
       clearUserCache()
       clearSettlementsCache()
       await supabase.auth.signOut().catch(() => {})
-      toast.info(reason, { id: 'session-expired', duration: 4000 })
+      toast.info(reason, { id: 'session-expired', duration: 3000 })
       const target = getBrowserLoginUrl()
       if (typeof window !== 'undefined') {
         window.location.replace(target)
@@ -49,6 +51,16 @@ export function InactivityGuard() {
     [router, supabase],
   )
 
+  // useUser 기반 초기 인증 확인
+  // getSession() 직접 호출 시 F5 직후 @supabase/ssr 쿠키 파싱 전에 null 반환 → 불필요한 로그아웃 발생
+  // userLoading이 false로 바뀐 뒤 user가 null이면 실제 미인증 상태이므로 로그아웃 처리
+  useEffect(() => {
+    if (userLoading) return
+    if (!user) {
+      void doLogout(MSG_LOGIN_REQUIRED)
+    }
+  }, [user, userLoading, doLogout])
+
   useInactivityLogout(
     () => {
       void doLogout(MSG_IDLE_LOGOUT)
@@ -56,19 +68,11 @@ export function InactivityGuard() {
     () => {
       toast.warning(MSG_IDLE_WARN, {
         id: 'inactivity-warn',
-        duration: 10_000,
+        duration: 8000,
       })
     },
     true,
   )
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        void doLogout(MSG_LOGIN_REQUIRED)
-      }
-    })
-  }, [supabase, doLogout])
 
   useEffect(() => {
     const handleVisibility = async () => {

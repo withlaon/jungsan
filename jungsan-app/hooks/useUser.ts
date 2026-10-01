@@ -82,7 +82,7 @@ async function fetchUserProfile(): Promise<UserCache> {
       broadcastUser(fallback)
       return fallback
     }
-  })()
+  })().finally(() => { _promise = null })
 
   return _promise
 }
