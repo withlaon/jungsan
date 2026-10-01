@@ -101,6 +101,15 @@ export async function revalidateRiders(): Promise<Rider[]> {
 }
 
 /**
+ * 로그인 직후 userId를 이용해 riders를 백그라운드 프리페치합니다.
+ * 이미 캐시나 진행 중인 요청이 있으면 무시합니다.
+ */
+export function prefetchRiders(): void {
+  if (_cache || _promise) return
+  loadRiders().catch(() => {})
+}
+
+/**
  * CRUD 성공 직후 서버 왕복 없이 즉시 로컬 상태에 반영합니다.
  * API 응답으로 받은 라이더 데이터를 낙관적으로 업데이트한 뒤
  * 백그라운드에서 서버 확인 refresh를 별도로 호출하세요.

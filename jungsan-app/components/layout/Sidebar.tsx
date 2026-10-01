@@ -26,11 +26,14 @@ import {
   Trash2,
   Menu,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
-import { clearSettlementsCache } from '@/hooks/useSettlements'
+import { clearSettlementsCache, revalidateSettlements, prefetchSettlementsForUser } from '@/hooks/useSettlements'
+import { revalidatePayments, prefetchPaymentsForUser } from '@/hooks/useAdvancePayments'
+import { revalidateRiders, prefetchRiders } from '@/hooks/useRiders'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -85,6 +88,8 @@ function AdminSidebarPanel({
   onCloseMobile,
   onLogout,
   onOpenProfile,
+  onRefresh,
+  refreshing,
 }: {
   pathname: string
   config: PlatformConfig
@@ -93,6 +98,8 @@ function AdminSidebarPanel({
   onCloseMobile: () => void
   onLogout: () => void
   onOpenProfile: () => void
+  onRefresh: () => void
+  refreshing: boolean
 }) {
   return (
     <aside className="w-64 min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
@@ -172,6 +179,18 @@ function AdminSidebarPanel({
         <Button
           type="button"
           variant="ghost"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+        >
+          {refreshing
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <RefreshCw className="h-4 w-4" />}
+          새로고침
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
           onClick={onLogout}
           className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
         >
@@ -196,12 +215,13 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const { platform, logoUrl: cachedLogoUrl } = useUser()
+  const { platform, logoUrl: cachedLogoUrl, userId } = useUser()
   const config = PLATFORM_CONFIG[platform ?? 'baemin']
   const PlatformIcon = config.icon
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [profile, setProfile] = useState<Profile>({ username: '', company_name: '', business_number: '', manager_name: '', phone: '', email: '', logo_url: '' })
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
@@ -224,6 +244,14 @@ export function Sidebar() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cachedLogoUrl])
+
+  // userId 확보 즉시 모든 데이터 프리페치 → 탭 이동 시 즉시 표시
+  useEffect(() => {
+    if (!userId) return
+    prefetchRiders()
+    prefetchSettlementsForUser(userId)
+    prefetchPaymentsForUser(userId)
+  }, [userId])
 
   useEffect(() => {
     if (profileOpen) {
@@ -348,6 +376,22 @@ export function Sidebar() {
     setTimeout(() => { setSaveMsg(''); setProfileOpen(false) }, 1000)
   }
 
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        revalidateRiders(),
+        revalidateSettlements(),
+        revalidatePayments(),
+      ])
+      toast.success('데이터가 새로고침되었습니다.')
+    } catch {
+      toast.error('새로고침에 실패했습니다.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const handleLogout = () => {
     // 캐시 및 브라우저 스토리지 즉시 초기화
     clearUserCache()
@@ -373,6 +417,8 @@ export function Sidebar() {
     onCloseMobile: () => setMobileOpen(false),
     onLogout: handleLogout,
     onOpenProfile: () => setProfileOpen(true),
+    onRefresh: handleRefresh,
+    refreshing,
   }
 
 

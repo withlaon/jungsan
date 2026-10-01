@@ -105,8 +105,11 @@ export function useAdvancePayments() {
 
   useEffect(() => {
     if (userLoading) return
-    // userId 미확정(로그인 직후 일시적 null) 상태에서는 빈 배열로 종료하지 않음
-    if (!userId && !isAdmin) return
+    // 인증 안 된 상태: 로딩을 false로 해제하고 종료 (무한 로딩 방지)
+    if (!userId && !isAdmin) {
+      setLoading(false)
+      return
+    }
 
     if (_cache) {
       setPayments(_cache)
