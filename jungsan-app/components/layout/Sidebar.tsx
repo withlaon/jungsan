@@ -14,6 +14,7 @@ import {
   Settings,
   Upload,
   FileText,
+  Landmark,
   Globe,
   Bike,
   LogOut,
@@ -63,6 +64,7 @@ const navItems = [
   { href: '/settings',           label: '관리비 설정',    icon: Settings   },
   { href: '/settlement/upload',  label: '정산파일 등록',  icon: Upload     },
   { href: '/settlement/result',  label: '정산결과보기',   icon: FileText   },
+  { href: '/settlement/tax-report', label: '세무서신고',    icon: Landmark   },
   { href: '/rider-site',         label: '라이더사이트',      icon: Globe      },
 ]
 
