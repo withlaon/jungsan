@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import type { TaxReportLine } from '@/lib/tax-report/allocate'
 
 export function attributionLabel(month: string): string {
@@ -45,54 +44,33 @@ export function periodOverlapsMonth(start: string, end: string, month: string): 
   return start <= monthEnd && end >= monthStart
 }
 
-function setCell(ws: XLSX.WorkSheet, row: number, col: number, value: string | number | null) {
-  const addr = XLSX.utils.encode_cell({ r: row, c: col })
-  if (value == null || value === '') {
-    delete ws[addr]
-    return
-  }
-  if (typeof value === 'number') {
-    ws[addr] = { t: 'n', v: value }
-    return
-  }
-  ws[addr] = { t: 's', v: value }
-}
-
 export async function downloadBusinessIncomeFile(lines: TaxReportLine[], month: string) {
-  const response = await fetch('/templates/business-income-blank.xls')
-  if (!response.ok) throw new Error('세무사 제출 양식을 불러오지 못했습니다.')
-  const template = await response.arrayBuffer()
-  const workbook = XLSX.read(template, { type: 'array' })
-  const sheetName = workbook.SheetNames[0]
-  const sheet = workbook.Sheets[sheetName]
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:O3')
-  const lastRow = Math.max(range.e.r, 3 + lines.length)
-
-  for (let row = 3; row <= lastRow; row++) {
-    for (let col = 0; col <= 14; col++) delete sheet[XLSX.utils.encode_cell({ r: row, c: col })]
+  const response = await fetch('/api/tax-report/business-income', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      month,
+      lines: lines.map((line) => ({
+        reportName: line.reportName,
+        ssn: line.ssn,
+        finalAmount: line.finalAmount,
+      })),
+    }),
+  })
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(typeof data.error === 'string' ? data.error : '파일 생성에 실패했습니다.')
   }
-
-  const belong = attributionLabel(month)
-  const paidOn = paymentDateLabel(month)
-  lines.forEach((line, index) => {
-    const row = 3 + index
-    const digits = ssnDigits(line.ssn)
-    const flag = domesticForeignFlag(digits)
-    setCell(sheet, row, 0, index + 1)
-    setCell(sheet, row, 1, belong)
-    setCell(sheet, row, 2, paidOn)
-    setCell(sheet, row, 3, line.reportName)
-    setCell(sheet, row, 4, digits ? Number(digits) : null)
-    setCell(sheet, row, 7, '퀵서비스')
-    setCell(sheet, row, 9, line.finalAmount)
-    if (flag != null) setCell(sheet, row, 13, flag)
-  })
-
-  sheet['!ref'] = XLSX.utils.encode_range({
-    s: { r: 0, c: 0 },
-    e: { r: Math.max(range.e.r, 3 + lines.length - 1), c: Math.max(range.e.c, 255) },
-  })
-
+  const blob = await response.blob()
   const [year, mon] = month.split('-')
-  XLSX.writeFile(workbook, `사업소득자료_윈드콜${year.slice(2)}년${mon}월.xls`, { bookType: 'xls' })
+  const filename = `사업소득자료_윈드콜${year.slice(2)}년${mon}월.xlsx`
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
 }
