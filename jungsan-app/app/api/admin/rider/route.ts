@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { readTaxSettings, writeTaxSettings } from '@/lib/tax-report/settings-store'
 
 async function getAuthUser() {
   const supabase = await createClient()
@@ -108,17 +109,48 @@ export async function DELETE(request: NextRequest) {
     if (!user) return NextResponse.json({ error: '로그?�이 ?�요?�니??' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .maybeSingle()
+    const body = await request.json().catch(() => ({}))
+    const id = typeof body?.id === 'string' ? body.id : ''
+    if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
 
-    const { id } = await request.json()
-    if (!id) return NextResponse.json({ error: 'id가 ?�요?�니??' }, { status: 400 })
+    const { data: rider, error: riderError } = await admin
+      .from('riders')
+      .select('id, user_id')
+      .eq('id', id)
+      .maybeSingle()
+    if (riderError) return NextResponse.json({ error: riderError.message }, { status: 500 })
+    if (!rider) return NextResponse.json({ error: '라이더를 찾을 수 없습니다.' }, { status: 404 })
+    if (rider.user_id && rider.user_id !== user.id) {
+      return NextResponse.json({ error: '삭제 권한이 없습니다.' }, { status: 403 })
+    }
+
+    const relatedTables = [
+      'settlement_details',
+      'advance_payments',
+      'promotions',
+      'management_fees',
+      'insurance_fees',
+    ] as const
+
+    for (const table of relatedTables) {
+      for (;;) {
+        const { data, error } = await admin.from(table).delete().eq('rider_id', id).select('id')
+        if (error) return NextResponse.json({ error: `${table} 삭제 실패: ${error.message}` }, { status: 500 })
+        if (!data || data.length < 1000) break
+      }
+    }
 
     const { error } = await admin.from('riders').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    try {
+      const settings = await readTaxSettings(user.id)
+      const next = settings.filter((row) => row.rider_id !== id)
+      if (next.length !== settings.length) await writeTaxSettings(user.id, next)
+    } catch (settingsError) {
+      console.warn('tax settings cleanup:', settingsError)
+    }
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('rider delete error:', err)

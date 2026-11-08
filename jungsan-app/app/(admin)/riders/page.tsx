@@ -914,7 +914,7 @@ export default function RidersPage() {
                   <div className="bg-rose-900/20 border border-rose-800 rounded-lg p-3">
                     <p className="text-rose-300 text-xs flex items-center gap-1.5">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      삭제된 데이터는 복구할 수 없습니다.
+                      정산, 선지급, 프로모션, 관리비 등 이 라이더의 과거 자료도 함께 삭제되며 복구할 수 없습니다.
                     </p>
                   </div>
                 </div>
@@ -962,7 +962,7 @@ export default function RidersPage() {
                 <div className="bg-rose-900/20 border border-rose-800 rounded-lg p-3">
                   <p className="text-rose-300 text-xs flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    삭제된 데이터는 복구할 수 없습니다. 관련 정산 데이터도 함께 삭제됩니다.
+                    정산, 선지급, 프로모션 등 과거 자료도 함께 삭제되며 복구할 수 없습니다.
                   </p>
                 </div>
               </>

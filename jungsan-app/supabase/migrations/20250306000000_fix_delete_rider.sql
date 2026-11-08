@@ -1,6 +1,5 @@
 -- 라이더 삭제 시 FK 제약 오류 수정
--- Supabase SQL Editor에서 실행하세요
--- settlement_details, advance_payments, promotions 등 관련 데이터를 먼저 삭제
+-- 연도와 무관하게 해당 라이더의 정산·선지급·프로모션·관리비·보험 자료를 먼저 삭제
 
 CREATE OR REPLACE FUNCTION delete_rider(p_id uuid)
 RETURNS void
