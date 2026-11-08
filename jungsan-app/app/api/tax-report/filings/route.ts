@@ -18,9 +18,8 @@ export async function GET() {
   try {
     const filings = await readFilings(user.id)
     return NextResponse.json({ filings }, { headers: noStore })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : '저장된 신고를 불러오지 못했습니다.'
-    return NextResponse.json({ error: message }, { status: 500, headers: noStore })
+  } catch {
+    return NextResponse.json({ filings: [] }, { headers: noStore })
   }
 }
 
@@ -43,8 +42,7 @@ export async function PUT(request: NextRequest) {
     const filing = { month, savedAt: new Date().toISOString(), supplyAmount, files }
     await writeFiling(user.id, filing)
     return NextResponse.json({ filing }, { headers: noStore })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : '저장에 실패했습니다.'
-    return NextResponse.json({ error: message }, { status: 500, headers: noStore })
+  } catch {
+    return NextResponse.json({ error: '저장에 실패했습니다.' }, { status: 500, headers: noStore })
   }
 }

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { allocateTaxReport, aggregateAmounts, normalizeRiderName } from '@/lib/tax-report/allocate'
 import { buildTaxInputs } from '@/lib/tax-report/inputs'
-import { readFilings } from '@/lib/tax-report/filings-store'
+import { readFilings, type StoredFiling } from '@/lib/tax-report/filings-store'
 import { readTaxSettings } from '@/lib/tax-report/settings-store'
 
 export const dynamic = 'force-dynamic'
@@ -85,12 +85,11 @@ export async function GET() {
     bucket.byRider.set(name, (bucket.byRider.get(name) ?? 0) + Math.round(Number(detail.tax_base_amount ?? 0)))
   }
 
-  let filings
+  let filings: StoredFiling[]
   try {
     filings = await readFilings(user.id)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : '저장된 신고를 불러오지 못했습니다.'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    filings = []
   }
   const savedReport = new Map(filings.map((filing) => [
     filing.month,

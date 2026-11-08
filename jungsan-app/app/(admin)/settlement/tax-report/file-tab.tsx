@@ -62,7 +62,9 @@ export function TaxReportFileTab({
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
         if (!res.ok) {
-          toast.error(typeof data.error === 'string' ? data.error : '월별 집계를 불러오지 못했습니다.')
+          if (!isStorageNoise(data.error)) {
+            toast.error(typeof data.error === 'string' ? data.error : '월별 집계를 불러오지 못했습니다.')
+          }
           return
         }
         const list = Array.isArray(data.months) ? data.months as MonthSummary[] : []
@@ -86,7 +88,9 @@ export function TaxReportFileTab({
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
         if (!res.ok) {
-          toast.error(typeof data.error === 'string' ? data.error : '저장된 신고 파일을 불러오지 못했습니다.')
+          if (!isStorageNoise(data.error)) {
+            toast.error(typeof data.error === 'string' ? data.error : '저장된 신고 파일을 불러오지 못했습니다.')
+          }
           return
         }
         const next: Record<string, SavedFiling> = {}
@@ -431,6 +435,10 @@ export function TaxReportFileTab({
       )}
     </div>
   )
+}
+
+function isStorageNoise(error: unknown) {
+  return typeof error === 'string' && (error.includes('supabase.co') || error.trim().startsWith('{'))
 }
 
 function currentMonth() {

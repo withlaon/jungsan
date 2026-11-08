@@ -23,14 +23,20 @@ function filePath(userId: string) {
 
 export async function readFilings(userId: string): Promise<StoredFiling[]> {
   const admin = createAdminClient()
-  const { data, error } = await admin.storage.from(BUCKET).download(filePath(userId))
-  if (error || !data) {
-    if (isMissing(error)) return []
-    throw new Error(error?.message ?? '저장된 신고 파일을 읽지 못했습니다.')
+  try {
+    await ensureBucket(admin)
+  } catch {
+    return []
   }
-  const parsed = JSON.parse(await data.text()) as { filings?: unknown[] }
-  if (!Array.isArray(parsed.filings)) return []
-  return parsed.filings.filter(isFiling)
+  const { data, error } = await admin.storage.from(BUCKET).download(filePath(userId))
+  if (error || !data) return []
+  try {
+    const parsed = JSON.parse(await data.text()) as { filings?: unknown[] }
+    if (!Array.isArray(parsed.filings)) return []
+    return parsed.filings.filter(isFiling)
+  } catch {
+    return []
+  }
 }
 
 export async function writeFiling(userId: string, filing: StoredFiling) {
@@ -50,23 +56,16 @@ async function writeAll(userId: string, filings: StoredFiling[]) {
     contentType: 'application/json',
     cacheControl: '0',
   })
-  if (error) throw new Error(error.message)
+  if (error) throw new Error('신고 파일을 저장하지 못했습니다.')
 }
 
 async function ensureBucket(admin: ReturnType<typeof createAdminClient>) {
   const existing = await admin.storage.getBucket(BUCKET)
   if (existing.data) return
   const created = await admin.storage.createBucket(BUCKET, { public: false })
-  if (created.error && !/already exists/i.test(created.error.message)) {
-    throw new Error(created.error.message)
+  if (created.error && !/already exists/i.test(created.error.message ?? '')) {
+    throw new Error('신고 파일 저장소를 준비하지 못했습니다.')
   }
-}
-
-function isMissing(error: { message?: string; status?: number; statusCode?: string | number } | null): boolean {
-  if (!error) return true
-  const message = (error.message ?? '').toLowerCase()
-  const status = Number(error.status ?? error.statusCode)
-  return status === 404 || message.includes('not found') || message.includes('does not exist')
 }
 
 function isFiling(value: unknown): value is StoredFiling {
