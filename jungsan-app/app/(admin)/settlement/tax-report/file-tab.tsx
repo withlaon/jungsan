@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatKRW } from '@/lib/utils'
-import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
+import { Download, FileSpreadsheet, Save, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface MonthSummary {
@@ -20,6 +20,14 @@ interface MonthSummary {
   reportAmount: number
   difference: number
   weekCount: number
+  saved?: boolean
+}
+
+interface SavedFiling {
+  month: string
+  savedAt: string
+  supplyAmount: number
+  files: ParsedSettlementFile[]
 }
 
 export function TaxReportFileTab({
@@ -37,9 +45,12 @@ export function TaxReportFileTab({
   const [month, setMonth] = useState('')
   const [months, setMonths] = useState<MonthSummary[]>([])
   const [monthsLoading, setMonthsLoading] = useState(true)
-  const [files, setFiles] = useState<ParsedSettlementFile[]>([])
+  const [monthsRefresh, setMonthsRefresh] = useState(0)
+  const [drafts, setDrafts] = useState<Record<string, ParsedSettlementFile[]>>({})
+  const [filings, setFilings] = useState<Record<string, SavedFiling>>({})
   const [reading, setReading] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const settingsKey = settings.map((row) => `${row.rider_id}:${row.mode}:${row.source_name ?? ''}`).join('|')
 
@@ -65,7 +76,34 @@ export function TaxReportFileTab({
         if (!cancelled) setMonthsLoading(false)
       })
     return () => { cancelled = true }
-  }, [settingsLoaded, settingsKey])
+  }, [settingsLoaded, settingsKey, monthsRefresh])
+
+  useEffect(() => {
+    if (!settingsLoaded) return
+    let cancelled = false
+    fetch('/api/tax-report/filings', { credentials: 'same-origin', cache: 'no-store' })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (!res.ok) {
+          toast.error(typeof data.error === 'string' ? data.error : '저장된 신고 파일을 불러오지 못했습니다.')
+          return
+        }
+        const next: Record<string, SavedFiling> = {}
+        for (const row of Array.isArray(data.filings) ? data.filings : []) {
+          if (!row || typeof row.month !== 'string' || !Array.isArray(row.files)) continue
+          next[row.month] = row as SavedFiling
+        }
+        setFilings(next)
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('저장된 신고 파일을 불러오지 못했습니다.')
+      })
+    return () => { cancelled = true }
+  }, [settingsLoaded, monthsRefresh])
+
+  const files = drafts[month] ?? filings[month]?.files ?? []
+  const dirty = drafts[month] != null
 
   const inputs = useMemo(() => buildTaxInputs(riders, settings), [riders, settings])
 
@@ -100,10 +138,11 @@ export function TaxReportFileTab({
       for (const file of parsed.filter((item) => item.error)) toast.error(`${file.fileName}: ${file.error}`)
       const ok = parsed.filter((item) => !item.error)
       if (ok.length === 0) return
-      setFiles((prev) => {
-        const map = new Map(prev.map((file) => [file.fileName, file]))
+      setDrafts((prev) => {
+        const base = prev[month] ?? filings[month]?.files ?? []
+        const map = new Map(base.map((file) => [file.fileName, file]))
         for (const file of ok) map.set(file.fileName, file)
-        return [...map.values()]
+        return { ...prev, [month]: [...map.values()] }
       })
     } finally {
       setReading(false)
@@ -136,6 +175,57 @@ export function TaxReportFileTab({
     } finally {
       setDownloading(false)
     }
+  }
+
+  const saveFiling = async () => {
+    if (!month) {
+      toast.error('신고월을 선택해 주세요.')
+      return
+    }
+    if (files.length === 0) {
+      toast.error('저장할 정산 파일이 없습니다.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/tax-report/filings', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month,
+          supplyAmount: selected?.supplyAmount ?? filings[month]?.supplyAmount ?? 0,
+          files: files.map(({ fileName, sheetName, period, rows }) => ({ fileName, sheetName, period, rows })),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(typeof data.error === 'string' ? data.error : '저장에 실패했습니다.')
+        return
+      }
+      if (data.filing?.month) {
+        setFilings((prev) => ({ ...prev, [data.filing.month]: data.filing }))
+      }
+      setDrafts((prev) => {
+        const next = { ...prev }
+        delete next[month]
+        return next
+      })
+      setMonthsRefresh((value) => value + 1)
+      toast.success('저장했습니다. 다음에도 이 내역으로 엑셀을 받을 수 있습니다.')
+    } catch {
+      toast.error('저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeFile = (fileName: string) => {
+    setDrafts((prev) => {
+      const base = prev[month] ?? filings[month]?.files ?? []
+      return { ...prev, [month]: base.filter((item) => item.fileName !== fileName) }
+    })
   }
 
   return (
@@ -187,7 +277,9 @@ export function TaxReportFileTab({
               >
                 <TableCell className="text-white">
                   {formatMonth(item.month)}
-                  <span className="block text-xs text-slate-500">{item.weekCount}주</span>
+                  <span className="block text-xs text-slate-500">
+                    {item.weekCount}주{item.saved ? ' · 저장됨' : ''}
+                  </span>
                 </TableCell>
                 <TableCell className="text-right text-slate-200">{formatKRW(item.supplyAmount)}</TableCell>
                 <TableCell className="text-right text-slate-200">{formatKRW(item.reportAmount)}</TableCell>
@@ -250,7 +342,7 @@ export function TaxReportFileTab({
               <div key={file.fileName} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${outside ? 'border-amber-700 text-amber-200' : 'border-slate-800 text-slate-300 bg-slate-900'}`}>
                 <span className="max-w-[240px] truncate">{file.fileName}</span>
                 <span className="text-slate-500">{file.rows.length}명</span>
-                <button type="button" className="text-slate-500 hover:text-white" onClick={() => setFiles((prev) => prev.filter((item) => item.fileName !== file.fileName))}>
+                <button type="button" className="text-slate-500 hover:text-white" onClick={() => removeFile(file.fileName)}>
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -285,10 +377,20 @@ export function TaxReportFileTab({
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button type="button" className="bg-teal-600 hover:bg-teal-700" disabled={downloading || result.lines.length === 0} onClick={() => { void download() }}>
               <Download className="h-4 w-4" />
               {downloading ? '만드는 중' : '세무사 제출 파일 다운로드'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-600 bg-slate-900 text-white hover:bg-slate-800"
+              disabled={saving || !dirty || result.lines.length === 0}
+              onClick={() => { void saveFiling() }}
+            >
+              <Save className="h-4 w-4" />
+              {saving ? '저장 중' : dirty ? '저장' : '저장됨'}
             </Button>
           </div>
 

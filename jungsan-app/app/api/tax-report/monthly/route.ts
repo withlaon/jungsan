@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { allocateTaxReport, normalizeRiderName } from '@/lib/tax-report/allocate'
+import { allocateTaxReport, aggregateAmounts, normalizeRiderName } from '@/lib/tax-report/allocate'
 import { buildTaxInputs } from '@/lib/tax-report/inputs'
+import { readFilings } from '@/lib/tax-report/filings-store'
 import { readTaxSettings } from '@/lib/tax-report/settings-store'
 
 export const dynamic = 'force-dynamic'
@@ -84,21 +85,53 @@ export async function GET() {
     bucket.byRider.set(name, (bucket.byRider.get(name) ?? 0) + Math.round(Number(detail.tax_base_amount ?? 0)))
   }
 
+  let filings
+  try {
+    filings = await readFilings(user.id)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '저장된 신고를 불러오지 못했습니다.'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+  const savedReport = new Map(filings.map((filing) => [
+    filing.month,
+    {
+      reportAmount: allocateTaxReport(aggregateAmounts(filing.files.flatMap((file) => file.rows)), inputs).finalTotal,
+      supplyAmount: Math.max(0, Math.round(Number(filing.supplyAmount) || 0)),
+      fileCount: filing.files.length,
+    },
+  ]))
+
   const months = [...buckets.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([month, bucket]) => {
-      const reportAmount = allocateTaxReport(
+      const calculated = allocateTaxReport(
         [...bucket.byRider.entries()].map(([name, amount]) => ({ name, amount })),
         inputs,
       ).finalTotal
+      const saved = savedReport.get(month)
+      const reportAmount = saved?.reportAmount ?? calculated
+      const supplyAmount = bucket.weekCount > 0 ? bucket.supplyAmount : (saved?.supplyAmount ?? bucket.supplyAmount)
+      savedReport.delete(month)
       return {
         month,
-        supplyAmount: bucket.supplyAmount,
+        supplyAmount,
         reportAmount,
-        difference: bucket.supplyAmount - reportAmount,
+        difference: supplyAmount - reportAmount,
         weekCount: bucket.weekCount,
+        saved: saved != null,
       }
     })
 
-  return NextResponse.json({ months })
+  for (const [month, saved] of savedReport) {
+    months.push({
+      month,
+      supplyAmount: saved.supplyAmount,
+      reportAmount: saved.reportAmount,
+      difference: saved.supplyAmount - saved.reportAmount,
+      weekCount: saved.fileCount,
+      saved: true,
+    })
+  }
+  months.sort((a, b) => b.month.localeCompare(a.month))
+
+  return NextResponse.json({ months }, { headers: { 'Cache-Control': 'no-store' } })
 }
