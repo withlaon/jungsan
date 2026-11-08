@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Rider } from '@/types'
-import { allocateTaxReport, aggregateAmounts, type RiderTaxInput } from '@/lib/tax-report/allocate'
+import { allocateTaxReport, aggregateAmounts } from '@/lib/tax-report/allocate'
+import { buildTaxInputs } from '@/lib/tax-report/inputs'
 import { parseSettlementWorkbook, type ParsedSettlementFile } from '@/lib/tax-report/parse-settlement-excel'
 import { downloadBusinessIncomeFile, filePeriod, periodOverlapsMonth } from '@/lib/tax-report/business-income'
 import type { TaxReportSettingRow } from '@/app/(admin)/settlement/tax-report/change-tab'
@@ -24,9 +25,13 @@ interface MonthSummary {
 export function TaxReportFileTab({
   riders,
   settings,
+  settingsLoaded,
+  onReloadSettings,
 }: {
   riders: Rider[]
   settings: TaxReportSettingRow[]
+  settingsLoaded: boolean
+  onReloadSettings: () => Promise<TaxReportSettingRow[] | null>
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [month, setMonth] = useState('')
@@ -36,9 +41,12 @@ export function TaxReportFileTab({
   const [reading, setReading] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
+  const settingsKey = settings.map((row) => `${row.rider_id}:${row.mode}:${row.source_name ?? ''}`).join('|')
+
   useEffect(() => {
+    if (!settingsLoaded) return
     let cancelled = false
-    fetch('/api/tax-report/monthly', { credentials: 'same-origin' })
+    fetch('/api/tax-report/monthly', { credentials: 'same-origin', cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
@@ -57,22 +65,9 @@ export function TaxReportFileTab({
         if (!cancelled) setMonthsLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [settingsLoaded, settingsKey])
 
-  const inputs = useMemo<RiderTaxInput[]>(() => {
-    const byRider = new Map(settings.map((s) => [s.rider_id, s]))
-    return riders.map((rider) => {
-      const setting = byRider.get(rider.id)
-      const mode = setting?.mode === 'split' || setting?.mode === 'exclude' ? setting.mode : 'report'
-      return {
-        sourceName: rider.name,
-        mode,
-        taxName: setting?.tax_name?.trim() || null,
-        taxSsn: setting?.tax_ssn?.trim() || null,
-        originalSsn: rider.id_number,
-      }
-    })
-  }, [riders, settings])
+  const inputs = useMemo(() => buildTaxInputs(riders, settings), [riders, settings])
 
   const result = useMemo(() => {
     if (files.length === 0) return null
@@ -98,6 +93,7 @@ export function TaxReportFileTab({
     }
     setReading(true)
     try {
+      await onReloadSettings()
       const parsed = await Promise.all(
         picked.map(async (file) => parseSettlementWorkbook(await file.arrayBuffer(), file.name)),
       )
@@ -119,13 +115,22 @@ export function TaxReportFileTab({
       toast.error('신고월을 선택해 주세요.')
       return
     }
-    if (!result || result.lines.length === 0) {
+    if (files.length === 0) {
       toast.error('세금신고용 정산 파일을 먼저 등록해 주세요.')
       return
     }
     setDownloading(true)
     try {
-      await downloadBusinessIncomeFile(result.lines, month)
+      const fresh = await onReloadSettings()
+      const allocated = allocateTaxReport(
+        aggregateAmounts(files.flatMap((file) => file.rows)),
+        buildTaxInputs(riders, fresh ?? settings),
+      )
+      if (allocated.lines.length === 0) {
+        toast.error('신고할 금액이 없습니다.')
+        return
+      }
+      await downloadBusinessIncomeFile(allocated.lines, month)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '파일 생성에 실패했습니다.')
     } finally {
@@ -148,6 +153,10 @@ export function TaxReportFileTab({
         </label>
         <p className="text-xs text-slate-500 pb-2">정산 종료일이 속한 달로 공급가액과 신고금액을 모읍니다.</p>
       </div>
+
+      <p className="text-xs text-slate-400">
+        저장된 금액 나누기 {settings.filter((row) => row.mode === 'split').length}명, 전체 신고 안 함 {settings.filter((row) => row.mode === 'exclude').length}명은 다시 바꾸기 전까지 모든 신고월에 적용됩니다.
+      </p>
 
       <div className="rounded-xl border border-slate-800 overflow-hidden">
         <Table>

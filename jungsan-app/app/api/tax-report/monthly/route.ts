@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { allocateTaxReport, normalizeRiderName, type RiderTaxInput } from '@/lib/tax-report/allocate'
+import { allocateTaxReport, normalizeRiderName } from '@/lib/tax-report/allocate'
+import { buildTaxInputs } from '@/lib/tax-report/inputs'
 import { readTaxSettings } from '@/lib/tax-report/settings-store'
+
+export const dynamic = 'force-dynamic'
 
 interface DetailRow {
   settlement_id: string
@@ -41,17 +44,14 @@ export async function GET() {
     .eq('user_id', user.id)
   if (riderError) return NextResponse.json({ error: riderError.message }, { status: 500 })
 
-  const settings = await readTaxSettings(user.id)
-  const inputs: RiderTaxInput[] = (riderRows ?? []).map((rider) => {
-    const setting = settings.find((item) => item.rider_id === rider.id)
-    return {
-      sourceName: rider.name,
-      mode: setting?.mode === 'split' || setting?.mode === 'exclude' ? setting.mode : 'report',
-      taxName: setting?.tax_name ?? null,
-      taxSsn: setting?.tax_ssn ?? null,
-      originalSsn: rider.id_number,
-    }
-  })
+  let settings
+  try {
+    settings = await readTaxSettings(user.id)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '세금신고 설정을 불러오지 못했습니다.'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+  const inputs = buildTaxInputs(riderRows ?? [], settings)
 
   const monthOf = new Map(
     rows

@@ -18,6 +18,7 @@ export interface TaxReportSettingRow {
   tax_name: string | null
   tax_ssn: string | null
   mode: TaxReportMode
+  source_name?: string | null
 }
 
 interface Draft {
@@ -91,7 +92,12 @@ export function TaxReportChangeTab({
   }
 
   const toggleMode = (mode: 'split' | 'exclude') => {
-    setDraft((prev) => ({ ...prev, mode: prev.mode === mode ? 'report' : mode }))
+    if (!selected || saving) return
+    const next = { ...draft, mode: draft.mode === mode ? 'report' as const : mode }
+    setDraft(next)
+    void onSave(selected.id, next).then((ok) => {
+      if (!ok) setDraft(draft)
+    })
   }
 
   const counts = useMemo(() => ({
@@ -204,16 +210,21 @@ export function TaxReportChangeTab({
 
               <div className="space-y-2">
                 <p className="text-slate-300 text-sm font-medium">세금신고 안 함</p>
+                <p className="text-xs text-slate-400">
+                  한 번 선택해 저장하면 다음 신고월과 다음 파일에도 그대로 적용됩니다. 바꿀 때만 다시 선택하거나 기본값으로 되돌리세요.
+                </p>
                 <ModeCheck
                   checked={draft.mode === 'split'}
                   title="세금신고금액 라이더에 나누기"
                   desc="이 라이더는 신고 파일에 넣지 않고, 금액을 신고하는 라이더에게 10원 단위로 나눕니다."
+                  disabled={saving}
                   onToggle={() => toggleMode('split')}
                 />
                 <ModeCheck
                   checked={draft.mode === 'exclude'}
                   title="전체신고안하기"
                   desc="이 라이더는 신고 파일에 나오지 않고, 금액도 버려집니다."
+                  disabled={saving}
                   onToggle={() => toggleMode('exclude')}
                 />
               </div>
@@ -257,16 +268,18 @@ function ModeCheck({
   checked,
   title,
   desc,
+  disabled,
   onToggle,
 }: {
   checked: boolean
   title: string
   desc: string
+  disabled?: boolean
   onToggle: () => void
 }) {
   return (
     <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer ${checked ? 'border-teal-600 bg-teal-950/40' : 'border-slate-700'}`}>
-      <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1 accent-teal-500" />
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} className="mt-1 accent-teal-500" />
       <span>
         <span className="block text-sm text-white">{title}</span>
         <span className="block text-xs text-slate-400 mt-1">{desc}</span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@/hooks/useUser'
 import { useRiders } from '@/hooks/useRiders'
 import { formatSsn, type TaxReportMode } from '@/lib/tax-report/allocate'
@@ -13,29 +13,40 @@ export default function TaxReportPage() {
   const { userId } = useUser()
   const { riders, loading: ridersLoading } = useRiders()
   const [settings, setSettings] = useState<TaxReportSettingRow[]>([])
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const loadSettings = useCallback(async (): Promise<TaxReportSettingRow[] | null> => {
+    if (!userId) return null
+    try {
+      const res = await fetch('/api/tax-report/settings', { credentials: 'same-origin', cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(typeof data.error === 'string' ? data.error : '세금신고 설정을 불러오지 못했습니다.')
+        return null
+      }
+      const next = Array.isArray(data.settings) ? data.settings as TaxReportSettingRow[] : []
+      setSettings(next)
+      return next
+    } catch {
+      toast.error('세금신고 설정을 불러오지 못했습니다.')
+      return null
+    } finally {
+      setSettingsLoaded(true)
+    }
+  }, [userId])
 
   useEffect(() => {
     if (!userId) return
-    let cancelled = false
-    fetch('/api/tax-report/settings', { credentials: 'same-origin' })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (cancelled) return
-        if (!res.ok) {
-          toast.error(typeof data.error === 'string' ? data.error : '세금신고 설정을 불러오지 못했습니다.')
-          return
-        }
-        setSettings(Array.isArray(data.settings) ? data.settings : [])
-      })
-      .catch(() => {
-        if (!cancelled) toast.error('세금신고 설정을 불러오지 못했습니다.')
-      })
-    return () => { cancelled = true }
-  }, [userId])
+    void loadSettings()
+  }, [userId, loadSettings])
 
   const save = async (riderId: string, draft: { taxName: string; taxSsn: string; mode: TaxReportMode }) => {
     if (!userId) return false
+    if (!settingsLoaded) {
+      toast.error('설정을 불러온 뒤에 저장해 주세요.')
+      return false
+    }
     const taxName = draft.taxName.trim()
     const taxSsnDigits = draft.taxSsn.replace(/\D/g, '')
     if (draft.mode === 'report' && draft.taxSsn.trim() && taxSsnDigits.length !== 13) {
@@ -50,6 +61,7 @@ export default function TaxReportPage() {
     const res = await fetch('/api/tax-report/settings', {
       method: 'PUT',
       credentials: 'same-origin',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         rider_id: riderId,
@@ -112,7 +124,7 @@ export default function TaxReportPage() {
         <TabsContent value="change" className="mt-4">
           <TaxReportChangeTab
             riders={riders}
-            ridersLoading={ridersLoading}
+            ridersLoading={ridersLoading || !settingsLoaded}
             settings={settings}
             saving={saving}
             onSave={save}
@@ -120,7 +132,7 @@ export default function TaxReportPage() {
           />
         </TabsContent>
         <TabsContent value="file" className="mt-4">
-          <TaxReportFileTab riders={riders} settings={settings} />
+          <TaxReportFileTab riders={riders} settings={settings} settingsLoaded={settingsLoaded} onReloadSettings={loadSettings} />
         </TabsContent>
       </Tabs>
     </div>
