@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { readFilings, sanitizeFilingFiles, writeFiling } from '@/lib/tax-report/filings-store'
+import { deleteFiling, readFilings, sanitizeFilingFiles, writeFiling } from '@/lib/tax-report/filings-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,5 +44,20 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ filing }, { headers: noStore })
   } catch {
     return NextResponse.json({ error: '저장에 실패했습니다.' }, { status: 500, headers: noStore })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const user = await requireUser()
+  if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: noStore })
+  const month = request.nextUrl.searchParams.get('month')?.trim() ?? ''
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return NextResponse.json({ error: '신고월이 필요합니다.' }, { status: 400, headers: noStore })
+  }
+  try {
+    await deleteFiling(user.id, month)
+    return NextResponse.json({ ok: true }, { headers: noStore })
+  } catch {
+    return NextResponse.json({ error: '삭제에 실패했습니다.' }, { status: 500, headers: noStore })
   }
 }

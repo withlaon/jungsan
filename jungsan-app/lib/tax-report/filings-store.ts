@@ -47,6 +47,11 @@ export async function writeFiling(userId: string, filing: StoredFiling) {
   await writeAll(userId, next)
 }
 
+export async function deleteFiling(userId: string, month: string) {
+  const current = await readFilings(userId)
+  await writeAll(userId, current.filter((row) => row.month !== month))
+}
+
 async function writeAll(userId: string, filings: StoredFiling[]) {
   const admin = createAdminClient()
   await ensureBucket(admin)

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatKRW } from '@/lib/utils'
-import { Download, FileSpreadsheet, Save, Upload, X } from 'lucide-react'
+import { Download, FileSpreadsheet, Save, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface MonthSummary {
@@ -51,6 +51,7 @@ export function TaxReportFileTab({
   const [reading, setReading] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const settingsKey = settings.map((row) => `${row.rider_id}:${row.mode}:${row.source_name ?? ''}`).join('|')
 
@@ -225,6 +226,42 @@ export function TaxReportFileTab({
     }
   }
 
+  const deleteMonth = async () => {
+    if (!month) return
+    if (!window.confirm(`${formatMonth(month)} 신고 내역을 삭제할까요?`)) return
+    setDeleting(true)
+    try {
+      if (filings[month]) {
+        const res = await fetch(`/api/tax-report/filings?month=${encodeURIComponent(month)}`, {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          toast.error(typeof data.error === 'string' ? data.error : '삭제에 실패했습니다.')
+          return
+        }
+      }
+      setFilings((prev) => {
+        const next = { ...prev }
+        delete next[month]
+        return next
+      })
+      setDrafts((prev) => {
+        const next = { ...prev }
+        delete next[month]
+        return next
+      })
+      setMonthsRefresh((value) => value + 1)
+      toast.success(`${formatMonth(month)} 내역을 삭제했습니다.`)
+    } catch {
+      toast.error('삭제에 실패했습니다.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const removeFile = (fileName: string) => {
     setDrafts((prev) => {
       const base = prev[month] ?? filings[month]?.files ?? []
@@ -395,6 +432,16 @@ export function TaxReportFileTab({
             >
               <Save className="h-4 w-4" />
               {saving ? '저장 중' : dirty ? '저장' : '저장됨'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-rose-800 bg-slate-900 text-rose-300 hover:bg-rose-950"
+              disabled={deleting || saving}
+              onClick={() => { void deleteMonth() }}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? '삭제 중' : '삭제'}
             </Button>
           </div>
 
