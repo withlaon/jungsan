@@ -1,7 +1,8 @@
-/** 세무서 신고 합산·배분. 정호걸은 최종 신고액 6,750,000원으로 맞춘다. */
+/** 세무서 신고 합산·배분. 정호걸은 최종 신고액 6,750,000원으로 맞춘다. 김형식은 본인 금액만 신고한다. */
 
 export const JEONG_NAME = '정호걸'
 export const JEONG_TARGET = 6_750_000
+export const KIM_NAME = '김형식'
 
 export type TaxReportMode = 'report' | 'split' | 'exclude'
 
@@ -129,6 +130,10 @@ function indexInputs(inputs: RiderTaxInput[]) {
   }
 }
 
+function isKim(name: string): boolean {
+  return normalizeRiderName(name) === KIM_NAME
+}
+
 function toReporter(row: SourceAmount, setting: RiderTaxInput | undefined, isJeong: boolean): Reporter {
   const taxName = setting?.taxName?.trim() || ''
   return {
@@ -226,7 +231,10 @@ export function allocateTaxReport(amounts: SourceAmount[], inputs: RiderTaxInput
       jeongFilledFromSplit = Math.min(need, splitPool)
       splitPool -= jeongFilledFromSplit
       jeongFilledFromOthers = jeong.finalAmount + jeongFilledFromSplit < JEONG_TARGET
-        ? deductExact(others, JEONG_TARGET - jeong.originalAmount - jeongFilledFromSplit)
+        ? deductExact(
+            others.filter((o) => !isKim(o.sourceName)),
+            JEONG_TARGET - jeong.originalAmount - jeongFilledFromSplit,
+          )
         : 0
       jeong.distributed = jeongFilledFromSplit + jeongFilledFromOthers
       jeong.finalAmount = jeong.originalAmount + jeong.distributed
@@ -253,9 +261,16 @@ export function allocateTaxReport(amounts: SourceAmount[], inputs: RiderTaxInput
   }
 
   const pool = splitPool + jeongExcess
-  const distributionTargets = others.filter((o) => o.originalAmount > 0 || o.finalAmount > 0)
+  const kim = others.find((o) => isKim(o.sourceName)) ?? null
+  const distributionTargets = others.filter(
+    (o) => !isKim(o.sourceName) && (o.originalAmount > 0 || o.finalAmount > 0),
+  )
   let distributedEach = 0
   let discarded = 0
+
+  if (kim) {
+    notes.push('김형식은 본인 금액만 신고하고, 나눈 금액은 포함하지 않습니다.')
+  }
 
   if (distributionTargets.length > 0 && pool > 0) {
     distributedEach = Math.floor(pool / distributionTargets.length / 10) * 10
@@ -283,7 +298,7 @@ export function allocateTaxReport(amounts: SourceAmount[], inputs: RiderTaxInput
     )
   }
 
-  const lines = [jeong, ...distributionTargets]
+  const lines = [jeong, ...others]
     .filter((r): r is Reporter => !!r && r.finalAmount > 0)
     .map((r) =>
       withTax({

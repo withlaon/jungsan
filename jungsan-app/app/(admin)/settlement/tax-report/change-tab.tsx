@@ -176,6 +176,11 @@ export function TaxReportChangeTab({
                   정호걸은 세무서 신고 파일에서 합계가 항상 6,750,000원으로 맞춰집니다.
                 </p>
               )}
+              {selected.name.replace(/\s+/g, '') === '김형식' && (
+                <p className="text-xs text-amber-300">
+                  김형식은 본인 금액만 신고되고, 다른 라이더에게서 나눈 금액은 포함되지 않습니다.
+                </p>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-slate-300 text-xs">세금신고 이름</Label>
                 <Input
