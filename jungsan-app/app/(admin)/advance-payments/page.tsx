@@ -20,6 +20,10 @@ import { Plus, Wallet, AlertCircle, Trash2, RotateCcw, Search, ChevronDown, Penc
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
 
+function notifySaved(message: string) {
+  toast.success(message, { duration: 500 })
+}
+
 type PaymentWithRider = import('@/hooks/useAdvancePayments').PaymentWithRider
 
 // 수요일~화요일 기준 주간 목록 생성 (최근 24주)
@@ -196,7 +200,7 @@ export default function AdvancePaymentsPage() {
         return
       }
 
-      toast.success(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
+      notifySaved(type === 'advance' ? '선지급금이 등록되었습니다.' : '회수 내역이 등록되었습니다.')
       if (type === 'advance') { setAdvanceOpen(false); setAdvanceForm(emptyForm) }
       else { setRecoveryOpen(false); setRecoveryForm(emptyForm) }
       bumpSettlementResults()
@@ -249,7 +253,7 @@ export default function AdvancePaymentsPage() {
         return
       }
 
-      toast.success('수정되었습니다.')
+      notifySaved('수정되었습니다.')
       setEditOpen(false)
       setEditingPayment(null)
       bumpSettlementResults()
@@ -280,7 +284,7 @@ export default function AdvancePaymentsPage() {
         return
       }
       applyOptimisticPayment(p, 'remove')
-      toast.success('삭제되었습니다.')
+      notifySaved('삭제되었습니다.')
       bumpSettlementResults()
       await revalidatePayments()
     } catch {

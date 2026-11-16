@@ -108,8 +108,30 @@ export default function RidersPage() {
   const [bulkActionConfirm, setBulkActionConfirm] = useState<'deactivate' | 'delete' | null>(null)
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [page, setPage] = useState(1)
+  const [lastSeen, setLastSeen] = useState<Record<string, string> | null>(null)
 
   const PAGE_SIZE = 15
+  const quietCutoff = useMemo(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 3)
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${date.getFullYear()}-${month}-${day}`
+  }, [])
+
+  useEffect(() => {
+    if (userLoading || !userId) return
+    let cancelled = false
+    fetch('/api/admin/rider-activity', { cache: 'no-store', credentials: 'same-origin' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.lastSeen && typeof data.lastSeen === 'object') {
+          setLastSeen(data.lastSeen as Record<string, string>)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [userId, userLoading])
 
   const openCreate = () => {
     setEditingRider(null)
@@ -681,10 +703,14 @@ export default function RidersPage() {
                         />
                       </TableCell>
                       <TableCell className="text-slate-400 text-sm">{rider.join_date ?? '-'}</TableCell>
-                      <TableCell
-                        className="text-white font-medium cursor-pointer hover:text-blue-400 hover:underline"
-                        onClick={() => openEdit(rider)}
-                      >
+              <TableCell
+                className={`font-medium cursor-pointer hover:underline ${
+                  lastSeen != null && (lastSeen[rider.id] ?? '') < quietCutoff
+                    ? 'text-rose-400 hover:text-rose-300'
+                    : 'text-white hover:text-blue-400'
+                }`}
+                onClick={() => openEdit(rider)}
+              >
                         {rider.name}
                       </TableCell>
                       <TableCell

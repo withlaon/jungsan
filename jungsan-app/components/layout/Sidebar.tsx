@@ -35,6 +35,7 @@ import { useUser, clearUserCache, updateCachedLogoUrl } from '@/hooks/useUser'
 import { clearSettlementsCache, revalidateSettlements, prefetchSettlementsForUser } from '@/hooks/useSettlements'
 import { revalidatePayments, prefetchPaymentsForUser } from '@/hooks/useAdvancePayments'
 import { revalidateRiders, prefetchRiders } from '@/hooks/useRiders'
+import { prefetchAdminLists } from '@/lib/admin-list-cache'
 
 const PLATFORM_CONFIG = {
   baemin: {
@@ -247,12 +248,17 @@ export function Sidebar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cachedLogoUrl])
 
+  useEffect(() => {
+    navItems.forEach((item) => router.prefetch(item.href))
+  }, [router])
+
   // userId 확보 즉시 모든 데이터 프리페치 → 탭 이동 시 즉시 표시
   useEffect(() => {
     if (!userId) return
     prefetchRiders()
     prefetchSettlementsForUser(userId)
     prefetchPaymentsForUser(userId)
+    prefetchAdminLists(userId).catch(() => {})
   }, [userId])
 
   useEffect(() => {

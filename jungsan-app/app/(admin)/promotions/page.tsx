@@ -18,6 +18,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Plus, Gift, Trash2, Users, Search, ChevronDown, X, PlusCircle, RefreshCw, ChevronRight, UserCircle } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
+import { readAdminList, writeAdminList } from '@/lib/admin-list-cache'
+
+function notifySaved(message: string) {
+  toast.success(message, { duration: 500 })
+}
+
+const PROMO_LIST_KEY = 'promotions'
 
 type PromotionWithRider = Promotion & { riders: Rider | null }
 
@@ -192,15 +199,14 @@ const initForm = () => ({
 })
 
 // 탭 재방문 시 로딩 없애기 위한 모듈 레벨 캐시
-let _promoCache: PromotionWithRider[] | null = null
 
 export default function PromotionsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-  const [promotions, setPromotions] = useState<PromotionWithRider[]>(_promoCache ?? [])
-  const [loading, setLoading] = useState(!_promoCache)
+  const [promotions, setPromotions] = useState<PromotionWithRider[]>(() => readAdminList<PromotionWithRider[]>(PROMO_LIST_KEY) ?? [])
+  const [loading, setLoading] = useState(() => !readAdminList<PromotionWithRider[]>(PROMO_LIST_KEY))
   const [regOpen, setRegOpen] = useState(false)
   const [saving, setSaving] = useSavingGuard()
   const [form, setForm] = useState(initForm)
@@ -217,9 +223,9 @@ export default function PromotionsPage() {
   useEffect(() => {
     if (userLoading) return
     if (!isAdmin && !userId) { setLoading(false); return }
-    if (_promoCache) {
-      // 캐시 존재 시 즉시 표시 후 백그라운드 갱신
-      setPromotions(_promoCache)
+    const cached = readAdminList<PromotionWithRider[]>(PROMO_LIST_KEY)
+    if (cached) {
+      setPromotions(cached)
       setLoading(false)
       fetchData(true)
     } else {
@@ -227,19 +233,6 @@ export default function PromotionsPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isAdmin, userLoading])
-
-  // 탭 전환 후 돌아왔을 때 자동 재조회
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && (userId || isAdmin)) {
-        _promoCache = null
-        fetchData(true)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isAdmin])
 
   const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) {
@@ -255,7 +248,7 @@ export default function PromotionsPage() {
       const promoRes = await q
       if (promoRes.data) {
         const data = promoRes.data as PromotionWithRider[]
-        _promoCache = data
+        writeAdminList(PROMO_LIST_KEY, data)
         setPromotions(data)
       }
     } catch (e) {
@@ -371,7 +364,7 @@ export default function PromotionsPage() {
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { toast.error('등록 실패: ' + (data?.error ?? res.statusText)); return }
-      toast.success(rider_ids.length > 0 ? `${rider_ids.length}명에게 프로모션이 등록되었습니다.` : '프로모션이 등록되었습니다.')
+      notifySaved(rider_ids.length > 0 ? `${rider_ids.length}명에게 프로모션이 등록되었습니다.` : '프로모션이 등록되었습니다.')
       bumpSettlementResults()
       setRegOpen(false); fetchData()
     } catch (e) {
@@ -385,9 +378,9 @@ export default function PromotionsPage() {
     if (!confirm('이 항목을 삭제하시겠습니까?')) return
     const { error } = await supabase.from('promotions').delete().eq('id', id)
     if (error) { toast.error('삭제 실패'); return }
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     const updated = promotions.filter(p => p.id !== id)
-    _promoCache = updated
+    writeAdminList(PROMO_LIST_KEY, updated)
     setPromotions(updated)
     // 상세 다이얼로그 갱신
     if (detailGroup) {
@@ -424,14 +417,14 @@ export default function PromotionsPage() {
         toast.error(data.error ?? '추가 실패')
         return
       }
-      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
+      notifySaved(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
       setDetailAddIds([])
       setDetailTab('info')
       await fetchData(true)
       setDetailGroup(prev => {
         if (!prev) return null
-        const fresh = (_promoCache ?? []).filter(p => groupKey(p) === prev.key)
+        const fresh = (readAdminList<PromotionWithRider[]>(PROMO_LIST_KEY) ?? []).filter(p => groupKey(p) === prev.key)
         return fresh.length > 0 ? { ...prev, promos: fresh } : null
       })
     } catch (e) {
@@ -476,7 +469,7 @@ export default function PromotionsPage() {
       const res = await fetchWithTimeout('/api/admin/promotions', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.promos.map(p => p.id), updates }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
-      toast.success('프로모션이 수정되었습니다.')
+      notifySaved('프로모션이 수정되었습니다.')
       bumpSettlementResults()
       setDetailTab('info')
       setDetailGroup(null)
@@ -493,7 +486,7 @@ export default function PromotionsPage() {
     const ids = g.promos.map(p => p.id)
     const { error } = await supabase.from('promotions').delete().in('id', ids)
     if (error) { toast.error('삭제 실패'); return }
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     bumpSettlementResults()
     setDetailGroup(null)
     fetchData()

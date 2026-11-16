@@ -26,24 +26,37 @@ function broadcastUser(data: UserCache) {
   _listeners.forEach(fn => fn(data))
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value) },
+      (error) => { clearTimeout(timer); reject(error) },
+    )
+  })
+}
+
 async function fetchUserProfile(): Promise<UserCache> {
   if (_promise) return _promise
 
   _promise = (async () => {
+    let sessionUser: User | null = null
     try {
       const supabase = createClient()
 
       // getSession()은 로컬(쿠키/localStorage) 읽기 → 즉시 userId 확보
-      const { data: { session } } = await supabase.auth.getSession()
+      const sessionResult = await withTimeout(supabase.auth.getSession(), 4_000).catch(() => null)
+      const session = sessionResult?.data.session ?? null
+      sessionUser = session?.user ?? null
       const quickUserId = session?.user?.id ?? null
 
       // getUser()(서버 검증)와 profiles 쿼리를 병렬 실행 → 약 300ms 절약
-      const [userResult, profileResult] = await Promise.all([
+      const [userResult, profileResult] = await withTimeout(Promise.all([
         supabase.auth.getUser(),
         quickUserId
           ? supabase.from('profiles').select('username, platform, logo_url').eq('id', quickUserId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
-      ])
+      ]), 8_000)
 
       const u = userResult.data.user
       if (!u) {
@@ -73,11 +86,16 @@ async function fetchUserProfile(): Promise<UserCache> {
       broadcastUser(result)
       return result
     } catch {
-      // 네트워크 오류 등 예외 상황에서도 loading이 멈추지 않도록 처리
-      const fallback: UserCache = {
-        user: null, isAdmin: false, platform: 'baemin',
-        userId: null, username: null, logoUrl: null,
-      }
+      // 네트워크가 멈춰도 세션이 있으면 화면은 그대로 열고, 없을 때만 비로그인으로 둔다.
+      const fallback: UserCache = _cache ?? (sessionUser
+        ? {
+            user: sessionUser, isAdmin: false, platform: 'baemin',
+            userId: sessionUser.id, username: null, logoUrl: null,
+          }
+        : {
+            user: null, isAdmin: false, platform: 'baemin',
+            userId: null, username: null, logoUrl: null,
+          })
       _cache = fallback
       broadcastUser(fallback)
       return fallback
@@ -101,6 +119,7 @@ function ensureAuthSubscription() {
     // INITIAL_SESSION: 페이지 로드 시 쿠키에서 세션 복원 → fetchUserProfile()이 이미 처리 중
     // TOKEN_REFRESHED: 토큰 자동 갱신 → 사용자 정보는 그대로이므로 재요청 불필요
     if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
+    if (event === 'SIGNED_IN' && _cache?.userId) return
 
     // SIGNED_IN / SIGNED_OUT / USER_UPDATED 등 실제 인증 이벤트만 처리
     _cache = null

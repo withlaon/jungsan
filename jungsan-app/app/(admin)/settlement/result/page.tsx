@@ -59,15 +59,16 @@ export default function SettlementResultPage() {
       return
     }
     let cancelled = false
-    setDetails([])
-
     const cached = readDetailsCache<DetailWithRider>(selectedId, 'result')
     if (cached != null) {
-      if (!cancelled) setDetails(cached)
+      setDetails(cached)
       return () => { cancelled = true }
     }
+    setDetails([])
 
     const sb = createClient()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12_000)
     ;(async () => {
       try {
         const { data, error } = await sb
@@ -75,14 +76,20 @@ export default function SettlementResultPage() {
           .select('*, riders(*)')
           .eq('settlement_id', selectedId)
           .order('final_amount', { ascending: false })
+          .abortSignal(controller.signal)
         if (cancelled || error || !data) return
         const rows = data as DetailWithRider[]
         writeDetailsCache(selectedId, 'result', rows)
         if (!cancelled) setDetails(rows)
       } catch { /* ignore */ }
+      finally { clearTimeout(timer) }
     })()
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      controller.abort()
+      clearTimeout(timer)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, refreshKey])
 

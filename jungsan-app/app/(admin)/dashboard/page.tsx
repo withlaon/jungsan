@@ -49,20 +49,31 @@ export default function DashboardPage() {
     }
     setAggLoading(true)
     const supabase = createClient()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12_000)
+    let cancelled = false
     ;(async () => {
       try {
         const { data, error } = await supabase
           .from('settlement_details')
           .select('settlement_id, promotion_amount, call_fee_deduction, income_tax_deduction, employment_insurance_addition, accident_insurance_addition')
           .in('settlement_id', settlements.map((s) => s.id))
-        if (!error && data) {
+          .abortSignal(controller.signal)
+        if (!cancelled && !error && data) {
           const rows = data as AggDetailRow[]
           writeAggCache(idsSortedKey, rows)
           setAllAgg(rows)
         }
       } catch { /* ignore */ }
-      setAggLoading(false)
+      if (!cancelled) setAggLoading(false)
+      clearTimeout(timer)
     })()
+    return () => {
+      cancelled = true
+      controller.abort()
+      clearTimeout(timer)
+      setAggLoading(false)
+    }
   }, [idsSortedKey, settlements.length])
 
   // 선택된 주차 상세 데이터 조회 (캐시 우선) + promotions 조회

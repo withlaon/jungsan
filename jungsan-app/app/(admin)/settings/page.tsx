@@ -18,6 +18,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Plus, Wrench, Trash2, Search, ChevronDown, RefreshCw, X, Phone, ShieldCheck, ChevronRight, UserCircle } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import { toast } from 'sonner'
+import { readAdminList, writeAdminList } from '@/lib/admin-list-cache'
+
+function notifySaved(message: string) {
+  toast.success(message, { duration: 500 })
+}
+
+const FEE_LIST_KEY = 'fees'
+const INS_LIST_KEY = 'insurance'
 
 type FeeWithRider = ManagementFee & { riders: Rider | null }
 type InsuranceFeeWithRider = InsuranceFee & { riders: Rider | null }
@@ -152,17 +160,15 @@ const initCall    = () => ({rider_ids:[] as string[],amount_per_call:'',date_mod
 const initInsurance = () => ({rider_ids:[] as string[],employment_fee:'',accident_fee:'',date_mode:'none' as 'week'|'deadline'|'none',week_start:weekOptions[0]?.value??'',deadline_date:'',memo:''})
 
 // 탭 재방문 시 로딩 없애기 위한 모듈 레벨 캐시
-let _feesCache: FeeWithRider[] | null = null
-let _insCache: InsuranceFeeWithRider[] | null = null
 
 export default function SettingsPage() {
   const supabase = createClient()
   const { userId, isAdmin, loading: userLoading } = useUser()
   const { riders: allRiders } = useRiders()
   const riders = allRiders.filter(r => r.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-  const [fees, setFees] = useState<FeeWithRider[]>(_feesCache ?? [])
-  const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>(_insCache ?? [])
-  const [loading, setLoading] = useState(!_feesCache)
+  const [fees, setFees] = useState<FeeWithRider[]>(() => readAdminList<FeeWithRider[]>(FEE_LIST_KEY) ?? [])
+  const [insuranceFees, setInsuranceFees] = useState<InsuranceFeeWithRider[]>(() => readAdminList<InsuranceFeeWithRider[]>(INS_LIST_KEY) ?? [])
+  const [loading, setLoading] = useState(() => !readAdminList<FeeWithRider[]>(FEE_LIST_KEY))
   const [dialogType, setDialogType] = useState<DialogType>(null)
   const [saving, setSaving] = useSavingGuard()
   const [generalForm, setGeneralForm] = useState(initGeneral)
@@ -185,9 +191,11 @@ export default function SettingsPage() {
   useEffect(()=>{
     if (userLoading) return
     if (!isAdmin && !userId) { setLoading(false); return }
-    if (_feesCache && _insCache) {
-      setFees(_feesCache)
-      setInsuranceFees(_insCache)
+    const cachedFees = readAdminList<FeeWithRider[]>(FEE_LIST_KEY)
+    const cachedIns = readAdminList<InsuranceFeeWithRider[]>(INS_LIST_KEY)
+    if (cachedFees && cachedIns) {
+      setFees(cachedFees)
+      setInsuranceFees(cachedIns)
       setLoading(false)
       fetchData(true)
     } else {
@@ -195,20 +203,6 @@ export default function SettingsPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isAdmin, userLoading])
-
-  // 탭 전환 후 돌아왔을 때 자동 재조회
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && (userId || isAdmin)) {
-        _feesCache = null
-        _insCache = null
-        fetchData(true)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isAdmin])
 
   const fetchData = async (silent = false) => {
     if (!userId && !isAdmin) {
@@ -224,12 +218,14 @@ export default function SettingsPage() {
         (() => { let q = supabase.from('insurance_fees').select('*, riders(*)').order('created_at',{ascending:false}).abortSignal(controller.signal); if (userId) q = q.eq('user_id', userId); return q })(),
       ])
       if (feesRes.data) {
-        _feesCache = feesRes.data as FeeWithRider[]
-        setFees(_feesCache)
+        const feeRows = feesRes.data as FeeWithRider[]
+        writeAdminList(FEE_LIST_KEY, feeRows)
+        setFees(feeRows)
       }
       if (insRes.data) {
-        _insCache = insRes.data as InsuranceFeeWithRider[]
-        setInsuranceFees(_insCache)
+        const insRows = insRes.data as InsuranceFeeWithRider[]
+        writeAdminList(INS_LIST_KEY, insRows)
+        setInsuranceFees(insRows)
       }
     } catch (e) {
       console.error('[SettingsPage] 로드 실패:', e)
@@ -290,7 +286,7 @@ export default function SettingsPage() {
       const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
-      toast.success(`일반관리비 ${rows.length}건 등록되었습니다.`)
+      notifySaved(`일반관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setGeneralForm(initGeneral());fetchData()
     } catch (e) {
@@ -310,7 +306,7 @@ export default function SettingsPage() {
       const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
-      toast.success(`콜관리비 ${rows.length}건 등록되었습니다.`)
+      notifySaved(`콜관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setCallForm(initCall());fetchData()
     } catch (e) {
@@ -331,7 +327,7 @@ export default function SettingsPage() {
       const res = await fetchWithTimeout('/api/admin/insurance-fees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ rows }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok){toast.error('등록 실패: '+(data?.error??res.statusText));return}
-      toast.success(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
+      notifySaved(`고용산재 관리비 ${rows.length}건 등록되었습니다.`)
       bumpSettlementResults()
       setDialogType(null);setInsuranceForm(initInsurance());fetchData()
     } catch (e) {
@@ -346,10 +342,10 @@ export default function SettingsPage() {
     if (!confirm('이 항목을 삭제하시겠습니까?')) return
     const {error}=await supabase.from('management_fees').delete().eq('id',id)
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     bumpSettlementResults()
     const updated=fees.filter(f=>f.id!==id)
-    _feesCache = updated
+    writeAdminList(FEE_LIST_KEY, updated)
     setFees(updated)
     if (detailFee){
       const fresh=updated.filter(f=>[...detailFee.items].map(x=>x.id).includes(f.id)||feeGroupKey(f)===detailFee.key)
@@ -362,7 +358,7 @@ export default function SettingsPage() {
     if (!confirm(`"${g.item_name}" 관리비 전체를 삭제하시겠습니까?`)) return
     const {error}=await supabase.from('management_fees').delete().in('id',g.items.map(i=>i.id))
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     bumpSettlementResults()
     setDetailFee(null);fetchData()
   }
@@ -370,10 +366,10 @@ export default function SettingsPage() {
     if (!confirm('이 항목을 삭제하시겠습니까?')) return
     const {error}=await supabase.from('insurance_fees').delete().eq('id',id)
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     bumpSettlementResults()
     const updated=insuranceFees.filter(f=>f.id!==id)
-    _insCache = updated
+    writeAdminList(INS_LIST_KEY, updated)
     setInsuranceFees(updated)
     if (detailIns){
       const freshGroup=updated.filter(f=>insGroupKey(f)===detailIns.key)
@@ -385,7 +381,7 @@ export default function SettingsPage() {
     if (!confirm('고용산재 관리비 전체를 삭제하시겠습니까?')) return
     const {error}=await supabase.from('insurance_fees').delete().in('id',g.items.map(i=>i.id))
     if (error){toast.error('삭제 실패');return}
-    toast.success('삭제되었습니다.')
+    notifySaved('삭제되었습니다.')
     bumpSettlementResults()
     setDetailIns(null);fetchData()
   }
@@ -419,14 +415,14 @@ export default function SettingsPage() {
         toast.error(data.error ?? '추가 실패')
         return
       }
-      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
+      notifySaved(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
       setFeeAddIds([])
       setFeeDetailTab('info')
       await fetchData(true)
       setDetailFee(prev => {
         if (!prev) return null
-        const fresh = (_feesCache ?? []).filter(f => feeGroupKey(f) === prev.key)
+        const fresh = (readAdminList<FeeWithRider[]>(FEE_LIST_KEY) ?? []).filter(f => feeGroupKey(f) === prev.key)
         return fresh.length > 0 ? { ...prev, items: fresh } : null
       })
     } catch (e) {
@@ -448,7 +444,7 @@ export default function SettingsPage() {
       const res = await fetchWithTimeout('/api/admin/management-fees', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.items.map(i => i.id), updates }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
-      toast.success('수정되었습니다.')
+      notifySaved('수정되었습니다.')
       bumpSettlementResults()
       setFeeDetailTab('info'); setDetailFee(null); fetchData()
     } catch (e) {
@@ -484,14 +480,14 @@ export default function SettingsPage() {
         toast.error(data.error ?? '추가 실패')
         return
       }
-      toast.success(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
+      notifySaved(`${data.inserted ?? newIds.length}명 라이더가 추가되었습니다.`)
       bumpSettlementResults()
       setInsAddIds([])
       setInsDetailTab('info')
       await fetchData(true)
       setDetailIns(prev => {
         if (!prev) return null
-        const fresh = (_insCache ?? []).filter(f => insGroupKey(f) === prev.key)
+        const fresh = (readAdminList<InsuranceFeeWithRider[]>(INS_LIST_KEY) ?? []).filter(f => insGroupKey(f) === prev.key)
         return fresh.length > 0 ? { ...prev, items: fresh } : null
       })
     } catch (e) {
@@ -513,7 +509,7 @@ export default function SettingsPage() {
       const res = await fetchWithTimeout('/api/admin/insurance-fees', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids: g.items.map(i => i.id), updates }), credentials: 'same-origin' }, 30_000)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { toast.error('수정 실패: ' + (data?.error ?? res.statusText)); return }
-      toast.success('수정되었습니다.')
+      notifySaved('수정되었습니다.')
       bumpSettlementResults()
       setInsDetailTab('info'); setDetailIns(null); fetchData()
     } catch (e) {
